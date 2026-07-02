@@ -400,10 +400,15 @@ function ChatMessagesView({
   );
 }
 
+// Kept broad and action-oriented so new users discover the range of things the
+// assistant can do (triage, rules, replies, labels) just by clicking.
 const CHAT_EXAMPLES = [
   "Help me handle my inbox today",
   "Clean up my inbox",
   "Suggest rules I should add",
+  "Create a rule to label newsletters",
+  "Which emails should I reply to?",
+  "Draft a reply to my latest email",
 ];
 
 function NewChatView({

@@ -24,6 +24,7 @@ type NavItem = {
   name: string;
   href: string;
   icon: LucideIcon | ((props: ComponentProps<"svg">) => React.ReactNode);
+  description?: string;
   target?: "_blank";
   count?: number;
   hideInMail?: boolean;
@@ -39,7 +40,7 @@ export function SideNavMenu({
   items: NavItem[];
   activeHref: string;
 }) {
-  const { closeMobileSidebar } = useSidebar();
+  const { closeMobileSidebar, isMobile } = useSidebar();
   const pathname = usePathname();
   const posthog = usePostHog();
   const currentAppPage = getAppPageFromPathname(pathname);
@@ -52,7 +53,23 @@ export function SideNavMenu({
             asChild
             isActive={item.active || activeHref === item.href}
             className="h-9"
-            tooltip={item.name}
+            tooltip={
+              item.description
+                ? {
+                    // Show name + description on hover in both the expanded and
+                    // collapsed sidebar so users can tell what each item does.
+                    hidden: isMobile,
+                    children: (
+                      <div className="max-w-52">
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.description}
+                        </p>
+                      </div>
+                    ),
+                  }
+                : item.name
+            }
             sidebarName="left-sidebar"
           >
             <Link

@@ -67,6 +67,7 @@ type NavItem = {
   name: string;
   href: string;
   icon: LucideIcon | (() => React.ReactNode);
+  description?: string;
   target?: "_blank";
   count?: number;
   hideInMail?: boolean;
@@ -88,16 +89,20 @@ export const useNavigation = () => {
         name: "Chat",
         href: prefixPath(currentEmailAccountId, "/assistant"),
         icon: MessageSquareIcon,
+        description:
+          "Ask the AI to triage, draft, label, and organize your mail",
       },
       {
         name: "Assistant",
         href: prefixPath(currentEmailAccountId, "/automation"),
         icon: SparklesIcon,
+        description: "Rules that automatically handle incoming email for you",
       },
       {
         name: "Channels",
         href: prefixPath(currentEmailAccountId, "/channels"),
         icon: MessagesSquareIcon,
+        description: "Get notified and take action in Slack and other channels",
       },
     ],
     [currentEmailAccountId],
@@ -109,16 +114,19 @@ export const useNavigation = () => {
         name: "Bulk Unsubscribe",
         href: prefixPath(currentEmailAccountId, "/bulk-unsubscribe"),
         icon: MailsIcon,
+        description: "See who emails you most and unsubscribe in bulk",
       },
       {
         name: "Bulk Archive",
         href: prefixPath(currentEmailAccountId, "/bulk-archive"),
         icon: ArchiveIcon,
+        description: "Quickly archive large batches of old email",
       },
       {
         name: "Analytics",
         href: prefixPath(currentEmailAccountId, "/stats"),
         icon: BarChartBigIcon,
+        description: "Understand your email volume, senders, and trends",
       },
       ...(isGoogleProvider(provider) && showCleaner
         ? [
@@ -126,6 +134,7 @@ export const useNavigation = () => {
               name: "Deep Clean",
               href: prefixPath(currentEmailAccountId, "/clean"),
               icon: BrushIcon,
+              description: "Clear out your inbox backlog with AI assistance",
               beta: true,
             },
           ]
@@ -140,6 +149,7 @@ export const useNavigation = () => {
         name: "Calendars",
         href: prefixPath(currentEmailAccountId, "/calendars"),
         icon: CalendarIcon,
+        description: "Connect calendars for scheduling and meeting context",
       },
       ...(showMeetingBriefs
         ? [
@@ -147,6 +157,7 @@ export const useNavigation = () => {
               name: "Meeting Briefs",
               href: prefixPath(currentEmailAccountId, "/briefs"),
               icon: FileTextIcon,
+              description: "Get prep notes and context before each meeting",
             },
           ]
         : []),
@@ -154,6 +165,7 @@ export const useNavigation = () => {
         name: "Attachments",
         href: prefixPath(currentEmailAccountId, "/drive"),
         icon: HardDriveIcon,
+        description: "Browse and manage files sent to your inbox",
         new: false,
       },
       ...(showIntegrations
@@ -162,6 +174,7 @@ export const useNavigation = () => {
               name: "Integrations",
               href: prefixPath(currentEmailAccountId, "/integrations"),
               icon: ZapIcon,
+              description: "Connect external tools and services",
               beta: true,
             },
           ]

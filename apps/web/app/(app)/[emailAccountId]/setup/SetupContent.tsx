@@ -144,7 +144,7 @@ const StepItem = ({
   linkProps,
   onMarkDone,
   showMarkDone,
-  markDoneText = "Mark Done",
+  markDoneText = "Skip for now",
   markDoneDisabled,
   markDonePending,
   onActionClick,
@@ -236,6 +236,7 @@ const StepItem = ({
                   onClick={handleMarkDone}
                   disabled={markDoneDisabled}
                   title={markDoneText}
+                  aria-label={markDoneText}
                   className="flex size-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-green-100 hover:text-green-600 dark:bg-slate-800 dark:text-slate-500 dark:hover:bg-green-900/50 dark:hover:text-green-400"
                 >
                   {markDonePending ? (
@@ -328,7 +329,12 @@ function Checklist({
     <Card className="mb-6 overflow-hidden">
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-foreground">Complete your setup</h2>
+          <div>
+            <h2 className="font-semibold text-foreground">Optional setup</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Every step is optional — skip anything you don't need.
+            </p>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:block">
               {completedCount} of {totalSteps} completed
@@ -510,7 +516,7 @@ function SetupPageContent({
         <PageHeading className="text-center">{`Welcome to ${BRAND_NAME}`}</PageHeading>
         <SectionDescription className="mt-2 text-center text-base">
           {shouldShowSetupChecklist
-            ? `Complete these steps to get the most out of ${BRAND_NAME}`
+            ? `${BRAND_NAME} already works out of the box — these steps are optional. Set up what's useful, or skip any of them for now.`
             : "What would you like to do?"}
         </SectionDescription>
       </div>

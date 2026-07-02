@@ -15,6 +15,20 @@ import { isInvalidGrantError, SafeError } from "@/utils/error";
 // Add buffer time to prevent token expiry during long-running operations
 const TOKEN_REFRESH_BUFFER_MS = 10 * 60 * 1000; // 10 minutes
 
+// The Graph SDK has no built-in request timeout, so a slow/stalled network
+// path can block sign-in for as long as the OS-level TCP timeout (often 60s+)
+// instead of failing fast with a retryable error.
+const GRAPH_REQUEST_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(message)), GRAPH_REQUEST_TIMEOUT_MS);
+    }),
+  ]);
+}
+
 // Wrapper class to hold both the Microsoft Graph client and its access token
 export class OutlookClient {
   private readonly client: Client;
@@ -74,15 +88,21 @@ export class OutlookClient {
 
   // Helper methods for common operations
   async getUserProfile(): Promise<User> {
-    return await this.client
-      .api("/me")
-      .select("id,displayName,mail,userPrincipalName")
-      .get();
+    return await withTimeout(
+      this.client
+        .api("/me")
+        .select("id,displayName,mail,userPrincipalName")
+        .get(),
+      "Timed out fetching Microsoft user profile",
+    );
   }
 
   async getUserPhoto(): Promise<string | null> {
     try {
-      const photoResponse = await this.client.api("/me/photo/$value").get();
+      const photoResponse = await withTimeout(
+        this.client.api("/me/photo/$value").get(),
+        "Timed out fetching Microsoft user photo",
+      );
 
       if (photoResponse) {
         const arrayBuffer = await photoResponse.arrayBuffer();

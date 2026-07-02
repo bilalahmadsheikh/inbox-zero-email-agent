@@ -11,6 +11,21 @@ minimumReleaseAgeExclude:
   - "@inboxzero/*"
   - "@inbox-zero/emulate"
 
+# tiptap-markdown's published package.json only declares @tiptap/core as a
+# peer dependency, but its bundled code imports from @tiptap/pm/* directly.
+# Under strict pnpm isolation this leaves @tiptap/pm unresolvable from within
+# tiptap-markdown's module scope, breaking the compose editor under Turbopack.
+packageExtensions:
+  "tiptap-markdown@0.8.10":
+    peerDependencies:
+      "@tiptap/pm": "^2.0.0"
+  # @hookform/resolvers imports zod/v4/core internally (the zod resolver
+  # subpath) but doesn't declare zod as a dependency or peer dependency, so
+  # it's unresolvable from its own module scope under strict pnpm isolation.
+  "@hookform/resolvers@5.2.2":
+    peerDependencies:
+      zod: "^4.0.0"
+
 overrides:
   "@hono/node-server": "1.19.14"
   "@tiptap/core": "2.27.2"

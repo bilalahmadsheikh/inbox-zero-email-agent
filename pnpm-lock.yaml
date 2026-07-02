@@ -23,6 +23,8 @@ overrides:
   vite: 7.3.6
   webpack: 5.106.2
 
+packageExtensionsChecksum: sha256-GivZiR3QsQd0NY2NoIsA1BFabsXbfNyCKq4R2Fl82gU=
+
 importers:
 
   .:
@@ -184,7 +186,7 @@ importers:
         version: 2.2.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@hookform/resolvers':
         specifier: 5.2.2
-        version: 5.2.2(react-hook-form@7.80.0(react@19.2.7))
+        version: 5.2.2(react-hook-form@7.80.0(react@19.2.7))(zod@4.2.1)
       '@inboxzero/image-proxy':
         specifier: workspace:*
         version: link:../../packages/image-proxy
@@ -595,7 +597,7 @@ importers:
         version: 1.0.7(tailwindcss@3.4.17)
       tiptap-markdown:
         specifier: 0.8.10
-        version: 0.8.10(@tiptap/core@2.27.2(@tiptap/pm@2.26.1))
+        version: 0.8.10(@tiptap/core@2.27.2(@tiptap/pm@2.26.1))(@tiptap/pm@2.26.1)
       tldts:
         specifier: 7.4.4
         version: 7.4.4
@@ -2838,6 +2840,7 @@ packages:
     resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
     peerDependencies:
       react-hook-form: ^7.55.0
+      zod: ^4.0.0
 
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
@@ -11580,6 +11583,7 @@ packages:
     resolution: {integrity: sha512-iDVkR2BjAqkTDtFX0h94yVvE2AihCXlF0Q7RIXSJPRSR5I0PA1TMuAg6FHFpmqTn4tPxJ0by0CK7PUMlnFLGEQ==}
     peerDependencies:
       '@tiptap/core': 2.27.2
+      '@tiptap/pm': ^2.0.0
 
   tldts-core@6.1.86:
     resolution: {integrity: sha512-Je6p7pkk+KMzMv2XXKmAE3McmolOQFdxkKw0R8EYNr7sELW46JqnNeTX8ybPiQgvg1ymCoF8LXs5fzFaZvJPTA==}
@@ -11659,6 +11663,7 @@ packages:
   tsconfck@3.1.6:
     resolution: {integrity: sha512-ks6Vjr/jEw0P1gmOVwutM3B7fWxoWBL2KRDb1JfqGVawBmO5UsvmWOQFGHBPl5yxYz4eERr19E6L7NMv+Fej4w==}
     engines: {node: ^18 || >=20}
+    deprecated: unmaintained
     hasBin: true
     peerDependencies:
       typescript: ^5.0.0
@@ -14453,10 +14458,11 @@ snapshots:
     dependencies:
       hono: 4.12.18
 
-  '@hookform/resolvers@5.2.2(react-hook-form@7.80.0(react@19.2.7))':
+  '@hookform/resolvers@5.2.2(react-hook-form@7.80.0(react@19.2.7))(zod@4.2.1)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.80.0(react@19.2.7)
+      zod: 4.2.1
 
   '@iconify/types@2.0.0': {}
 
@@ -24571,9 +24577,10 @@ snapshots:
     dependencies:
       '@popperjs/core': 2.11.8
 
-  tiptap-markdown@0.8.10(@tiptap/core@2.27.2(@tiptap/pm@2.26.1)):
+  tiptap-markdown@0.8.10(@tiptap/core@2.27.2(@tiptap/pm@2.26.1))(@tiptap/pm@2.26.1):
     dependencies:
       '@tiptap/core': 2.27.2(@tiptap/pm@2.26.1)
+      '@tiptap/pm': 2.26.1
       '@types/markdown-it': 13.0.9
       markdown-it: 14.1.1
       markdown-it-task-lists: 2.1.1

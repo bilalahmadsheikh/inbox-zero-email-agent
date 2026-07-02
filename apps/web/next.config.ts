@@ -465,7 +465,17 @@ function commonAncestorPath(firstPath: string, secondPath: string) {
     commonParts.push(firstParts[index]);
   }
 
-  return commonParts.length === 1 && commonParts[0] === ""
-    ? path.sep
-    : commonParts.join(path.sep);
+  if (commonParts.length === 1) {
+    // POSIX root ("/") and Windows drive root ("D:") both collapse to a
+    // single common segment, but joining that segment alone yields "" or
+    // "D:" — neither is an absolute path (Windows treats "D:" as
+    // drive-relative), so Turbopack rejects it and silently falls back to
+    // the project directory, which can't see packages symlinked outside it
+    // (e.g. a pnpm store living outside the repo).
+    if (commonParts[0] === "") return path.sep;
+    if (/^[A-Za-z]:$/.test(commonParts[0]))
+      return `${commonParts[0]}${path.sep}`;
+  }
+
+  return commonParts.join(path.sep);
 }

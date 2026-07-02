@@ -84,6 +84,7 @@
             "group": "Setup Guides",
             "pages": [
               "hosting/setup-guides",
+              "hosting/windows-local-dev",
               "hosting/google-oauth",
               "hosting/google-pubsub",
               "hosting/microsoft-oauth",

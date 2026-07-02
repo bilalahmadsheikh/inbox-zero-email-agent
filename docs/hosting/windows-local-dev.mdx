@@ -1,0 +1,185 @@
+---
+title: 'Windows Local Development'
+description: 'Setting up and running Inbox Zero locally on Windows, plus Windows-specific bugs and how they were fixed'
+---
+
+This guide walks through setting up Inbox Zero for local development on Windows (outside Docker, i.e. running `pnpm dev` directly). It also documents several Windows-specific bugs found and fixed along the way, in case you hit the same errors.
+
+<Note>
+  Most of this applies to any pnpm setup where the pnpm store lives outside the repo tree (e.g. a different drive), not strictly to Windows. Everything here should be safe to keep even if you later fix it a different way upstream.
+</Note>
+
+## Prerequisites
+
+- [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/)
+- [Node.js](https://nodejs.org/) v24+
+- [pnpm](https://pnpm.io/) v10+ (repo is pinned to `pnpm@11.9.0` via `packageManager` in `package.json`)
+
+## 1. Start Postgres + Redis
+
+```powershell
+docker compose -f docker-compose.dev.yml up -d
+```
+
+This starts `db` (Postgres), `redis`, and `redis-http` (serverless-redis-http, so the app can talk to Redis over HTTP like it would to Upstash in production).
+
+## 2. Install dependencies
+
+```powershell
+pnpm install
+```
+
+## 3. Create `apps/web/.env`
+
+Copy `apps/web/.env.example` to `apps/web/.env` and fill in the required values. At minimum, the app won't boot without:
+
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` / `DIRECT_URL` | Matches the Docker Compose defaults: `postgresql://postgres:password@localhost:5432/inboxzero?schema=public` |
+| `UPSTASH_REDIS_URL` | `http://localhost:8079` |
+| `UPSTASH_REDIS_TOKEN` | `dev_token` (matches the Compose default `SRH_TOKEN`) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | See [Google OAuth setup](#google--microsoft-oauth) below |
+| `GOOGLE_PUBSUB_TOPIC_NAME` | Required to be non-empty, but a placeholder like `"projects/abc/topics/xyz"` is fine for local dev — see [Is Pub/Sub necessary?](#is-google-pubsub-necessary) |
+| `AUTH_SECRET`, `EMAIL_ENCRYPT_SECRET`, `EMAIL_ENCRYPT_SALT`, `INTERNAL_API_KEY`, `API_KEY_SALT`, `CRON_SECRET` | Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` (use 16 bytes for `EMAIL_ENCRYPT_SALT`) |
+| `DEFAULT_LLMS` (and `ECONOMY_LLMS`/`CHAT_LLMS`/`NANO_LLMS`/`DRAFT_LLMS`) | Must be non-empty. Pick one provider block from `.env.example` and set the matching API key — see [LLM provider mismatch](#llm-provider-mismatch) below |
+
+Everything else in `.env.example` is optional for basic local dev (Slack, Sentry, Stripe, etc.).
+
+## 4. Run database migrations
+
+```powershell
+cd apps/web
+pnpm prisma migrate deploy
+cd ../..
+```
+
+<Warning>
+  Use `prisma migrate deploy`, **not** `prisma migrate dev`, for a first-time setup against the existing migration history. `migrate dev` does drift detection and will happily generate a *new* migration file (e.g. index `RenameIndex` statements) if your local Postgres/Prisma engine version produces slightly different default identifier names than whatever generated the checked-in migrations. That new migration file is a local artifact, not something to commit — if it happens to you, delete the generated migration folder, drop and recreate the local database, and run `migrate deploy` instead.
+</Warning>
+
+## 5. Start the dev server
+
+```powershell
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Windows-specific bugs and fixes
+
+These three bugs were hit setting this up on Windows with pnpm's store living outside the repo (`enableGlobalVirtualStore: true` in `pnpm-workspace.yaml`, store at the drive root, e.g. `D:\.pnpm-store`). All three stem from the same root cause: pnpm's strict, isolated `node_modules` means a package can only resolve what it actually declares as a dependency, and Turbopack is stricter than webpack about *how* it's allowed to resolve things.
+
+### Turbopack root fails to resolve `next` itself
+
+**Symptom:**
+```
+⚠ turbopack.root should be absolute, using: ...\apps\web
+Error: Turbopack build failed with 1 errors:
+./app
+Error: Next.js inferred your workspace root, but it may not be correct.
+    We couldn't find the Next.js package (next/package.json) from the project directory
+```
+
+**Cause:** `next.config.ts` computes `turbopack.root` as the common ancestor path between the repo root and wherever the `next` package physically resolves to (which, with a pnpm store outside the repo, can be on a completely different part of the filesystem). On Windows, when the *only* shared path segment is the drive letter, the common-ancestor helper returned the bare string `"D:"` — which Windows does **not** treat as an absolute path (it needs a trailing `\`, i.e. `"D:\\"`). Turbopack rejected the malformed root and silently fell back to `apps/web`, which is too narrow to reach the pnpm-store location where `next` actually lives.
+
+**Fix** ([`apps/web/next.config.ts`](../../apps/web/next.config.ts), in `commonAncestorPath`): special-case a lone drive-letter result and append `path.sep` so it's a valid Windows absolute path.
+
+### `tiptap-markdown` — `Module not found: Can't resolve '@tiptap/pm/model'`
+
+**Cause:** `tiptap-markdown@0.8.10` imports from `@tiptap/pm/*` in its source but only declares `@tiptap/core` as a peer dependency — `@tiptap/pm` is never declared anywhere in its `package.json`. Under npm/yarn's flat hoisting this accidentally works; under pnpm's strict per-package isolation, `tiptap-markdown` simply can't see `@tiptap/pm`, even though it's a normal dependency of `apps/web` itself.
+
+**Fix** ([`pnpm-workspace.yaml`](../../pnpm-workspace.yaml), `packageExtensions`): tell pnpm about the real dependency so it gets linked into `tiptap-markdown`'s own isolated `node_modules`:
+```yaml
+packageExtensions:
+  tiptap-markdown@0.8.10:
+    dependencies:
+      "@tiptap/pm": "*"
+```
+Then `pnpm install` again.
+
+### `@hookform/resolvers` — `Module not found: Can't resolve 'zod/v4/core'`
+
+**Cause:** same class of bug — `@hookform/resolvers`'s `./zod` subpath imports `zod/v4/core` internally, but `zod` is only listed as a `devDependency` of `@hookform/resolvers`, not a real dependency. The repo already has a workaround for this in `next.config.ts`'s `webpack` config (a manual `resolve.alias` pointing straight at the physical `zod/v4/core` file), but that alias only applies to webpack builds — `next dev --turbopack` (the repo's actual dev command) doesn't use it.
+
+Two things were tried before landing on the real fix:
+1. **Turbopack `resolveAlias` mirroring the webpack alias** — failed with `windows imports are not implemented yet`, because Turbopack's `resolveAlias` rejects raw Windows-style backslash paths.
+2. **Same alias, normalized to forward slashes** — got further, but then failed with `the chunking context (unknown) does not support external modules`: Turbopack refuses to inline an absolute filesystem path (outside normal package resolution) into a browser bundle at all, even though webpack allows it there.
+
+**Real fix** ([`pnpm-workspace.yaml`](../../pnpm-workspace.yaml), `packageExtensions`), same mechanism as the `tiptap-markdown` fix — make `zod` a real, resolvable dependency of `@hookform/resolvers` instead of hacking around it with a path alias:
+```yaml
+packageExtensions:
+  "@hookform/resolvers@5.2.2":
+    dependencies:
+      zod: "*"
+```
+This is more robust than the alias approach because it works identically under both webpack and Turbopack, with no bundler-specific special-casing.
+
+<Warning>
+  After adding a `packageExtensions` entry, `pnpm install` alone isn't always enough to see the fix take effect if Turbopack already has a stale persistent cache from a previous failed compile. If you still see the old error after reinstalling and restarting `pnpm dev`, delete `apps/web/.next` and restart again.
+</Warning>
+
+---
+
+## Common runtime issues
+
+### "Another next dev server is already running" / stale process on port 3000
+
+If a previous `pnpm dev` process didn't shut down cleanly (e.g. it was killed at the process-tree root but a child process survived), you'll see this on the next `pnpm dev`, or the browser will show `Jest worker encountered 2 child process exceptions, exceeding retry limit` (Next.js's internal worker pool, unrelated to the Jest test framework, crashing because its parent connection was severed uncleanly).
+
+Fix — find and kill whatever's still bound to port 3000, then restart:
+```powershell
+Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+pnpm dev
+```
+
+### Google/Microsoft OAuth emulators don't work on Windows
+
+`docker-compose.dev.yml`'s `google-emulator` / `microsoft-emulator` profiles mount the whole repo, including `node_modules`, into a Linux container (`.:/workspace`). Since `node_modules` here was installed for Windows, the container's `pnpm install` detects a platform mismatch and wants to purge and reinstall — but refuses non-interactively (`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`), so the container crash-loops.
+
+<Warning>
+  Don't try to force this through (e.g. by setting `CI=true` on the emulator service) — since the container shares the same `node_modules` directory as your host via the bind mount, letting it "succeed" would purge and reinstall Linux-native binaries over your working Windows `node_modules`, breaking your host dev server.
+</Warning>
+
+Workaround used here: skip the emulators entirely and use real Google/Microsoft OAuth apps instead — see below. If you specifically want the local emulator route on Windows, it needs a Docker named volume for `node_modules` instead of the shared bind mount (not yet done in this repo).
+
+## Google + Microsoft OAuth
+
+Real OAuth credentials are more reliable than the emulators on Windows (see above). Follow the existing guides:
+
+- [Google OAuth setup](/hosting/google-oauth) — redirect URI for local dev is `http://localhost:3000/api/auth/callback/google`
+- [Microsoft OAuth setup](/hosting/microsoft-oauth) — redirect URI for local dev is `http://localhost:3000/api/auth/callback/microsoft`
+
+Once you have real credentials, remove/comment out `GOOGLE_BASE_URL` in `.env` — it's only meant for pointing at the local emulator, and leaving it set while using real credentials makes Google API/OAuth calls try to hit `localhost:4002` instead of Google, failing with `ECONNREFUSED`.
+
+### "Error 403: access_denied" on Google sign-in
+
+Expected if your Google Cloud OAuth app is still in **Testing** publish status (the normal state for local/self-hosted dev) and the account you're signing in with hasn't been added as a test user. Fix: [Google Cloud Console → Audience](https://console.cloud.google.com/auth/audience) → **Test users** → add the exact Google account email → retry (no restart needed).
+
+### Is Google Pub/Sub necessary?
+
+No, not for local dev. Pub/Sub only powers real-time push notifications (Google notifying the app the instant new mail arrives, instead of polling). `GOOGLE_PUBSUB_TOPIC_NAME` must be a non-empty string to pass env validation, but a placeholder value is fine — the Gmail watch-setup call will fail against Google (since the topic doesn't exist), but that failure is caught and logged as non-fatal ([`utils/email/watch-manager.ts`](../../apps/web/utils/email/watch-manager.ts)) rather than blocking sign-in or core usage. Only set up real Pub/Sub ([guide](/hosting/google-pubsub)) if you want live push notifications.
+
+### LLM provider mismatch
+
+`DEFAULT_LLMS`/`ECONOMY_LLMS`/etc. use a `provider:model` format, and the provider prefix must match whichever API key you put in `LLM_API_KEY`. For example, an OpenAI key (`sk-proj-...`) needs `openai:` prefixed model names, not `openrouter:`:
+```bash
+DEFAULT_LLMS=openai:gpt-5.4-mini
+ECONOMY_LLMS=openai:gpt-5.4-nano
+CHAT_LLMS=openai:gpt-5.4-mini
+NANO_LLMS=openai:gpt-5.4-nano
+DRAFT_LLMS=openai:gpt-5.4-mini
+LLM_API_KEY=sk-proj-...
+```
+A mismatched provider/key pair won't fail at startup (env validation only checks the fields are non-empty) — it fails at runtime the first time an AI feature is used. See [LLM setup](/hosting/llm-setup) for all supported providers.
+
+## Day-to-day
+
+Once set up, restarting a dev session is just:
+```powershell
+docker compose -f docker-compose.dev.yml up -d   # if containers aren't already running
+pnpm dev
+```
+`Ctrl+C` to stop. Containers keep running in the background between sessions unless you explicitly `docker compose -f docker-compose.dev.yml down`.

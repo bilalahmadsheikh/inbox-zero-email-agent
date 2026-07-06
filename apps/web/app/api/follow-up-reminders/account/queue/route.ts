@@ -5,7 +5,7 @@ import { createScopedLogger } from "@/utils/logger";
 import { getQueueRetryBackoffSeconds } from "@/utils/queue/retry";
 import { processFollowUpRemindersForEmailAccountId } from "@/utils/follow-up/process";
 
-export const maxDuration = 300; // Hobby plan caps at 300s (was 800)
+export const maxDuration = 800;
 
 const logger = createScopedLogger("follow-up-reminders/account/queue");
 

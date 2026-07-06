@@ -5,7 +5,7 @@ import { captureException } from "@/utils/error";
 import type { Logger } from "@/utils/logger";
 import { ensureEmailAccountsWatched } from "@/utils/email/watch-manager";
 
-export const maxDuration = 300; // Hobby plan caps at 300s (was 800)
+export const maxDuration = 800;
 
 export const GET = withError("watch/all", async (request) => {
   if (!hasCronSecret(request)) {

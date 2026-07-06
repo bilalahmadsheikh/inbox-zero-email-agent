@@ -14,6 +14,7 @@ const _prisma =
   (new PrismaClient({
     adapter: new PrismaPg({
       connectionString: env.PREVIEW_DATABASE_URL ?? env.DATABASE_URL,
+      max: env.DATABASE_POOL_MAX,
     }),
   })
     .$extends(encryptedTokens)

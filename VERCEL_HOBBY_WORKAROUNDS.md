@@ -128,14 +128,19 @@ Vercel Hobby also caps `maxDuration` at 300 seconds per function:
 > "admin". Serverless Functions must have a maxDuration between 1 and 300
 > for plan hobby.
 
-Five routes were set to `maxDuration = 800` (clearly intentional — these
-are long-running background jobs). All five were capped to `300`:
+Six routes/pages were set to `maxDuration = 800` (clearly intentional —
+these are long-running background jobs; the admin page's own comment
+notes it needs Vercel's Fluid Compute add-on for 800s). All six were
+capped to `300`:
 
 - `app/api/follow-up-reminders/account/queue/route.ts`
 - `app/api/follow-up-reminders/account/route.ts`
 - `app/api/follow-up-reminders/route.ts`
 - `app/api/meeting-briefs/route.ts`
 - `app/api/watch/all/route.ts`
+- `app/(app)/admin/page.tsx` (a **page**, not an API route — easy to miss
+  if you only grep `route.ts` files, which is exactly what happened here
+  the first time around)
 
 **Real functional risk**: if any of these jobs genuinely needs more than
 300s to finish on a given run (e.g., an account with a large mailbox or
@@ -144,7 +149,8 @@ letting it complete, until this is reverted.
 
 ### Revert
 
-Once on Pro, change `maxDuration = 300` back to `maxDuration = 800` in all
-five files listed above.
+Once on Pro (and Fluid Compute enabled for the admin page), change
+`maxDuration = 300` back to `maxDuration = 800` in all six files listed
+above.
 
 After restoring all three workarounds, delete this file.

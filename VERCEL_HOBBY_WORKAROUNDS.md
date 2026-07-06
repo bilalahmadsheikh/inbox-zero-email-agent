@@ -118,4 +118,33 @@ Once on Pro, add this exact block back into `apps/web/vercel.json`
 }
 ```
 
-After restoring both workarounds, delete this file.
+## 3. `maxDuration` capped at 300s on five routes
+
+### Why
+
+Vercel Hobby also caps `maxDuration` at 300 seconds per function:
+
+> Builder returned invalid maxDuration value for Serverless Function
+> "admin". Serverless Functions must have a maxDuration between 1 and 300
+> for plan hobby.
+
+Five routes were set to `maxDuration = 800` (clearly intentional — these
+are long-running background jobs). All five were capped to `300`:
+
+- `app/api/follow-up-reminders/account/queue/route.ts`
+- `app/api/follow-up-reminders/account/route.ts`
+- `app/api/follow-up-reminders/route.ts`
+- `app/api/meeting-briefs/route.ts`
+- `app/api/watch/all/route.ts`
+
+**Real functional risk**: if any of these jobs genuinely needs more than
+300s to finish on a given run (e.g., an account with a large mailbox or
+many meetings), Vercel will now forcibly terminate it mid-run instead of
+letting it complete, until this is reverted.
+
+### Revert
+
+Once on Pro, change `maxDuration = 300` back to `maxDuration = 800` in all
+five files listed above.
+
+After restoring all three workarounds, delete this file.

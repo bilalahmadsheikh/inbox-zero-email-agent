@@ -246,6 +246,7 @@
         "VERCEL_ENV",
         "VERCEL_URL",
         "NODE_ENV",
+        "SKIP_TYPE_CHECK",
         "DATABASE_URL",
         "AUTH_SECRET",
         "AUTH_ALLOWED_EMAILS",

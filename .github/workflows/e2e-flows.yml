@@ -4,7 +4,7 @@ name: E2E Flow Tests
 # It uses the pre-built Docker image from ghcr.io/elie222/inbox-zero:latest
 # instead of building from source, saving ~5 minutes per run.
 #
-# To enable: Set the repository variable E2E_FLOWS_ENABLED=true
+# To enable it: Set the repository variable E2E_FLOWS_ENABLED=true
 # To disable: Remove the variable or set it to anything other than "true"
 
 on:

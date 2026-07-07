@@ -52,6 +52,9 @@ const parsedEnv = createEnv({
   server: {
     NODE_ENV: z.enum(["development", "production", "test"]),
     DATABASE_URL: z.string().url(),
+    // Max pg pool connections per server instance. Set low (2-5) on
+    // serverless platforms hitting Postgres directly without a pooler.
+    DATABASE_POOL_MAX: z.coerce.number().int().positive().optional(),
     DATABASE_URL_UNPOOLED: z.string().url().optional(),
     PREVIEW_DATABASE_URL: z.string().url().optional(),
     PREVIEW_DATABASE_URL_UNPOOLED: z.preprocess(

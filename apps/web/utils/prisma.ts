@@ -19,7 +19,7 @@ export default _prisma;
 function createPrismaClient() {
   const pool = new Pool({
     connectionString: env.PREVIEW_DATABASE_URL ?? env.DATABASE_URL,
-    max: env.DATABASE_POOL_MAX,
+    max: env.DATABASE_POOL_MAX ?? 5,
   });
 
   // Serverless instances are frozen after responding, which suspends the

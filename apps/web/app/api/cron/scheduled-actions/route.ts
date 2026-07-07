@@ -10,6 +10,7 @@ import {
   executeScheduledAction,
 } from "@/utils/scheduled-actions/executor";
 import { markQStashActionAsExecuting } from "@/utils/scheduled-actions/scheduler";
+import { processScheduledEmails } from "@/utils/scheduled-send/executor";
 import { env } from "@/env";
 import type { Logger } from "@/utils/logger";
 
@@ -25,14 +26,21 @@ export const GET = withError("cron/scheduled-actions", async (request) => {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  // Compose "send later" emails are always cron-swept, even with QStash.
+  const scheduledEmails = await processScheduledEmails(request.logger);
+
   if (env.QSTASH_TOKEN) {
     request.logger.info("QStash configured, skipping cron fallback");
-    return NextResponse.json({ skipped: true, reason: "qstash-configured" });
+    return NextResponse.json({
+      skipped: true,
+      reason: "qstash-configured",
+      scheduledEmails,
+    });
   }
 
   const result = await processScheduledActions(request.logger);
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, scheduledEmails });
 });
 
 export const POST = withError("cron/scheduled-actions", async (request) => {
@@ -43,14 +51,21 @@ export const POST = withError("cron/scheduled-actions", async (request) => {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  // Compose "send later" emails are always cron-swept, even with QStash.
+  const scheduledEmails = await processScheduledEmails(request.logger);
+
   if (env.QSTASH_TOKEN) {
     request.logger.info("QStash configured, skipping cron fallback");
-    return NextResponse.json({ skipped: true, reason: "qstash-configured" });
+    return NextResponse.json({
+      skipped: true,
+      reason: "qstash-configured",
+      scheduledEmails,
+    });
   }
 
   const result = await processScheduledActions(request.logger);
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, scheduledEmails });
 });
 
 async function processScheduledActions(logger: Logger) {

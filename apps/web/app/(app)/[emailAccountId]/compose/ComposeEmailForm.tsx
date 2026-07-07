@@ -7,7 +7,15 @@ import {
   ComboboxOption,
   ComboboxOptions,
 } from "@headlessui/react";
-import { CheckCircleIcon, TrashIcon, XIcon } from "lucide-react";
+import { CheckCircleIcon, ClockIcon, TrashIcon, XIcon } from "lucide-react";
+import {
+  addDays,
+  addHours,
+  format,
+  nextMonday,
+  setHours,
+  setMinutes,
+} from "date-fns";
 import { useCallback, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import useSWR from "swr";
@@ -21,7 +29,19 @@ import { ButtonLoader } from "@/components/Loading";
 import { env } from "@/env";
 import { extractNameFromEmail } from "@/utils/email";
 import { Tiptap, type TiptapHandle } from "@/components/editor/Tiptap";
-import { sendEmailAction } from "@/utils/actions/mail";
+import { scheduleSendAction, sendEmailAction } from "@/utils/actions/mail";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { ContactsResponse } from "@/app/api/google/contacts/route";
 import type { SendEmailBody } from "@/utils/gmail/mail";
 import { CommandShortcut } from "@/components/ui/command";
@@ -74,15 +94,60 @@ export const ComposeEmailForm = ({
     },
   });
 
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [customPickerOpen, setCustomPickerOpen] = useState(false);
+  const [customSendAt, setCustomSendAt] = useState("");
+
+  const enrichData = useCallback(
+    (data: SendEmailBody) => ({
+      ...data,
+      replyToEmail: getReplyToEmailPayload(data.replyToEmail),
+      messageHtml: showFullContent
+        ? data.messageHtml || ""
+        : `${data.messageHtml || ""}<br>${replyingToEmail?.quotedContentHtml || ""}`,
+    }),
+    [showFullContent, replyingToEmail],
+  );
+
+  const scheduleSend = useCallback(
+    (sendAt: Date) =>
+      handleSubmit(async (data) => {
+        setIsScheduling(true);
+        try {
+          const { attachments: _attachments, ...email } = enrichData(data);
+          const res = await scheduleSendAction(emailAccountId, {
+            ...email,
+            sendAt,
+          });
+          if (res?.serverError || res?.validationErrors) {
+            toastError({
+              description:
+                res?.serverError ??
+                "There was an error scheduling the email :(",
+            });
+          } else if (res?.data) {
+            toastSuccess({
+              description: `Scheduled — will send ${format(sendAt, "EEE, MMM d 'at' h:mm a")}`,
+            });
+            setCustomPickerOpen(false);
+            onSuccess?.("", "");
+          }
+        } catch (error) {
+          console.error(error);
+          toastError({
+            description: "There was an error scheduling the email :(",
+          });
+        } finally {
+          setIsScheduling(false);
+        }
+        refetch?.();
+      })(),
+    [handleSubmit, enrichData, emailAccountId, onSuccess, refetch],
+  );
+
   const onSubmit: SubmitHandler<SendEmailBody> = useCallback(
     async (data) => {
-      const enrichedData = {
-        ...data,
-        replyToEmail: getReplyToEmailPayload(data.replyToEmail),
-        messageHtml: showFullContent
-          ? data.messageHtml || ""
-          : `${data.messageHtml || ""}<br>${replyingToEmail?.quotedContentHtml || ""}`,
-      };
+      const enrichedData = enrichData(data);
 
       try {
         const res = await sendEmailAction(emailAccountId, enrichedData);
@@ -101,7 +166,7 @@ export const ComposeEmailForm = ({
 
       refetch?.();
     },
-    [refetch, onSuccess, showFullContent, replyingToEmail, emailAccountId],
+    [refetch, onSuccess, enrichData, emailAccountId],
   );
 
   useHotkeys(
@@ -341,11 +406,91 @@ export const ComposeEmailForm = ({
       />
 
       <div className="flex items-center justify-between">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting && <ButtonLoader />}
-          Send
-          <CommandShortcut className="ml-2">{symbol}+Enter</CommandShortcut>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="submit" disabled={isSubmitting || isScheduling}>
+            {isSubmitting && <ButtonLoader />}
+            Send
+            <CommandShortcut className="ml-2">{symbol}+Enter</CommandShortcut>
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting || isScheduling}
+              >
+                {isScheduling ? (
+                  <ButtonLoader />
+                ) : (
+                  <ClockIcon className="mr-2 h-4 w-4" />
+                )}
+                Send later
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onClick={() => scheduleSend(addHours(new Date(), 1))}
+              >
+                In 1 hour
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  scheduleSend(
+                    setMinutes(setHours(addDays(new Date(), 1), 8), 0),
+                  )
+                }
+              >
+                Tomorrow 8:00 AM
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  scheduleSend(
+                    setMinutes(setHours(nextMonday(new Date()), 8), 0),
+                  )
+                }
+              >
+                Monday 8:00 AM
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setCustomPickerOpen(true);
+                }}
+              >
+                Custom time…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Popover open={customPickerOpen} onOpenChange={setCustomPickerOpen}>
+            <PopoverTrigger asChild>
+              <span />
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto p-3">
+              <div className="flex items-end gap-2">
+                <div className="space-y-1">
+                  <span className="block text-sm font-medium">Send at</span>
+                  <input
+                    type="datetime-local"
+                    className="block rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                    value={customSendAt}
+                    min={format(new Date(), "yyyy-MM-dd'T'HH:mm")}
+                    onChange={(event) => setCustomSendAt(event.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  disabled={!customSendAt || isScheduling}
+                  onClick={() => scheduleSend(new Date(customSendAt))}
+                >
+                  Schedule
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
 
         {onDiscard && (
           <Button

@@ -194,6 +194,7 @@ model EmailAccount {
   chatMemories     ChatMemory[]
   digests          Digest[]
   scheduledActions ScheduledAction[]
+  scheduledEmails  ScheduledEmail[]
   responseTimes    ResponseTime[]
   actions          Action[]
 
@@ -760,6 +761,36 @@ model ScheduledAction {
   @@index([executedRuleId])
   @@index([status, scheduledFor])
   @@index([emailAccountId, messageId])
+}
+
+// A user-composed email scheduled from the compose window ("Send later").
+// Unlike ScheduledAction, it is not tied to a rule or an existing message.
+model ScheduledEmail {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailAccountId String
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+
+  to           String
+  cc           String?
+  bcc          String?
+  replyTo      String?
+  subject      String
+  messageHtml  String
+  replyToEmail Json? // threading info matching sendEmailBody.replyToEmail
+
+  sendAt   DateTime
+  status   ScheduledEmailStatus @default(PENDING)
+  attempts Int                  @default(0)
+
+  sentMessageId String?
+  sentThreadId  String?
+  error         String?
+
+  @@index([status, sendAt])
+  @@index([emailAccountId, status])
 }
 
 // Notes:
@@ -1859,6 +1890,14 @@ enum ScheduledActionStatus {
 enum SchedulingStatus {
   PENDING
   SCHEDULED
+  FAILED
+}
+
+enum ScheduledEmailStatus {
+  PENDING
+  SENDING
+  SENT
+  CANCELLED
   FAILED
 }
 

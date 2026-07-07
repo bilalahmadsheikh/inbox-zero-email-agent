@@ -3,6 +3,11 @@
 import { z } from "zod";
 import prisma from "@/utils/prisma";
 import { sendEmailBody } from "@/utils/gmail/mail";
+import {
+  cancelScheduledEmailBody,
+  scheduleSendBody,
+} from "@/utils/actions/mail.validation";
+import { ScheduledEmailStatus } from "@/generated/prisma/enums";
 import { actionClient } from "@/utils/actions/safe-action";
 import { SafeError } from "@/utils/error";
 import { createEmailProvider } from "@/utils/email/provider";
@@ -257,3 +262,50 @@ export const sendEmailAction = actionClient
       };
     },
   );
+
+export const scheduleSendAction = actionClient
+  .metadata({ name: "scheduleSend" })
+  .inputSchema(scheduleSendBody)
+  .action(async ({ ctx: { emailAccountId }, parsedInput }) => {
+    const { sendAt, replyToEmail, ...email } = parsedInput;
+
+    const scheduledEmail = await prisma.scheduledEmail.create({
+      data: {
+        emailAccountId,
+        to: email.to,
+        cc: email.cc,
+        bcc: email.bcc,
+        replyTo: email.replyTo,
+        subject: email.subject,
+        messageHtml: email.messageHtml,
+        ...(replyToEmail ? { replyToEmail } : {}),
+        sendAt,
+      },
+    });
+
+    return {
+      success: true,
+      id: scheduledEmail.id,
+      sendAt: scheduledEmail.sendAt,
+    };
+  });
+
+export const cancelScheduledEmailAction = actionClient
+  .metadata({ name: "cancelScheduledEmail" })
+  .inputSchema(cancelScheduledEmailBody)
+  .action(async ({ ctx: { emailAccountId }, parsedInput }) => {
+    const result = await prisma.scheduledEmail.updateMany({
+      where: {
+        id: parsedInput.id,
+        emailAccountId,
+        status: ScheduledEmailStatus.PENDING,
+      },
+      data: { status: ScheduledEmailStatus.CANCELLED },
+    });
+
+    if (result.count === 0) {
+      throw new SafeError("Scheduled email not found or already sent");
+    }
+
+    return { success: true };
+  });

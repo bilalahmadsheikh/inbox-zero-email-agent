@@ -5,6 +5,7 @@ import { env } from "@/env";
 import { PrismaClient } from "@/generated/prisma/client";
 import { encryptedTokens } from "@/utils/prisma-extensions";
 import { auditPrismaQueries } from "@/utils/audit/prisma-extension";
+import { retryConnectionSlotExhaustion } from "@/utils/prisma-connection-retry";
 
 declare global {
   var prisma: PrismaClient | undefined;
@@ -28,8 +29,12 @@ function createPrismaClient() {
   // until idle connections have actually closed.
   if (process.env.VERCEL) attachDatabasePool(pool);
 
-  // Create the Prisma client with extensions, but cast it back to PrismaClient for type compatibility
+  // Create the Prisma client with extensions, but cast it back to PrismaClient for type compatibility.
+  // retryConnectionSlotExhaustion must stay last: later extensions run closer
+  // to the engine, and retrying from outside encryptedTokens would re-encrypt
+  // args that it mutates in place.
   return new PrismaClient({ adapter: new PrismaPg(pool) })
     .$extends(encryptedTokens)
-    .$extends(auditPrismaQueries) as unknown as PrismaClient;
+    .$extends(auditPrismaQueries)
+    .$extends(retryConnectionSlotExhaustion) as unknown as PrismaClient;
 }

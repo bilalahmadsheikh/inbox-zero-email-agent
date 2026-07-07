@@ -109,6 +109,13 @@ const sendEmailToolInputSchema = z
       .trim()
       .min(1)
       .describe("HTML body content for the email draft."),
+    sendAt: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "Only when the user asks to schedule the email for later: the UTC instant to send it, as an ISO 8601 string (e.g. 2026-07-09T04:00:00Z). Convert natural language like 'tomorrow at 9am' using the user's timezone and the current time from context. Must be at least 2 minutes in the future and at most 90 days out. Omit entirely for immediate sends.",
+      ),
   })
   .strict();
 const replyEmailToolInputSchema = z
@@ -1235,7 +1242,7 @@ export const sendEmailTool = ({
 }) =>
   tool({
     description:
-      "Prepare a new email to send. This does NOT send immediately — it returns a confirmation payload for the user to approve.",
+      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately — it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time.",
     inputSchema: sendEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "send_email", email, logger });
@@ -1243,6 +1250,16 @@ export const sendEmailTool = ({
       const parsedInput = sendEmailToolInputSchema.safeParse(input);
       if (!parsedInput.success) {
         return { error: getSendEmailValidationError(parsedInput.error) };
+      }
+
+      if (parsedInput.data.sendAt) {
+        const sendAt = new Date(parsedInput.data.sendAt);
+        if (sendAt.getTime() < Date.now() + 60 * 1000) {
+          return {
+            error:
+              "sendAt must be at least a minute in the future. Recompute it from the current time in context and try again.",
+          };
+        }
       }
 
       try {
@@ -1406,6 +1423,7 @@ function createPendingSendEmailOutput(
       subject: input.subject,
       messageHtml: input.messageHtml,
       from,
+      sendAt: input.sendAt || null,
     },
   };
 }

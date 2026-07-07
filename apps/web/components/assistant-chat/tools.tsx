@@ -426,6 +426,7 @@ type EmailConfirmationResult = {
   to?: string | null;
   subject?: string | null;
   confirmedAt: string;
+  scheduledFor?: string | null;
 };
 
 export function ReadEmailResult({ output }: { output: unknown }) {
@@ -615,6 +616,17 @@ function EmailActionResult({
   const displaySubject = decodeHtmlEntities(subject || referenceSubject);
   const body = getActionBodyText({ actionType, pendingAction });
   const [editedBody, setEditedBody] = useState(body || "");
+  const pendingSendAt = getPendingString(pendingAction, "sendAt");
+  const scheduledFor = confirmationResult?.scheduledFor || pendingSendAt;
+  const scheduledForLabel = scheduledFor
+    ? new Date(scheduledFor).toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
 
   const messageId =
     confirmationResult?.messageId ||
@@ -672,7 +684,9 @@ function EmailActionResult({
 
       setConfirmationResultOverride(parsed);
       toastSuccess({
-        description: getAssistantEmailSuccessMessage(actionType),
+        description: parsed.scheduledFor
+          ? "Email scheduled."
+          : getAssistantEmailSuccessMessage(actionType),
       });
     } catch {
       toastError({ description: "Could not confirm this email action." });
@@ -682,7 +696,9 @@ function EmailActionResult({
   };
 
   const sentLabel = isConfirmed
-    ? getEmailActionSentLabel(actionType)
+    ? confirmationResult?.scheduledFor
+      ? "Scheduled email to"
+      : getEmailActionSentLabel(actionType)
     : actionLabel;
 
   return (
@@ -702,6 +718,11 @@ function EmailActionResult({
           {bcc && (
             <div className="mt-0.5 text-xs text-muted-foreground">
               BCC: {bcc}
+            </div>
+          )}
+          {scheduledForLabel && (
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Scheduled for: {scheduledForLabel}
             </div>
           )}
         </div>
@@ -825,7 +846,7 @@ function EmailActionResult({
               ) : (
                 <>
                   <SendIcon className="hidden size-3.5 sm:inline" />
-                  Send
+                  {pendingSendAt ? "Schedule" : "Send"}
                 </>
               )}
             </Button>
@@ -2097,6 +2118,7 @@ function parseConfirmationResult(
     threadId: asString(value.threadId) || null,
     to: asString(value.to) || null,
     subject: asString(value.subject) || null,
+    scheduledFor: asString(value.scheduledFor) || null,
   };
 }
 

@@ -469,6 +469,37 @@ async function confirmPendingSendEmailAction({
   const messageHtml = contentOverride
     ? convertNewlinesToBr(escapeHtml(contentOverride))
     : output.pendingAction.messageHtml;
+
+  if (output.pendingAction.sendAt) {
+    // If the confirmation card sat past the requested time, deliver on the
+    // next sweep rather than erroring on an already-approved email.
+    const sendAt = new Date(
+      Math.max(new Date(output.pendingAction.sendAt).getTime(), Date.now()),
+    );
+
+    const scheduledEmail = await prisma.scheduledEmail.create({
+      data: {
+        emailAccountId,
+        to: output.pendingAction.to,
+        cc: output.pendingAction.cc || undefined,
+        bcc: output.pendingAction.bcc || undefined,
+        subject: output.pendingAction.subject,
+        messageHtml,
+        sendAt,
+      },
+    });
+
+    return {
+      actionType: output.actionType,
+      messageId: null,
+      threadId: null,
+      to: output.pendingAction.to,
+      subject: output.pendingAction.subject,
+      confirmedAt,
+      scheduledFor: scheduledEmail.sendAt.toISOString(),
+    };
+  }
+
   const sentAfter = new Date();
 
   const result = await emailProvider.sendEmailWithHtml({

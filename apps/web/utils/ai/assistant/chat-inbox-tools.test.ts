@@ -103,6 +103,78 @@ describe("chat inbox tools", () => {
     });
   });
 
+  it("carries sendAt into the pending action for scheduled sends", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      sendAt,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({ sendAt }),
+    });
+  });
+
+  it("defaults pendingAction.sendAt to null for immediate sends", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+    });
+
+    expect(result).toMatchObject({
+      pendingAction: expect.objectContaining({ sendAt: null }),
+    });
+  });
+
+  it("rejects scheduled sends whose sendAt is in the past", async () => {
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      sendAt: new Date(Date.now() - 1000).toISOString(),
+    });
+
+    expect(result).toMatchObject({
+      error: expect.stringContaining("future"),
+    });
+    expect(createEmailProvider).not.toHaveBeenCalled();
+  });
+
   it("rejects sendEmail input when recipient has no email address", async () => {
     const toolInstance = sendEmailTool({
       email: TEST_EMAIL,

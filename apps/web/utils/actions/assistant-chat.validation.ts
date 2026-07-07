@@ -18,6 +18,7 @@ const confirmationResultSchema = z.object({
   to: z.string().nullish(),
   subject: z.string().nullish(),
   confirmedAt: z.string().min(1),
+  scheduledFor: z.string().nullish(),
 });
 export type AssistantEmailConfirmationResult = z.infer<
   typeof confirmationResultSchema
@@ -37,6 +38,7 @@ export const pendingSendEmailToolOutputSchema = z.object({
     subject: z.string().trim().min(1),
     messageHtml: z.string().trim().min(1),
     from: z.string().nullish(),
+    sendAt: z.string().nullish(),
   }),
   confirmationResult: confirmationResultSchema.optional(),
 });

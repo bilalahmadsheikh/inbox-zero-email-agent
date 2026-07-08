@@ -28,7 +28,6 @@ import {
   Badge,
   type BadgeVariant,
 } from "@/components/new-landing/common/Badge";
-import { BrandScroller } from "@/components/new-landing/BrandScroller";
 
 interface HeroProps {
   badge?: React.ReactNode;
@@ -89,7 +88,7 @@ export function HeroVideoPlayer() {
   return (
     <BlurFade delay={0.125 * 9}>
       <div className="relative w-full">
-        <div className="relative border border-[#EFEFEF] rounded-3xl md:rounded-[43px] overflow-hidden block">
+        <div className="relative block overflow-hidden rounded-3xl border border-[var(--landing-border)] bg-[var(--landing-surface)] shadow-[var(--landing-shadow)] md:rounded-[43px]">
           <Dialog>
             <DialogTrigger
               asChild
@@ -132,10 +131,5 @@ export function HeroVideoPlayer() {
 }
 
 export function HeroContent() {
-  return (
-    <>
-      <BrandScroller />
-      <HeroVideoPlayer />
-    </>
-  );
+  return <HeroVideoPlayer />;
 }

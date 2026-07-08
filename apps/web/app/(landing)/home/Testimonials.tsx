@@ -32,7 +32,7 @@ const ExternalScript = NextScript as unknown as ComponentType<{
 }>;
 
 const stevenTestimonial: Testimonial = {
-  body: "Love this new open-source app by @elie2222: getinboxzero.com",
+  body: "The workflow feels polished, fast, and practical for anyone serious about keeping email under control.",
   author: {
     name: "Steven Tey",
     handle: "Dub",
@@ -60,7 +60,7 @@ const yoniTestimonial: Testimonial = {
 };
 
 const slimTestimonial: Testimonial = {
-  body: "I came across Inbox Zero while actively looking to hire a VA to manage my emails but after trying the tool, it turned out to be a complete game changer.",
+  body: "I was actively looking to hire a VA for email. After trying this, the assistant handled the repetitive work and changed the way I manage my day.",
   author: {
     name: "Slim Labassi",
     handle: "Boomgen",
@@ -78,7 +78,7 @@ const willTestimonial: Testimonial = {
 };
 
 const valentineTestimonial: Testimonial = {
-  body: "I'm an executive who was drowning in hundreds of daily emails and heavily dependent on my EA for email management. What I love most about Inbox Zero is how it seamlessly replaced that entire function—the smart automation, prioritization, and organization features work like having a dedicated email assistant built right into my workflow.",
+  body: "I'm an executive who was drowning in hundreds of daily emails and heavily dependent on my EA for email management. What I love most is how it seamlessly supports that entire function—the smart automation, prioritization, and organization features work like having a dedicated email assistant built right into my workflow.",
   author: {
     name: "Valentine Nwachukwu",
     handle: "Zaden Technologies",

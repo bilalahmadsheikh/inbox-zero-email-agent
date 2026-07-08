@@ -176,11 +176,6 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
-        source: "/github",
-        destination: "https://go.getinboxzero.com/github",
-        permanent: true,
-      },
-      {
         source: "/ios",
         destination:
           "https://apps.apple.com/app/inbox-zero-ai-email/id6759736561",
@@ -193,18 +188,8 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       {
-        source: "/discord",
-        destination: "https://go.getinboxzero.com/discord",
-        permanent: true,
-      },
-      {
         source: "/linkedin",
         destination: "https://go.getinboxzero.com/linkedin",
-        permanent: true,
-      },
-      {
-        source: "/contact",
-        destination: "/support",
         permanent: true,
       },
       {
@@ -226,21 +211,6 @@ const nextConfig: NextConfig = {
         source: "/newsletters",
         destination: "/bulk-unsubscribe",
         permanent: false,
-      },
-      {
-        source: "/docs",
-        destination: "https://docs.getinboxzero.com",
-        permanent: true,
-      },
-      {
-        source: "/docs/:path*",
-        destination: "https://docs.getinboxzero.com/:path*",
-        permanent: true,
-      },
-      {
-        source: "/api-reference/cli",
-        destination: "https://docs.getinboxzero.com",
-        permanent: true,
       },
       {
         source: "/request-access",
@@ -343,12 +313,21 @@ const nextConfig: NextConfig = {
       },
     ];
 
+    // Browsers cache 308 redirects permanently. Old builds shipped
+    // /contact -> /support and /docs -> external, so dev browsers replay them
+    // and 404 without ever hitting the server. Purging the origin's HTTP
+    // cache on each dev response evicts those stale redirects.
+    const devCachePurgeHeaders = isDevelopment
+      ? [{ key: "Clear-Site-Data", value: '"cache"' }]
+      : [];
+
     return [
       {
         // Apply all security headers + static CORS to non-auth routes
         source: "/((?!api/auth).*)",
         headers: [
           ...securityHeaders,
+          ...devCachePurgeHeaders,
           {
             key: "Access-Control-Allow-Origin",
             value: env.NEXT_PUBLIC_BASE_URL,

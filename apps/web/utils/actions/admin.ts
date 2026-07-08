@@ -23,6 +23,7 @@ import {
   loadResponseTimeDataBody,
   disableAllRulesBody,
   cleanupDraftsBody,
+  terminateIdleDbConnectionsBody,
 } from "@/utils/actions/admin.validation";
 import { ensureEmailAccountsWatched } from "@/utils/email/watch-manager";
 import { syncAppleSubscriptionToDb } from "@/ee/billing/apple";
@@ -30,6 +31,7 @@ import {
   cleanupAIDraftsForAccount,
   getConfiguredDraftCleanupDays,
 } from "@/utils/ai/draft-cleanup";
+import { terminateIdleDbConnections } from "@/utils/db-connections";
 import {
   getAdminResponseTimeProviderDelayMs,
   getResponseTimeStats,
@@ -754,3 +756,18 @@ async function findUserByUserOrAccountEmail(email: string) {
 
   return emailAccount?.user ?? null;
 }
+
+export const adminTerminateIdleDbConnectionsAction = adminActionClient
+  .metadata({ name: "adminTerminateIdleDbConnections" })
+  .inputSchema(terminateIdleDbConnectionsBody)
+  .action(async ({ parsedInput: { minIdleSeconds }, ctx: { logger } }) => {
+    const result = await terminateIdleDbConnections({ minIdleSeconds });
+
+    logger.warn("Terminated idle DB connections from admin monitor", {
+      minIdleSeconds,
+      terminatedCount: result.terminatedCount,
+      candidateCount: result.sessions.length,
+    });
+
+    return result;
+  });

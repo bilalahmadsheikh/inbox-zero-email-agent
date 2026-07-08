@@ -54,3 +54,10 @@ export const cleanupDraftsBody = z.object({
   email: z.string().trim().email("Valid email address is required"),
 });
 export type CleanupDraftsBody = z.infer<typeof cleanupDraftsBody>;
+
+export const terminateIdleDbConnectionsBody = z.object({
+  minIdleSeconds: z.coerce.number().int().min(0).max(3600).default(0),
+});
+export type TerminateIdleDbConnectionsBody = z.infer<
+  typeof terminateIdleDbConnectionsBody
+>;

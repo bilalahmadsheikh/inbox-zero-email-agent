@@ -6,7 +6,7 @@ const LAYOUT_CLASSNAME = "max-w-6xl mx-auto px-6 lg:px-8 xl:px-0";
 
 export function BasicLayout(props: { children: React.ReactNode }) {
   return (
-    <div>
+    <div className="landing-theme min-h-screen overflow-hidden bg-[var(--landing-bg)] text-[var(--landing-text)] transition-colors duration-500">
       <Header className={LAYOUT_CLASSNAME} />
       <main className={cn("isolate", LAYOUT_CLASSNAME)}>{props.children}</main>
       <Footer className={LAYOUT_CLASSNAME} />

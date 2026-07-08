@@ -25,7 +25,7 @@ export function Privacy() {
 
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl lg:text-center">
-          <h2 className="font-title text-base leading-7 text-blue-600">
+          <h2 className="font-title text-base leading-7 text-emerald-800">
             Privacy first
           </h2>
           <p className="mt-2 font-title text-3xl text-gray-900 sm:text-4xl">
@@ -36,9 +36,9 @@ export function Privacy() {
             the highest security and privacy standards.
           </p>
           <p className="mt-2 text-lg leading-8 text-gray-600">
-            Inbox Zero is SOC2 compliant and CASA Tier 2 approved. It has
-            undergone a thorough security process with Google to ensure the
-            protection of your emails. You can even self-host Inbox Zero on your
+            Zynbox is built around SOC2 and CASA Tier 2 security expectations.
+            It has undergone a thorough security process with Google to ensure
+            the protection of your emails. You can even self-host Zynbox on your
             own infrastructure.
           </p>
         </div>

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Confetti } from "@/components/Confetti";
 import { getCelebrationImage } from "@/utils/celebration";
 import { Button } from "@/components/Button";
+import { BRAND_NAME } from "@/utils/branding";
 
 export function Celebration(props: { message: string }) {
   const [active, setActive] = useState(false);
@@ -34,7 +35,7 @@ export function Celebration(props: { message: string }) {
           size="2xl"
           onClick={() => {
             const tweet = encodeURIComponent(
-              "I made it to Inbox Zero thanks to @inboxzero_ai!",
+              `${BRAND_NAME} helped me clear my inbox.`,
             );
             const twitterIntentURL = `https://x.com/intent/tweet?text=${tweet}`;
             window.open(

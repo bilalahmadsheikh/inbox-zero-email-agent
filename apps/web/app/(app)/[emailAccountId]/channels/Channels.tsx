@@ -268,7 +268,7 @@ function ChannelsIntro({
     <section className="rounded-xl border border-blue-100 bg-blue-50/40 p-6 dark:border-blue-950 dark:bg-blue-950/20">
       <h2 className="flex items-start gap-2 text-lg font-semibold tracking-tight">
         <BellIcon className="mt-1 size-5 shrink-0 text-blue-600 dark:text-blue-400" />
-        <span>Inbox Zero where you work.</span>
+        <span>Zynbox where you work.</span>
       </h2>
       <MutedText className="mt-2 text-sm">
         Important emails, pre-drafted replies, meeting briefs, and a daily inbox
@@ -629,7 +629,7 @@ function LinkCodeDialog({
         <DialogHeader>
           <DialogTitle>Connect {providerName}</DialogTitle>
           <DialogDescription>
-            Send this command in a direct message with the Inbox Zero bot on{" "}
+            Send this command in a direct message with the Zynbox bot on{" "}
             {providerName}. The code is one-time use and expires in 10 minutes.
           </DialogDescription>
         </DialogHeader>

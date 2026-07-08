@@ -15,6 +15,7 @@ import { DebugLabels } from "@/app/(app)/admin/DebugLabels";
 import { PageWrapper } from "@/components/PageWrapper";
 import { PageHeader } from "@/components/PageHeader";
 import { AdminTopSpenders } from "@/app/(app)/admin/AdminTopSpenders";
+import { AdminDbConnections } from "@/app/(app)/admin/AdminDbConnections";
 
 // NOTE: Turn on Fluid Compute on Vercel to allow for 800 seconds max duration
 export const maxDuration = 800;
@@ -49,6 +50,7 @@ export default async function AdminPage() {
           <AdminSyncStripeCustomers />
         </div>
 
+        <AdminDbConnections />
         <AdminTopSpenders />
       </div>
     </PageWrapper>

@@ -1,4 +1,4 @@
----
+﻿---
 title: 'Slack Integration Setup'
 description: 'Set up the Slack bot for meeting briefs and AI assistant'
 ---
@@ -23,13 +23,13 @@ This configures all scopes, event subscriptions, and the bot user automatically.
 
 Under **OAuth & Permissions**:
 
-**Redirect URLs** — add:
+**Redirect URLs** â€” add:
 
 ```
 https://<your-domain>/api/slack/callback
 ```
 
-**Bot Token Scopes** — add these scopes:
+**Bot Token Scopes** â€” add these scopes:
 
 | Scope | Purpose |
 |-------|---------|
@@ -56,10 +56,10 @@ Under **Event Subscriptions**:
    https://<your-domain>/api/slack/events
    ```
 3. Under **Subscribe to bot events**, add:
-   - `message.im` — direct messages to the bot
-   - `app_mention` — @mentions in channels
-   - `assistant_thread_started` — initialize Slack assistant thread prompts
-   - `assistant_thread_context_changed` — respond to assistant context switches
+   - `message.im` â€” direct messages to the bot
+   - `app_mention` â€” @mentions in channels
+   - `assistant_thread_started` â€” initialize Slack assistant thread prompts
+   - `assistant_thread_context_changed` â€” respond to assistant context switches
 
 Slack will send a verification challenge to the URL; the app handles this automatically.
 

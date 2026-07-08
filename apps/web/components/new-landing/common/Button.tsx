@@ -35,14 +35,14 @@ export function Button({
       variants: {
         variant: {
           primary: [
-            "bg-gradient-to-b from-[#2965EC] to-[#5C89F8] text-white button-gradient-border shadow-[0px_2px_10.1px_0px_#4B83FD33] hover:shadow-[0px_2px_10.1px_0px_#4B83FD44]",
+            "bg-gradient-to-b from-[var(--landing-button-from)] to-[var(--landing-button-to)] text-[var(--landing-accent-contrast)] button-gradient-border shadow-[var(--landing-button-shadow)] hover:shadow-[var(--landing-button-shadow-hover)]",
             "relative overflow-hidden z-10",
-            "before:absolute before:inset-0 before:bg-gradient-to-b before:from-[#285EE5] before:to-[#5380F2] before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-200 before:z-0",
+            "before:absolute before:inset-0 before:bg-gradient-to-b before:from-[var(--landing-button-hover-from)] before:to-[var(--landing-button-hover-to)] before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-200 before:z-0",
           ],
           secondary:
-            "bg-white hover:bg-gray-50 border border-gray-100 hover:border-gray-200 text-gray-800",
+            "bg-[var(--landing-surface)] hover:bg-[var(--landing-surface-hover)] border border-[var(--landing-border)] text-[var(--landing-text)] shadow-[var(--landing-shadow-soft)]",
           "secondary-two":
-            "bg-white hover:bg-gray-50 border border-gray-100 hover:border-gray-200 text-gray-500 shadow-[0px_2px_16px_0px_#00000008] hover:shadow-[0px_2px_16px_0px_#00000015] [&>svg]:text-[#AEAAA8]",
+            "bg-[var(--landing-surface)] hover:bg-[var(--landing-surface-hover)] border border-[var(--landing-border)] text-[var(--landing-muted)] shadow-[var(--landing-shadow-soft)] hover:text-[var(--landing-text)] hover:shadow-[var(--landing-shadow)] [&>svg]:text-[var(--landing-accent)]",
         },
         size: {
           md: "text-sm py-2 px-4",
@@ -63,7 +63,7 @@ export function Button({
         className={cn(
           "hover:scale-[1.04] transition-all duration-200 will-change-transform",
           "rounded-[14px] p-[1px] bg-gradient-to-b",
-          "from-[#5989F0] to-[#578AFA] hover:from-[#4875d0] hover:to-[#396ecc]",
+          "from-[var(--landing-gold)] to-[var(--landing-button-to)] hover:from-[var(--landing-gold-strong)] hover:to-[var(--landing-button-hover-to)]",
           auto ? "w-full" : "w-fit",
         )}
       >

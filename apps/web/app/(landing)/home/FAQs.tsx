@@ -1,4 +1,3 @@
-import { Anchor } from "@/components/new-landing/common/Anchor";
 import { Card, CardContent } from "@/components/new-landing/common/Card";
 import { CardWrapper } from "@/components/new-landing/common/CardWrapper";
 import {
@@ -9,7 +8,6 @@ import {
   Paragraph,
   SectionHeading,
 } from "@/components/new-landing/common/Typography";
-import { env } from "@/env";
 import { BRAND_NAME } from "@/utils/branding";
 
 const faqs: {
@@ -24,52 +22,27 @@ const faqs: {
   },
   {
     question: "How can I request a feature?",
-    answer: (
-      <span>
-        Email us or post an issue on{" "}
-        <Anchor href="/github" newTab>
-          GitHub
-        </Anchor>
-        . We're happy to hear how we can improve your email experience.
-      </span>
-    ),
-    answerText:
-      "Email us or post an issue on GitHub. We're happy to hear how we can improve your email experience.",
+    answer:
+      "Send us a note through support with the workflow you want improved. We review product requests regularly.",
   },
   {
     question: `Will ${BRAND_NAME} replace my current email client?`,
-    answer: `No! ${BRAND_NAME} isn't an email client. It's used alongside your existing email client. You use Google or Outlook as normal.`,
+    answer: `No. ${BRAND_NAME} works alongside Gmail and Outlook so your current inbox stays familiar while automation handles the repetitive work.`,
   },
   {
-    question: "Is the code open-source?",
-    answer: (
-      <span>
-        Yes! You can see the entire source code for the inbox zero app in our{" "}
-        <Anchor href="/github" newTab>
-          GitHub repo
-        </Anchor>
-        .
-      </span>
-    ),
-    answerText:
-      "Yes! You can see the entire source code for the inbox zero app in our GitHub repo.",
+    question: "Is self-hosting available?",
+    answer:
+      "Yes. Teams can self-host when they need infrastructure-level control and custom deployment policies.",
   },
   {
     question: "Do you offer refunds?",
-    answer: (
-      <span>
-        Yes, if you don't think we provided you with value send us an{" "}
-        <Anchor href={`mailto:${env.NEXT_PUBLIC_SUPPORT_EMAIL}`}>email</Anchor>{" "}
-        within 14 days of upgrading and we'll refund you.
-      </span>
-    ),
-    answerText:
-      "Yes, if you don't think we provided you with value send us an email within 14 days of upgrading and we'll refund you.",
+    answer:
+      "Yes. If the product is not a fit, contact support within 14 days of upgrading and we will refund you.",
   },
   {
     question: `Can I try ${BRAND_NAME} for free?`,
     answer:
-      "Absolutely, we have a 7 day free trial on all of our plans so you can try it out right away, no credit card needed!",
+      "Absolutely. Plans include a 7 day free trial so you can try the workflow without a credit card.",
   },
 ];
 

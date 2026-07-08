@@ -1,15 +1,15 @@
----
+﻿---
 title: "Microsoft Teams Integration Setup"
-description: "Set up the Teams bot for Inbox Zero assistant chat."
+description: "Set up the Teams bot for The Inbox Intern assistant chat."
 ---
 
 # Microsoft Teams Integration Setup
 
-This guide is for self-hosted deployments that want to enable Teams chat with the Inbox Zero assistant.
+This guide is for self-hosted deployments that want to enable Teams chat with the The Inbox Intern assistant.
 
 ## What Teams currently supports
 
-- AI assistant chat in **direct messages** with the Inbox Zero bot
+- AI assistant chat in **direct messages** with the Inbox Intern bot
 - Account linking with one-time `/connect <code>` commands
 
 Currently not supported on Teams:
@@ -39,12 +39,12 @@ You can reuse the same Microsoft App ID you already use for Outlook OAuth. We re
 From your new Bot resource:
 
 1. Go to **Configuration**
-2. Copy **Microsoft App ID** — this is your `TEAMS_BOT_APP_ID`
+2. Copy **Microsoft App ID** â€” this is your `TEAMS_BOT_APP_ID`
 3. Click **Manage Password** (next to Microsoft App ID)
 4. In the App Registration page, go to **Certificates & secrets**
 5. Click **New client secret**, add a description, choose an expiry, click **Add**
-6. Copy the **Value** immediately (it's only shown once) — this is your `TEAMS_BOT_APP_PASSWORD`
-7. Go to **Overview** and copy **Directory (tenant) ID** — this is your `TEAMS_BOT_APP_TENANT_ID`
+6. Copy the **Value** immediately (it's only shown once) â€” this is your `TEAMS_BOT_APP_PASSWORD`
+7. Go to **Overview** and copy **Directory (tenant) ID** â€” this is your `TEAMS_BOT_APP_TENANT_ID`
 
 ## 3. Set the messaging endpoint
 
@@ -82,12 +82,12 @@ Create a `manifest.json` file with your bot details:
     "termsOfUseUrl": "https://your-domain.com/terms"
   },
   "name": {
-    "short": "Inbox Zero",
-    "full": "Inbox Zero Assistant"
+    "short": "The Inbox Intern",
+    "full": "The Inbox Intern Assistant"
   },
   "description": {
     "short": "AI email assistant",
-    "full": "Chat with your Inbox Zero AI assistant directly from Teams."
+    "full": "Chat with your The Inbox Intern AI assistant directly from Teams."
   },
   "icons": {
     "outline": "outline.png",
@@ -109,18 +109,18 @@ Create a `manifest.json` file with your bot details:
 
 Replace `<your-app-id>` with your `TEAMS_BOT_APP_ID` and `your-domain.com` with your actual domain.
 
-You'll also need two icon files: a 32×32 `outline.png` and a 192×192 `color.png`. Zip those three files together.
+You'll also need two icon files: a 32Ã—32 `outline.png` and a 192Ã—192 `color.png`. Zip those three files together.
 
 **To install for testing (sideloading):**
 
 1. In Teams, click **Apps** in the sidebar
-2. Click **Manage your apps** → **Upload an app**
+2. Click **Manage your apps** â†’ **Upload an app**
 3. Click **Upload a custom app** and select your zip file
 
 **For organization-wide deployment:**
 
 1. Go to the [Teams Admin Center](https://admin.teams.microsoft.com)
-2. Go to **Teams apps** → **Manage apps**
+2. Go to **Teams apps** â†’ **Manage apps**
 3. Click **Upload new app** and select your zip file
 4. Use **Setup policies** to control who can access the app
 
@@ -136,14 +136,14 @@ TEAMS_BOT_APP_TENANT_ID=      # required for the single-tenant Teams bot
 
 If `TEAMS_BOT_APP_ID`, `TEAMS_BOT_APP_PASSWORD`, or `TEAMS_BOT_APP_TENANT_ID` is missing, the Teams connect option is hidden in the UI and `/api/teams/events` returns `503`.
 
-## 7. Connect a user account from Inbox Zero
+## 7. Connect a user account from The Inbox Intern
 
-Each Inbox Zero email account links to a Teams user via a connect code:
+Each The Inbox Intern email account links to a Teams user via a connect code:
 
-1. In Inbox Zero, go to **Settings** → **Connected Apps**
+1. In The Inbox Intern, go to **Settings** â†’ **Connected Apps**
 2. Click **Connect Teams**
 3. Copy the generated command: `/connect <code>`
-4. Open a DM with the Inbox Zero bot in Teams
+4. Open a DM with the Inbox Intern bot in Teams
 5. Send the command
 
 After linking, the user can chat with the assistant in that DM.
@@ -156,7 +156,7 @@ Quick checks:
 2. Sending `/connect <code>` in the bot DM links the account
 3. A normal DM message gets an assistant response
 
-If linking fails, generate a new code — codes are one-time and expire after 10 minutes.
+If linking fails, generate a new code â€” codes are one-time and expire after 10 minutes.
 
 <Tip>
 
@@ -165,7 +165,7 @@ You can also set up most of this integration with the Azure CLI (`az`) instead o
 Example prompt:
 
 ```text
-Use Azure CLI to set up the Microsoft Teams integration for Inbox Zero. Create a single-tenant Entra app registration with a client secret, create an Azure Bot resource on the F0 tier, point it at https://<your-domain>/api/teams/events, enable the Teams channel, and then tell me exactly which environment variables and manual Azure/Teams UI steps are left for me to complete.
+Use Azure CLI to set up the Microsoft Teams integration for The Inbox Intern. Create a single-tenant Entra app registration with a client secret, create an Azure Bot resource on the F0 tier, point it at https://<your-domain>/api/teams/events, enable the Teams channel, and then tell me exactly which environment variables and manual Azure/Teams UI steps are left for me to complete.
 ```
 
 </Tip>

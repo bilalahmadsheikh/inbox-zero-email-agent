@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+﻿import { Fragment, type ReactNode } from "react";
 import Image from "next/image";
 import { Container } from "@/components/Container";
 import {
@@ -55,11 +55,11 @@ type SlackPreview = {
 const slackPreviews: SlackPreview[] = [
   {
     title: "Channel confirmation",
-    text: "✅ Inbox Zero connected! You can mention <@UAPP123> in this channel to chat about your emails. If you enable meeting briefs or attachment filing notifications, I can send those here too.",
+    text: "âœ… Zynbox connected! You can mention <@UAPP123> in this channel to chat about your emails. If you enable meeting briefs or attachment filing notifications, I can send those here too.",
   },
   {
     title: "Connection onboarding DM",
-    text: "✅ Inbox Zero connected. Next, choose a private channel in Inbox Zero Settings for meeting brief and attachment notifications, then invite <@UAPP123> there. You can also DM me anytime to chat about your emails.",
+    text: "âœ… Zynbox connected. Next, choose a private channel in Zynbox Settings for meeting brief and attachment notifications, then invite <@UAPP123> there. You can also DM me anytime to chat about your emails.",
   },
   {
     title: "Automation channel message",
@@ -223,11 +223,12 @@ export default function SlackComponentsPage() {
     <Container size="6xl">
       <div className="space-y-8 py-8">
         <div className="space-y-3">
-          <TextLink href="/components">← Components</TextLink>
+          <TextLink href="/components">â† Components</TextLink>
           <div className="space-y-2">
             <PageHeading>Slack Components</PageHeading>
             <PageSubHeading>
-              Storybook-style previews for Slack messages sent by Inbox Zero.
+              Storybook-style previews for Slack messages sent by The Inbox
+              Intern.
             </PageSubHeading>
           </div>
         </div>
@@ -259,7 +260,7 @@ function SlackPreviewCard({ preview }: { preview: SlackPreview }) {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className="text-[15px] font-bold leading-5 text-[#f8f8f8]">
-                Inbox Zero
+                Zynbox
               </span>
               <span className="rounded bg-[#383a40] px-1 text-[10px] font-bold leading-4 text-[#d1d2d3]">
                 APP
@@ -361,7 +362,7 @@ function SlackButton({ element }: { element: SlackElement }) {
         className="h-9 rounded border border-[#5e6167] bg-transparent px-3 text-sm font-bold text-[#f8f8f8]"
         type="button"
       >
-        {element.placeholder?.text ?? "More"} ▾
+        {element.placeholder?.text ?? "More"} â–¾
       </button>
     );
   }
@@ -465,7 +466,7 @@ function renderSlackLink(part: string, index: number) {
   const value = part.slice(1, -1);
 
   if (value.startsWith("@")) {
-    const displayName = value === "@UAPP123" ? "@Inbox Zero" : value;
+    const displayName = value === "@UAPP123" ? "@Zynbox" : value;
 
     return (
       <span

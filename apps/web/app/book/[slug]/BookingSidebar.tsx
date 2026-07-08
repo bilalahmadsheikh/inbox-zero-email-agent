@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
 import {
   Calendar as CalendarIcon,
   Check,
@@ -28,7 +27,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { BRAND_ICON_URL, BRAND_NAME } from "@/utils/branding";
 import { getSupportedTimezonesWithOffsets } from "@/utils/timezone";
 import { cn } from "@/utils";
 import {
@@ -36,8 +34,6 @@ import {
   type HourFormat,
   type Slot,
 } from "./booking-helpers";
-
-const BRAND_HOMEPAGE_URL = "https://www.getinboxzero.com";
 
 type BookingLink = Omit<GetPublicBookingLinkResponse, "locationValue"> & {
   locationValue: string | null;
@@ -99,23 +95,9 @@ export function BookingSidebar({
           {bookingLink.description}
         </p>
       ) : null}
-      <a
-        href={BRAND_HOMEPAGE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-auto flex items-center gap-1.5 border-t pt-4 text-xs text-muted-foreground transition-colors hover:text-foreground"
-      >
-        Powered by
-        <Image
-          src={BRAND_ICON_URL}
-          alt={`${BRAND_NAME} icon`}
-          width={14}
-          height={14}
-          className="rounded-sm"
-          unoptimized
-        />
-        <span>{BRAND_NAME}</span>
-      </a>
+      <div className="mt-auto border-t pt-4 text-xs text-muted-foreground">
+        Powered by Devaicon
+      </div>
     </div>
   );
 }

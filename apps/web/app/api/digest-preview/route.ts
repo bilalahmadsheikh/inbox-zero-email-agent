@@ -1,9 +1,10 @@
-import type { NextRequest } from "next/server";
+﻿import type { NextRequest } from "next/server";
 import { render } from "@react-email/render";
 import DigestEmail, {
   type DigestEmailProps,
 } from "@inboxzero/resend/emails/digest";
 import { digestPreviewBody } from "@/app/api/digest-preview/validation";
+import { env } from "@/env";
 
 // http://localhost:3000/api/digest-preview?categories=["Newsletter","Receipt","Marketing","Cold Emails"]
 export async function GET(request: NextRequest) {
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
 
 function createMockDigestData(categories: string[]): DigestEmailProps {
   const digestData: DigestEmailProps = {
-    baseUrl: "https://www.getinboxzero.com",
+    baseUrl: env.NEXT_PUBLIC_BASE_URL,
     unsubscribeToken: "preview-token",
     emailAccountId: "preview-account",
     date: new Date(),
@@ -53,7 +54,7 @@ function createMockDigestData(categories: string[]): DigestEmailProps {
     newsletter: [
       {
         from: "Morning Brew",
-        subject: "🔥 Today's top business stories",
+        subject: "ðŸ”¥ Today's top business stories",
         content:
           "Apple unveils Vision Pro 2 with 40% lighter design and $2,499 price tag",
       },
@@ -84,7 +85,7 @@ function createMockDigestData(categories: string[]): DigestEmailProps {
       },
       {
         from: "Nike",
-        subject: "JUST IN: New Summer Collection 🔥",
+        subject: "JUST IN: New Summer Collection ðŸ”¥",
         content: "Be the first to shop our latest styles before they sell out",
       },
     ],
@@ -93,7 +94,7 @@ function createMockDigestData(categories: string[]): DigestEmailProps {
         from: "Sarah Johnson",
         subject: "Team Weekly Sync",
         content:
-          "Title: Team Weekly Sync\nDate: Tomorrow, 10:00 AM - 11:00 AM • Meeting Room 3 / Zoom",
+          "Title: Team Weekly Sync\nDate: Tomorrow, 10:00 AM - 11:00 AM â€¢ Meeting Room 3 / Zoom",
       },
     ],
     notification: [
@@ -107,7 +108,7 @@ function createMockDigestData(categories: string[]): DigestEmailProps {
       {
         from: "John Smith",
         subject: "Re: Project proposal feedback",
-        content: "Received: Yesterday, 4:30 PM • Due: Today",
+        content: "Received: Yesterday, 4:30 PM â€¢ Due: Today",
       },
     ],
     coldEmail: [

@@ -10,7 +10,7 @@ export function Heading({ children, className }: HeadingProps) {
   return (
     <h1
       className={cn(
-        "font-title text-[#242424] text-[34px] sm:text-5xl md:text-6xl leading-tight",
+        "font-title text-[var(--landing-text)] text-[34px] sm:text-5xl md:text-6xl leading-tight",
         className,
       )}
     >
@@ -21,10 +21,15 @@ export function Heading({ children, className }: HeadingProps) {
 
 interface PageHeadingProps {
   children: React.ReactNode;
+  className?: string;
 }
 
-export function PageHeading({ children }: PageHeadingProps) {
-  return <Heading className="mx-auto max-w-[780px]">{children}</Heading>;
+export function PageHeading({ children, className }: PageHeadingProps) {
+  return (
+    <Heading className={cn("mx-auto max-w-[780px]", className)}>
+      {children}
+    </Heading>
+  );
 }
 
 interface SectionHeadingProps {
@@ -61,7 +66,7 @@ export function Subheading({ children, className }: SubheadingProps) {
   return (
     <h2
       className={cn(
-        "font-title text-[#242424] text-[1.7rem] md:text-[2.5rem] leading-tight",
+        "font-title text-[var(--landing-text)] text-[1.7rem] md:text-[2.5rem] leading-tight",
         className,
       )}
     >
@@ -88,12 +93,12 @@ export function Paragraph({
   const paragraphStyles = cva("font-geist", {
     variants: {
       color: {
-        default: "text-[#848484]",
-        light: "text-gray-400",
-        dark: "text-[#3D3D3D]",
-        "gray-700": "text-gray-700",
-        "gray-500": "text-gray-500",
-        "gray-900": "text-gray-900",
+        default: "text-[var(--landing-muted)]",
+        light: "text-[var(--landing-muted-soft)]",
+        dark: "text-[var(--landing-text)]",
+        "gray-700": "text-[var(--landing-muted)]",
+        "gray-500": "text-[var(--landing-muted)]",
+        "gray-900": "text-[var(--landing-text)]",
       },
       size: {
         default: "text-sm md:text-base",

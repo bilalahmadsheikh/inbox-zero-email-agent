@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { SparklesIcon } from "lucide-react";
 import {
@@ -77,17 +77,17 @@ export default function Components() {
 
         <div className="space-y-1">
           <div>
-            <TextLink href="/components/tools">Assistant Tools →</TextLink>
+            <TextLink href="/components/tools">Assistant Tools â†’</TextLink>
           </div>
           <div>
-            <TextLink href="/components/chat">Chat Components →</TextLink>
+            <TextLink href="/components/chat">Chat Components â†’</TextLink>
           </div>
           <div>
-            <TextLink href="/components/slack">Slack Components →</TextLink>
+            <TextLink href="/components/slack">Slack Components â†’</TextLink>
           </div>
           <div>
             <TextLink href="/components/onboarding">
-              Onboarding Components →
+              Onboarding Components â†’
             </TextLink>
           </div>
         </div>
@@ -1010,20 +1010,20 @@ function getActivityLogEntries(): ActivityLogEntry[] {
     {
       id: "2",
       from: "ZenDaily <zendaily@substack.com>",
-      subject: "🔮 ZenDaily - 15th Dec 2025 🔮",
+      subject: "ðŸ”® ZenDaily - 15th Dec 2025 ðŸ”®",
       status: "processing",
       ruleName: "Newsletter",
     },
     {
       id: "3",
-      from: "Elie Steinbock <elie@getinboxzero.com>",
+      from: "Elie Steinbock <hello@devaicon.com>",
       subject: "talk tomorrow",
       status: "processing",
     },
     {
       id: "4",
       from: "Morning Brew <crew@morningbrew.com>",
-      subject: "☕ Gathering storm",
+      subject: "â˜• Gathering storm",
       status: "waiting",
     },
     {

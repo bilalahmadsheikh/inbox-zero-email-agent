@@ -1,9 +1,9 @@
----
+﻿---
 title: 'EC2 Deployment'
-description: 'Deploy Inbox Zero on AWS EC2 with ALB'
+description: 'Deploy The Inbox Intern on AWS EC2 with ALB'
 ---
 
-This guide covers setting up Inbox Zero on AWS EC2 with an Application Load Balancer.
+This guide covers setting up The Inbox Intern on AWS EC2 with an Application Load Balancer.
 
 **Note:** This is a reference implementation. There are many ways to deploy on AWS (ECS, EKS, Elastic Beanstalk, etc.). Use what works best for your infrastructure and expertise.
 
@@ -105,14 +105,14 @@ You can also use nginx or any approach of your choice.
 
 1.  **Request SSL Certificate (AWS Certificate Manager):**
     *   Go to **AWS Certificate Manager** console
-    *   Click **Request certificate** → **Request a public certificate**
+    *   Click **Request certificate** â†’ **Request a public certificate**
     *   Enter your domain name (e.g., `app.yourdomain.com`)
     *   Choose **DNS validation** (easier) or **Email validation**
     *   Follow validation steps: AWS will provide a CNAME record to add to your DNS. Once added, the certificate will be issued in 5-10 minutes.
     *   Wait for certificate status to show **Issued**
 
 2.  **Create Target Group:**
-    *   Go to **EC2 Console** → **Target Groups** → **Create target group**
+    *   Go to **EC2 Console** â†’ **Target Groups** â†’ **Create target group**
     *   Name: e.g., `inbox-zero-web`
     *   Target type: **Instances**
     *   Protocol: **HTTP**, Port: **3000**
@@ -120,7 +120,7 @@ You can also use nginx or any approach of your choice.
     *   Click **Next**, select your EC2 instance, click **Include as pending below**, then **Next**, then **Create target group**
 
 3.  **Create Application Load Balancer:**
-    *   Go to **EC2 Console** → **Load Balancers** → **Create load balancer**
+    *   Go to **EC2 Console** â†’ **Load Balancers** â†’ **Create load balancer**
     *   Choose **Application Load Balancer**
     *   Name: `inbox-zero-alb`
     *   Scheme: **Internet-facing**
@@ -128,14 +128,14 @@ You can also use nginx or any approach of your choice.
     *   Network mapping: Select at least 2 availability zones
     *   Security groups: Create/select one that allows HTTP (80) and HTTPS (443) from anywhere
     *   **Listeners:**
-        *   Add listener: **HTTPS (443)** → Forward to your target group
-        *   (Optional) Add listener: **HTTP (80)** → Redirect to HTTPS
+        *   Add listener: **HTTPS (443)** â†’ Forward to your target group
+        *   (Optional) Add listener: **HTTP (80)** â†’ Redirect to HTTPS
     *   **Secure listener settings**: Select your ACM certificate
     *   Click **Create load balancer**
 
 4.  **Update DNS:**
     *   Wait for the ALB to finish provisioning (status: **Active**, takes 2-5 minutes)
-    *   Find the ALB DNS name in **EC2 Console** → **Load Balancers** → click your ALB → copy the **DNS name**
+    *   Find the ALB DNS name in **EC2 Console** â†’ **Load Balancers** â†’ click your ALB â†’ copy the **DNS name**
     *   In your DNS provider, create a CNAME record:
         *   **Name:** Your domain/subdomain (e.g., `test` for `test.yourdomain.com` or `@` for root domain)
         *   **Target:** `<ALB-DNS-name>` (e.g., `inbox-zero-alb-123456789.us-east-1.elb.amazonaws.com`)
@@ -143,7 +143,7 @@ You can also use nginx or any approach of your choice.
 
 5.  **Update Security Group:**
     *   Your EC2 instance security group should allow traffic from the ALB security group on port 3000
-    *   Add a new port 3000 rule with source set to the ALB's security group (find it in ALB → Security tab)
+    *   Add a new port 3000 rule with source set to the ALB's security group (find it in ALB â†’ Security tab)
     *   This allows only the ALB to access your app on port 3000, not the public internet
 
 ## 4. Deployment

@@ -76,7 +76,7 @@ export function Card({
 }: CardProps) {
   const cardVariants = cva(
     [
-      "text-left flex flex-col border border-[#E7E7E780] bg-white shadow-[0px_3px_12.9px_0px_#97979714]",
+      "text-left flex flex-col border border-[var(--landing-border)] bg-[var(--landing-surface)] shadow-[var(--landing-shadow-soft)] backdrop-blur-xl transition-colors",
     ],
     {
       variants: {

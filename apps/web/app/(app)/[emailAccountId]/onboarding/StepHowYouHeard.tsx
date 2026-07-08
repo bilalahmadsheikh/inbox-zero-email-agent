@@ -152,7 +152,7 @@ export function StepHowYouHeard({ onNext }: { onNext: () => void }) {
       </IconCircle>
 
       <div className="text-center mt-4">
-        <PageHeading>How did you hear about Inbox Zero?</PageHeading>
+        <PageHeading>How did you hear about Zynbox?</PageHeading>
         <TypographyP className="mt-2 max-w-lg mx-auto">
           We'd love to know how you found us.
         </TypographyP>

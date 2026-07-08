@@ -31,9 +31,9 @@ const geist = Geist({
   display: "swap",
 });
 
-const title = `${BRAND_NAME} | Automate and clean your inbox`;
+const title = `${BRAND_NAME} | Your AI email operations assistant`;
 const description =
-  "Your AI executive assistant to reach inbox zero fast. Automate emails, bulk unsubscribe, block cold emails, and analytics. Open-source";
+  "A polished AI email operations assistant that organizes priority mail, drafts replies, cleans subscriptions, and keeps your team focused.";
 
 // JSON-LD structured data
 const jsonLd: WithContext<WebApplication> = {
@@ -72,10 +72,7 @@ const jsonLd: WithContext<WebApplication> = {
       "@type": "ImageObject",
       url: toAbsoluteUrl(BRAND_ICON_URL),
     },
-    sameAs: [
-      "https://x.com/inboxzero_ai",
-      "https://github.com/elie222/inbox-zero",
-    ],
+    sameAs: [],
   },
 };
 
@@ -93,7 +90,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title,
     description,
-    creator: "@inboxzero_ai",
+    creator: "@devaicon",
   },
   metadataBase: new URL(env.NEXT_PUBLIC_BASE_URL),
   // issues with robots.txt: https://github.com/vercel/next.js/issues/58615#issuecomment-1852457285
@@ -121,7 +118,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#FFF",
+  themeColor: "#0E3B2E",
 };
 
 export default async function RootLayout({

@@ -1,13 +1,13 @@
-# Inbox Zero Slack App Manifest
+# The Inbox Intern Slack App Manifest
 #
 # Use this to create a Slack app via: Create New App > From a manifest
 # Replace YOUR_DOMAIN with your actual domain (e.g. app.inboxzero.com or your-ngrok-domain.ngrok-free.app)
 
 display_information:
-  name: Inbox Zero
+  name: The Inbox Intern
   description: AI executive assistant
   long_description: |
-    Inbox Zero is an AI email assistant that lives in Slack. Chat with it to get summaries, draft replies, triage your inbox, and stay on top of important emails — without switching apps.
+    The Inbox Intern is an AI email assistant that lives in Slack. Chat with it to get summaries, draft replies, triage your inbox, and stay on top of important emails — without switching apps.
 
     Features:
     - DM or @mention the bot to ask questions about your inbox
@@ -25,7 +25,7 @@ features:
     messages_tab_enabled: true
     messages_tab_read_only_enabled: false
   bot_user:
-    display_name: Inbox Zero
+    display_name: The Inbox Intern
     always_online: true
   slash_commands:
     - command: /summary
@@ -47,7 +47,7 @@ features:
       should_escape: false
     - command: /help
       url: https://YOUR_DOMAIN/api/slack/commands
-      description: See all available Inbox Zero commands
+      description: See all available The Inbox Intern commands
       should_escape: false
 
 oauth_config:

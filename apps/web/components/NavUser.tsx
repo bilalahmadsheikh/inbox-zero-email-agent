@@ -182,9 +182,7 @@ export function NavUser() {
             )}
             <DropdownMenuItem asChild>
               <Link
-                href="https://docs.getinboxzero.com"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/contact"
                 onClick={() => closeMobileSidebar("left-sidebar")}
               >
                 <CircleHelpIcon className="mr-2 size-4" />

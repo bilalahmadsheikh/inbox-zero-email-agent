@@ -6,34 +6,34 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%; /* white */
-    --foreground: 222.2 47.4% 11.2%; /* slate-900 */
+    --background: 42 33% 97%; /* warm ivory */
+    --foreground: 156 42% 14%; /* deep green */
 
-    --muted: 210 40% 96.1%; /* slate-100 */
-    --muted-foreground: 215.4 16.3% 46.9%; /* slate-500 */
+    --muted: 43 28% 92%; /* warm gray */
+    --muted-foreground: 160 8% 42%; /* mineral gray */
 
-    --popover: 0 0% 100%; /* white */
-    --popover-foreground: 222.2 47.4% 11.2%; /* slate-900 */
+    --popover: 42 33% 98%; /* ivory */
+    --popover-foreground: 156 42% 14%; /* deep green */
 
-    --card: 0 0% 100%; /* white */
-    --card-foreground: 222.2 47.4% 11.2%; /* slate-900 */
+    --card: 42 33% 99%; /* soft ivory */
+    --card-foreground: 156 42% 14%; /* deep green */
 
-    --border: 214.3 31.8% 91.4%; /* slate-200 */
-    --input: 214.3 31.8% 91.4%; /* slate-200 */
+    --border: 43 18% 84%; /* warm border */
+    --input: 43 18% 84%; /* warm border */
 
-    --primary: 222.2 47.4% 11.2%; /* slate-900 */
-    --primary-foreground: 210 40% 98%; /* slate-50 */
+    --primary: 157 62% 14%; /* executive green */
+    --primary-foreground: 42 33% 98%; /* ivory */
 
-    --secondary: 210 40% 96.1%; /* slate-100 */
-    --secondary-foreground: 222.2 47.4% 11.2%; /* slate-900 */
+    --secondary: 44 32% 91%; /* champagne */
+    --secondary-foreground: 156 42% 14%; /* deep green */
 
-    --accent: 210 40% 96.1%; /* slate-100 */
-    --accent-foreground: 222.2 47.4% 11.2%; /* slate-900 */
+    --accent: 41 52% 82%; /* restrained gold */
+    --accent-foreground: 156 42% 14%; /* deep green */
 
     --destructive: 0 100% 50%;
     --destructive-foreground: 210 40% 98%;
 
-    --ring: 215 20.2% 65.1%; /* slate-400 */
+    --ring: 41 48% 48%; /* gold */
 
     --radius: 0.5rem;
 
@@ -46,11 +46,11 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    --chart-1: oklch(0.75 0.15 250);
-    --chart-2: oklch(0.65 0.18 250);
-    --chart-3: oklch(0.55 0.2 250);
-    --chart-4: oklch(0.45 0.22 250);
-    --chart-5: oklch(0.35 0.18 250);
+    --chart-1: oklch(0.58 0.11 162);
+    --chart-2: oklch(0.71 0.13 78);
+    --chart-3: oklch(0.58 0.14 238);
+    --chart-4: oklch(0.62 0.16 25);
+    --chart-5: oklch(0.48 0.09 302);
   }
 
   .dark {
@@ -190,4 +190,85 @@
     flex-wrap: wrap;
     justify-content: flex-end;
   }
+}
+
+@layer base {
+  :root {
+    --landing-bg: #ffffff;
+    --landing-bg-soft: #fbfbf8;
+    --landing-page-texture: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.96),
+      rgba(248, 248, 244, 0.92)
+    );
+    --landing-surface: rgba(255, 255, 255, 0.92);
+    --landing-surface-hover: #f7f5ef;
+    --landing-wrapper-from: #ffffff;
+    --landing-wrapper-to: #f8f8f4;
+    --landing-text: #242424;
+    --landing-muted: #73716c;
+    --landing-muted-soft: #a09c92;
+    --landing-border: rgba(36, 36, 36, 0.1);
+    --landing-border-soft: rgba(36, 36, 36, 0.06);
+    --landing-header-bg: rgba(255, 255, 255, 0.84);
+    --landing-accent: #0e3b2e;
+    --landing-accent-contrast: #fff8ea;
+    --landing-gold: #d6af55;
+    --landing-gold-strong: #c99a35;
+    --landing-button-from: #0e3b2e;
+    --landing-button-to: #185c46;
+    --landing-button-hover-from: #123f32;
+    --landing-button-hover-to: #236b52;
+    --landing-shadow-soft: 0 10px 30px rgba(15, 23, 18, 0.08);
+    --landing-shadow: 0 24px 80px rgba(15, 23, 18, 0.14);
+    --landing-wrapper-shadow: 0 18px 60px rgba(15, 23, 18, 0.08);
+    --landing-button-shadow: 0 10px 30px rgba(14, 59, 46, 0.2);
+    --landing-button-shadow-hover: 0 14px 36px rgba(14, 59, 46, 0.3);
+    --landing-hero-gradient: linear-gradient(
+      to right,
+      var(--landing-text),
+      var(--landing-text)
+    );
+  }
+
+  .premium {
+    --landing-bg: #07150f;
+    --landing-bg-soft: #0b1c15;
+    --landing-page-texture:
+      linear-gradient(135deg, rgba(214, 175, 85, 0.12), transparent 28%),
+      linear-gradient(180deg, #07150f 0%, #0d2118 48%, #07120e 100%);
+    --landing-surface: rgba(255, 248, 234, 0.08);
+    --landing-surface-hover: rgba(255, 248, 234, 0.14);
+    --landing-wrapper-from: rgba(255, 248, 234, 0.12);
+    --landing-wrapper-to: rgba(214, 175, 85, 0.05);
+    --landing-text: #fff8ea;
+    --landing-muted: #c9c1b1;
+    --landing-muted-soft: #968d7c;
+    --landing-border: rgba(214, 175, 85, 0.24);
+    --landing-border-soft: rgba(255, 248, 234, 0.1);
+    --landing-header-bg: transparent;
+    --landing-accent: #d6af55;
+    --landing-accent-contrast: #07150f;
+    --landing-gold: #f0cc70;
+    --landing-gold-strong: #ffd980;
+    --landing-button-from: #f0cc70;
+    --landing-button-to: #d6af55;
+    --landing-button-hover-from: #ffe09a;
+    --landing-button-hover-to: #c99a35;
+    --landing-shadow-soft: 0 16px 48px rgba(0, 0, 0, 0.22);
+    --landing-shadow: 0 30px 100px rgba(0, 0, 0, 0.38);
+    --landing-wrapper-shadow: 0 28px 90px rgba(0, 0, 0, 0.28);
+    --landing-button-shadow: 0 12px 34px rgba(214, 175, 85, 0.24);
+    --landing-button-shadow-hover: 0 18px 44px rgba(214, 175, 85, 0.36);
+    --landing-hero-gradient: linear-gradient(
+      to right,
+      var(--landing-text),
+      var(--landing-gold-strong),
+      var(--landing-accent)
+    );
+  }
+}
+
+.landing-theme {
+  background: var(--landing-page-texture), var(--landing-bg);
 }

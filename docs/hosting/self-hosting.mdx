@@ -1,4 +1,4 @@
----
+﻿---
 title: 'Docker/VPS Deployment Guide'
 description: 'Production deployment on your own VPS with Docker and Docker Compose'
 ---
@@ -28,7 +28,7 @@ Connect to your VPS and install:
 
 ### 2. Setup and Configure
 
-The easiest way to get started is with the Inbox Zero CLI. You can either use it standalone or from within the cloned repo.
+The easiest way to get started is with the The Inbox Intern CLI. You can either use it standalone or from within the cloned repo.
 
 **Option A: Standalone (no clone needed)**
 
@@ -164,7 +164,7 @@ Replace `YOUR_CRON_SECRET` with the value of `CRON_SECRET` from your `.env` file
 
 ## Optional: Background Job Backends
 
-Inbox Zero supports multiple background job backends for self-hosted deployments:
+The Inbox Intern supports multiple background job backends for self-hosted deployments:
 
 - **QStash**: best when you want a managed queue and are already using Upstash.
 - **BullMQ worker**: best when you're running Docker or another long-lived environment and want a local durable queue backed by Redis.
@@ -176,10 +176,10 @@ When neither QStash nor BullMQ is configured, we fall back to internal API calls
 
 | Feature | Without QStash | With QStash |
 |---------|---------------|-------------|
-| **Email digest** | ✅ Works (sync, no retries) | ✅ Full support |
-| **Delayed/scheduled email actions** | ✅ Works via cron fallback | ✅ Full support |
-| **AI categorization of senders*** | ✅ Works (sync) | ✅ Works (async with retries) |
-| **Bulk inbox cleaning*** | ✅ Works (sync, no throttling) | ✅ Full support |
+| **Email digest** | âœ… Works (sync, no retries) | âœ… Full support |
+| **Delayed/scheduled email actions** | âœ… Works via cron fallback | âœ… Full support |
+| **AI categorization of senders*** | âœ… Works (sync) | âœ… Works (async with retries) |
+| **Bulk inbox cleaning*** | âœ… Works (sync, no throttling) | âœ… Full support |
 
 *Early access features - available on the Early Access page.
 
@@ -245,7 +245,7 @@ For self-hosted instances where all users should belong to a single organization
 AUTO_JOIN_ORGANIZATION_ENABLED=true
 ```
 
-New users will automatically join the organization when they sign in. This requires exactly one organization to exist — create one first via the app before enabling this.
+New users will automatically join the organization when they sign in. This requires exactly one organization to exist â€” create one first via the app before enabling this.
 
 To retroactively add all existing users to your organization, run this SQL query:
 

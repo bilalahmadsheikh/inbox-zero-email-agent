@@ -392,8 +392,8 @@ const enterpriseTier: Tier = {
       text: "Dedicated account manager & training",
     },
   ],
-  cta: "Speak to sales",
-  ctaLink: "https://go.getinboxzero.com/sales",
+  cta: "Contact us",
+  ctaLink: "/contact",
   mostPopular: false,
 };
 

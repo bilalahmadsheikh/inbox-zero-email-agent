@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -141,7 +141,7 @@ export function StepReady() {
               <Link
                 href={getGmailBasicSearchUrl(
                   emailAccount.email,
-                  "from:(getinboxzero.com) subject:(Briefing for)",
+                  "from:(devaicon.com) subject:(Briefing for)",
                 )}
                 target="_blank"
                 rel="noopener noreferrer"

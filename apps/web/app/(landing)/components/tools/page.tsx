@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense } from "react";
 import { SWRConfig } from "swr";
@@ -637,7 +637,7 @@ function AssistantEmailActionStates() {
   return (
     <div className="space-y-4">
       <div className="space-y-3">
-        <MutedText>Send — pending</MutedText>
+        <MutedText>Send â€” pending</MutedText>
         <SendEmailResult
           output={getAssistantSendEmailOutput("pending")}
           chatMessageId="assistant-demo-send-pending"
@@ -647,7 +647,7 @@ function AssistantEmailActionStates() {
       </div>
 
       <div className="space-y-3">
-        <MutedText>Send — processing</MutedText>
+        <MutedText>Send â€” processing</MutedText>
         <SendEmailResult
           output={getAssistantSendEmailOutput("processing")}
           chatMessageId="assistant-demo-send-processing"
@@ -657,7 +657,7 @@ function AssistantEmailActionStates() {
       </div>
 
       <div className="space-y-3">
-        <MutedText>Send — confirmed</MutedText>
+        <MutedText>Send â€” confirmed</MutedText>
         <SendEmailResult
           output={getAssistantSendEmailOutput("confirmed")}
           chatMessageId="assistant-demo-send-confirmed"
@@ -667,7 +667,7 @@ function AssistantEmailActionStates() {
       </div>
 
       <div className="space-y-3">
-        <MutedText>Reply — pending</MutedText>
+        <MutedText>Reply â€” pending</MutedText>
         <ReplyEmailResult
           output={getAssistantReplyEmailOutput("pending")}
           chatMessageId="assistant-demo-reply-pending"
@@ -677,7 +677,7 @@ function AssistantEmailActionStates() {
       </div>
 
       <div className="space-y-3">
-        <MutedText>Reply — confirmed</MutedText>
+        <MutedText>Reply â€” confirmed</MutedText>
         <ReplyEmailResult
           output={getAssistantReplyEmailOutput("confirmed")}
           chatMessageId="assistant-demo-reply-confirmed"
@@ -687,7 +687,7 @@ function AssistantEmailActionStates() {
       </div>
 
       <div className="space-y-3">
-        <MutedText>Forward — pending</MutedText>
+        <MutedText>Forward â€” pending</MutedText>
         <ForwardEmailResult
           output={getAssistantForwardEmailOutput("pending")}
           chatMessageId="assistant-demo-forward-pending"
@@ -697,7 +697,7 @@ function AssistantEmailActionStates() {
       </div>
 
       <div className="space-y-3">
-        <MutedText>Forward — confirmed</MutedText>
+        <MutedText>Forward â€” confirmed</MutedText>
         <ForwardEmailResult
           output={getAssistantForwardEmailOutput("confirmed")}
           chatMessageId="assistant-demo-forward-confirmed"
@@ -879,7 +879,7 @@ function getAssistantSendEmailOutput(state: EmailActionState) {
       bcc: null,
       subject: "Weekly update",
       messageHtml: "<p>Hi team,<br/>Here is this week's update.</p>",
-      from: "Inbox Zero <assistant@example.com>",
+      from: "Zynbox <assistant@example.com>",
     },
     ...(state === "confirmed"
       ? {

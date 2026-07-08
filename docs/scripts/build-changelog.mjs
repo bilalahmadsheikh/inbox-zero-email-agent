@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+﻿import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,7 +8,7 @@ const outputFile = join(__dirname, "..", "changelog.mdx");
 
 const HEADER = `---
 title: "Changelog"
-description: "Latest updates and improvements to Inbox Zero"
+description: "Latest updates and improvements to The Inbox Intern"
 ---
 
 `;

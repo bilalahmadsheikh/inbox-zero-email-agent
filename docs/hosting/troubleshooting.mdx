@@ -1,6 +1,6 @@
----
+﻿---
 title: 'Troubleshooting'
-description: 'Solutions for common issues when running Inbox Zero'
+description: 'Solutions for common issues when running The Inbox Intern'
 ---
 
 ## Viewing Logs
@@ -94,15 +94,15 @@ Check logs for errors using the commands above.
 **AI-powered rules fail but manually created rules work:**
 - This means your AI provider API key is missing, invalid, or out of credits.
 - Verify `LLM_API_KEY` is set in `.env`.
-- Check that your API key has billing credits. A ChatGPT Plus or Claude Pro subscription does **not** include API access — you need a separate API key with credits from the provider's developer platform.
+- Check that your API key has billing credits. A ChatGPT Plus or Claude Pro subscription does **not** include API access â€” you need a separate API key with credits from the provider's developer platform.
 - You can change your AI provider on the Settings page in the app.
 
 **Can't create rules using AI prompt:**
-- Same cause — the AI provider must be correctly configured with a valid, funded API key.
+- Same cause â€” the AI provider must be correctly configured with a valid, funded API key.
 - Check logs (`inbox-zero logs -f`) for specific error messages from the AI provider.
 
 **Emails not processing automatically (Pub/Sub):**
-- Verify your Pub/Sub topic and subscription are configured correctly — see the [Pub/Sub setup guide](/hosting/google-pubsub).
+- Verify your Pub/Sub topic and subscription are configured correctly â€” see the [Pub/Sub setup guide](/hosting/google-pubsub).
 - The push subscription endpoint must be publicly accessible. For local development, use ngrok.
 - Check that `GOOGLE_PUBSUB_TOPIC_NAME` and `GOOGLE_PUBSUB_VERIFICATION_TOKEN` are set in your `.env`.
 - Verify the Gmail service account (`gmail-api-push@system.gserviceaccount.com`) has the **Pub/Sub Publisher** role on your topic.
@@ -183,6 +183,6 @@ rm apps/web/.env
 ## Getting Help
 
 If you're still stuck:
-1. Check [GitHub Issues](https://github.com/elie222/inbox-zero/issues) for similar problems
-2. Join the [Discord community](https://www.getinboxzero.com/discord)
+1. Check the issue tracker for similar problems
+2. Join the support
 3. Include relevant logs and your setup details when asking for help

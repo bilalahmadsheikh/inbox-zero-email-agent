@@ -1,24 +1,22 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Inbox Zero Documentation",
+  "name": "The Inbox Intern Documentation",
   "colors": {
-    "primary": "#2563eb",
-    "light": "#60a5fa",
-    "dark": "#2563eb"
+    "primary": "#0E3B2E",
+    "light": "#C79A3B",
+    "dark": "#0B2F25"
   },
   "favicon": "/favicon.png",
   "navigation": {
     "anchors": [
       {
-        "anchor": "Documentation",
+        "anchor": "Guides",
         "icon": "book-open",
         "groups": [
           {
-            "group": "Get Started",
-            "pages": [
-              "introduction"
-            ]
+            "group": "Start Here",
+            "pages": ["introduction"]
           },
           {
             "group": "Essentials",
@@ -64,9 +62,7 @@
           },
           {
             "group": "Configuration",
-            "pages": [
-              "essentials/api-keys"
-            ]
+            "pages": ["essentials/api-keys"]
           }
         ]
       },
@@ -76,9 +72,7 @@
         "groups": [
           {
             "group": "Quick Start",
-            "pages": [
-              "hosting/quick-start"
-            ]
+            "pages": ["hosting/quick-start"]
           },
           {
             "group": "Setup Guides",
@@ -114,23 +108,15 @@
           },
           {
             "group": "GCP Deployment",
-            "pages": [
-              "hosting/gcp-cloudflare-tunnel"
-            ]
+            "pages": ["hosting/gcp-cloudflare-tunnel"]
           },
           {
             "group": "Contributing",
-            "pages": [
-              "contributing"
-            ]
+            "pages": ["contributing"]
           },
           {
             "group": "Integrations",
-            "pages": [
-              "slack/setup",
-              "teams/setup",
-              "telegram/setup"
-            ]
+            "pages": ["slack/setup", "teams/setup", "telegram/setup"]
           },
           {
             "group": "API",
@@ -157,13 +143,8 @@
           "icon": "clock-rotate-left"
         },
         {
-          "anchor": "Community",
-          "href": "https://getinboxzero.com/discord",
-          "icon": "discord"
-        },
-        {
           "anchor": "Blog",
-          "href": "https://www.getinboxzero.com/blog",
+          "href": "/blog",
           "icon": "newspaper"
         }
       ]
@@ -177,23 +158,14 @@
     "openapi": "openapi.json"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:support@getinboxzero.com"
-      }
-    ],
+    "links": [],
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://www.getinboxzero.com/welcome"
+      "href": "/welcome"
     }
   },
   "footer": {
-    "socials": {
-      "twitter": "https://www.getinboxzero.com/twitter",
-      "github": "https://www.getinboxzero.com/github",
-      "linkedin": "https://www.getinboxzero.com/linkedin"
-    }
+    "socials": {}
   }
 }

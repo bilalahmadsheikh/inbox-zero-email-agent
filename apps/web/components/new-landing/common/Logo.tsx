@@ -7,11 +7,19 @@ interface LogoProps {
 }
 
 export function Logo({ variant = "default" }: LogoProps) {
-  const sizeClass = variant === "mobile" ? "h-4 w-auto" : "h-5 w-auto";
+  const sizeClass = variant === "mobile" ? "h-11 w-auto" : "h-14 w-auto";
 
   return (
     <Link href="/">
-      <Wordmark className={cn(sizeClass, "text-gray-900")} />
+      <Wordmark
+        className={cn(
+          sizeClass,
+          "text-[var(--landing-text)] transition-colors",
+          // The wordmark's dark text is unreadable on the dark premium
+          // background, so render it as a clean white logo there.
+          "[.premium_&]:brightness-0 [.premium_&]:invert",
+        )}
+      />
     </Link>
   );
 }

@@ -16,7 +16,7 @@ export function CardWrapper({
   className,
 }: CardWrapperProps) {
   const cardWrapperStyles = cva(
-    "text-left border bg-gradient-to-b from-[#FFFFFF] to-[#F9F9F9]",
+    "text-left border bg-gradient-to-b from-[var(--landing-wrapper-from)] to-[var(--landing-wrapper-to)] shadow-[var(--landing-wrapper-shadow)] transition-colors",
     {
       variants: {
         padding: {
@@ -34,8 +34,8 @@ export function CardWrapper({
           full: "rounded-full",
         },
         variant: {
-          default: "border-[#F7F7F7]",
-          "dark-border": "border-[#F2F2F2]",
+          default: "border-[var(--landing-border-soft)]",
+          "dark-border": "border-[var(--landing-border)]",
         },
       },
     },

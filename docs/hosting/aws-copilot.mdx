@@ -1,9 +1,9 @@
----
+﻿---
 title: 'Copilot Deployment'
-description: 'Deploy Inbox Zero to AWS using AWS Copilot and ECS Fargate'
+description: 'Deploy The Inbox Intern to AWS using AWS Copilot and ECS Fargate'
 ---
 
-Deploy Inbox Zero to AWS using AWS Copilot. The deployment uses Amazon ECS on Fargate.
+Deploy The Inbox Intern to AWS using AWS Copilot. The deployment uses Amazon ECS on Fargate.
 
 If you prefer Terraform, see [Terraform Deployment Guide](/hosting/terraform).
 
@@ -13,7 +13,7 @@ If you prefer Terraform, see [Terraform Deployment Guide](/hosting/terraform).
 - AWS Copilot CLI installed ([installation guide](https://aws.github.io/copilot-cli/docs/getting-started/install/))
 - Docker installed and running
 - An AWS account with appropriate permissions
-- Inbox Zero repository cloned locally (run all commands from the repo root)
+- The Inbox Intern repository cloned locally (run all commands from the repo root)
 
 ## CLI Setup
 
@@ -254,8 +254,8 @@ For deployments where the main application is behind a firewall or private netwo
 ### Architecture
 
 ```
-Google Pub/Sub → API Gateway (public) → VPC Link → Internal ALB → ECS
-                      ↑
+Google Pub/Sub â†’ API Gateway (public) â†’ VPC Link â†’ Internal ALB â†’ ECS
+                      â†‘
                JWT validation
                (Google OIDC)
 ```

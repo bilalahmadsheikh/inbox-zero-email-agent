@@ -21,9 +21,8 @@ import {
 } from "@/components/ui/navigation-menu";
 
 const navigation = [
-  { name: "Enterprise", href: "/enterprise" },
-  { name: "Case Studies", href: "/case-studies" },
-  { name: "Pricing", href: "/pricing" },
+  { name: "Documentation", href: "/docs" },
+  { name: "Contact", href: "/contact" },
 ];
 
 const useCases = [
@@ -96,7 +95,14 @@ export function HeaderLinks() {
         <NavigationMenuList>
           {/* Solutions Dropdown */}
           <NavigationMenuItem>
-            <NavigationMenuTrigger className="text-sm font-semibold font-geist leading-6 text-gray-900">
+            <NavigationMenuTrigger
+              className={cn(
+                "bg-transparent text-sm font-semibold font-geist leading-6 text-[var(--landing-text)]",
+                "hover:bg-[var(--landing-surface-hover)] hover:text-[var(--landing-text)]",
+                "focus:bg-[var(--landing-surface-hover)] focus:text-[var(--landing-text)]",
+                "data-[state=open]:bg-[var(--landing-surface-hover)] data-[state=open]:text-[var(--landing-text)]",
+              )}
+            >
               Solutions
             </NavigationMenuTrigger>
             <NavigationMenuContent>
@@ -122,13 +128,15 @@ export function HeaderLinks() {
           {/* Regular Navigation Items */}
           {navigation.map((item) => (
             <NavigationMenuItem key={item.name}>
-              <NavigationMenuLink
-                asChild
-                className={navigationMenuTriggerStyle()}
-              >
+              <NavigationMenuLink asChild>
                 <Link
                   href={item.href}
-                  className="text-sm font-semibold font-geist leading-6 text-gray-900"
+                  className={cn(
+                    navigationMenuTriggerStyle(),
+                    "bg-transparent text-sm font-semibold font-geist leading-6 text-[var(--landing-text)]",
+                    "hover:bg-[var(--landing-surface-hover)] hover:text-[var(--landing-text)]",
+                    "focus:bg-[var(--landing-surface-hover)] focus:text-[var(--landing-text)]",
+                  )}
                 >
                   {item.name}
                 </Link>
@@ -166,7 +174,7 @@ function EnhancedListItem({
         <Link
           href={href}
           className={cn(
-            "group block select-none space-y-1 rounded-xl p-4 leading-none no-underline outline-none transition-all duration-200 focus:bg-accent focus:text-accent-foreground",
+            "group block select-none space-y-1 rounded-xl p-4 leading-none no-underline outline-none transition-all duration-200 focus:bg-accent focus:text-accent-foreground hover:bg-[var(--landing-surface-hover)]",
             hoverBg,
           )}
         >
@@ -187,10 +195,10 @@ function EnhancedListItem({
               </div>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold leading-none text-gray-900 group-hover:text-gray-800">
+              <div className="text-sm font-semibold leading-none text-[var(--landing-text)]">
                 {title}
               </div>
-              <p className="mt-1 text-sm leading-snug text-gray-600 group-hover:text-gray-700">
+              <p className="mt-1 text-sm leading-snug text-[var(--landing-muted)]">
                 {children}
               </p>
             </div>

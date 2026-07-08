@@ -237,7 +237,7 @@ function CalendarBookingLinkCard({
         >
           {disabledByInboxZeroLink ? (
             <span className="text-sm text-muted-foreground">
-              Using Inbox Zero booking link
+              Using Zynbox booking link
             </span>
           ) : (
             <form

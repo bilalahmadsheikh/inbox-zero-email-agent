@@ -19,8 +19,17 @@ export function Logo({ className }: LogoProps) {
     );
   }
 
+  // Width tracks the brand name so the SVG box has no invisible trailing
+  // space (which inflates layout width wherever the logo is height-scaled).
+  const viewBoxWidth = BRAND_NAME.length * 16 + 8;
+
   return (
-    <svg viewBox="0 0 260 36" fill="none" className={className} role="img">
+    <svg
+      viewBox={`0 0 ${viewBoxWidth} 36`}
+      fill="none"
+      className={className}
+      role="img"
+    >
       <title>{BRAND_NAME}</title>
       <text
         x="0"

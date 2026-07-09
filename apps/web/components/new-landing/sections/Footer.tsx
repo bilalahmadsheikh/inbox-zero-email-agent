@@ -38,8 +38,11 @@ export function Footer({ className, variant = "default" }: FooterProps) {
       <div
         className={cn("overflow-hidden px-6 py-20 sm:py-24 lg:px-8", className)}
       >
+        <div className="mb-14 flex justify-center sm:justify-start">
+          <Logo className="h-20 w-auto max-w-[260px] sm:h-24 sm:max-w-[320px]" />
+        </div>
         <nav aria-label="Footer">
-          <div className="mt-16 grid grid-cols-2 gap-8 lg:grid-cols-5 xl:col-span-2 xl:mt-0">
+          <div className="grid grid-cols-2 gap-8 lg:grid-cols-5 xl:col-span-2">
             <div>
               <FooterList title="Product" items={footerNavigation.main} />
             </div>
@@ -69,9 +72,6 @@ export function Footer({ className, variant = "default" }: FooterProps) {
             </div>
           </div>
         </nav>
-        <div className="mt-40 flex items-center justify-between">
-          <Logo />
-        </div>
       </div>
       {variant === "default" && !BRAND_LOGO_URL ? (
         <FooterLineLogo className="hidden xl:block absolute bottom-0 left-1/2 -translate-x-1/2 mx-auto px-6 lg:px-8 -z-10" />

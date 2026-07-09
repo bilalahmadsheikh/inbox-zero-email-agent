@@ -3,11 +3,12 @@ import { Logo as Wordmark } from "@/components/Logo";
 import { cn } from "@/utils";
 
 interface LogoProps {
+  className?: string;
   variant?: "default" | "mobile";
 }
 
-export function Logo({ variant = "default" }: LogoProps) {
-  const sizeClass = variant === "mobile" ? "h-11 w-auto" : "h-14 w-auto";
+export function Logo({ variant = "default", className }: LogoProps) {
+  const sizeClass = variant === "mobile" ? "h-12 w-auto" : "h-16 w-auto";
 
   return (
     <Link href="/">
@@ -18,6 +19,7 @@ export function Logo({ variant = "default" }: LogoProps) {
           // The wordmark's dark text is unreadable on the dark premium
           // background, so render it as a clean white logo there.
           "[.premium_&]:brightness-0 [.premium_&]:invert",
+          className,
         )}
       />
     </Link>

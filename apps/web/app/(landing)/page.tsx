@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Hero, HeroContent } from "@/app/(landing)/home/Hero";
 import { Awards } from "@/components/new-landing/sections/Awards";
 import { EverythingElseSection } from "@/components/new-landing/sections/EverythingElseSection";
@@ -20,8 +21,18 @@ export default function NewLanding() {
     <BasicLayout>
       <Hero
         title={
-          <span className="bg-[image:var(--landing-hero-gradient)] bg-clip-text font-sans font-bold tracking-tight text-transparent">
-            Zynbox
+          <span className="inline-flex flex-col items-center gap-2">
+            <span className="bg-[image:var(--landing-hero-gradient)] bg-clip-text font-sans font-bold text-transparent">
+              Zynbox
+            </span>
+            <Link
+              href="https://devaicon.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-geist text-xs font-semibold text-[var(--landing-muted)] transition-colors hover:text-[var(--landing-text)] md:text-sm"
+            >
+              by Devaicon
+            </Link>
           </span>
         }
         subtitle={`${BRAND_NAME} organizes your inbox and calendar, drafts replies in your voice, and helps you reach inbox zero fast. Never miss an important email again.`}

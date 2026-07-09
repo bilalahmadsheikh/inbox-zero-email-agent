@@ -36,6 +36,7 @@ import { Avatar, AvatarFallbackColor } from "@/components/ui/avatar";
 import {
   AlertTriangleIcon,
   ChevronRightIcon,
+  ClockIcon,
   TrashIcon,
   ExternalLinkIcon,
   Loader2,
@@ -44,6 +45,11 @@ import {
   CheckIcon,
   SendIcon,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toastError, toastSuccess } from "@/components/Toast";
 import { Tooltip } from "@/components/Tooltip";
 import {
@@ -616,6 +622,8 @@ function EmailActionResult({
   const displaySubject = decodeHtmlEntities(subject || referenceSubject);
   const body = getActionBodyText({ actionType, pendingAction });
   const [editedBody, setEditedBody] = useState(body || "");
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [customSendAt, setCustomSendAt] = useState("");
   const pendingSendAt = getPendingString(pendingAction, "sendAt");
   const scheduledFor = confirmationResult?.scheduledFor || pendingSendAt;
   const scheduledForLabel = scheduledFor
@@ -653,7 +661,7 @@ function EmailActionResult({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSend = async () => {
+  const handleSend = async (sendAtOverride?: string | null) => {
     setIsConfirming(true);
     try {
       if (!chatId) {
@@ -667,6 +675,7 @@ function EmailActionResult({
         toolCallId,
         actionType,
         ...(hasEdits ? { contentOverride: editedBody } : {}),
+        ...(sendAtOverride !== undefined ? { sendAtOverride } : {}),
       };
 
       const result = await confirmAssistantEmailAction(emailAccountId, input);
@@ -828,28 +837,112 @@ function EmailActionResult({
           </div>
 
           {!isConfirmed && requiresConfirmation && (
-            <Button
-              onClick={handleSend}
-              disabled={isConfirming || isProcessing || isChatBusy}
-              size="sm"
-              className="gap-2"
-            >
-              {isProcessing ? (
-                "Sending..."
-              ) : isConfirming ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Sending...
-                </>
-              ) : !isPersistedMessage ? (
-                "Saving..."
-              ) : (
-                <>
-                  <SendIcon className="hidden size-3.5 sm:inline" />
-                  {pendingSendAt ? "Schedule" : "Send"}
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              {actionType === "send_email" &&
+                isPersistedMessage &&
+                (pendingSendAt ? (
+                  <Button
+                    onClick={() => handleSend(null)}
+                    disabled={isConfirming || isProcessing || isChatBusy}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <SendIcon className="hidden size-3.5 sm:inline" />
+                    Send now
+                  </Button>
+                ) : (
+                  <Popover
+                    open={scheduleOpen}
+                    onOpenChange={(open) => {
+                      setScheduleOpen(open);
+                      if (open) {
+                        setCustomSendAt(
+                          toDatetimeLocalValue(
+                            new Date(Date.now() + 60 * 60 * 1000),
+                          ),
+                        );
+                      }
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        disabled={isConfirming || isProcessing || isChatBusy}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <ClockIcon className="hidden size-3.5 sm:inline" />
+                        Schedule
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-3" align="end">
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-muted-foreground">
+                          Send at
+                        </div>
+                        <input
+                          type="datetime-local"
+                          className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                          value={customSendAt}
+                          min={toDatetimeLocalValue(new Date())}
+                          onChange={(event) =>
+                            setCustomSendAt(event.target.value)
+                          }
+                        />
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          disabled={!customSendAt || isConfirming}
+                          onClick={() => {
+                            const chosen = new Date(customSendAt);
+                            if (
+                              Number.isNaN(chosen.getTime()) ||
+                              chosen.getTime() < Date.now() + 60 * 1000
+                            ) {
+                              toastError({
+                                description:
+                                  "Pick a time at least a minute in the future.",
+                              });
+                              return;
+                            }
+                            setScheduleOpen(false);
+                            handleSend(chosen.toISOString());
+                          }}
+                        >
+                          Schedule
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ))}
+              <Button
+                onClick={() => handleSend()}
+                disabled={isConfirming || isProcessing || isChatBusy}
+                size="sm"
+                className="gap-2"
+              >
+                {isProcessing ? (
+                  "Sending..."
+                ) : isConfirming ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : !isPersistedMessage ? (
+                  "Saving..."
+                ) : (
+                  <>
+                    <SendIcon className="hidden size-3.5 sm:inline" />
+                    {pendingSendAt
+                      ? "Schedule"
+                      : actionType === "send_email"
+                        ? "Send now"
+                        : "Send"}
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </CardFooter>
       )}
@@ -2428,4 +2521,9 @@ function FieldLabel({
   className?: string;
 }) {
   return <RuleSummaryLabel className={className}>{children}</RuleSummaryLabel>;
+}
+
+function toDatetimeLocalValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

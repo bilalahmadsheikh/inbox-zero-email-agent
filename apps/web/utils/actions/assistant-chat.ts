@@ -24,6 +24,7 @@ export const confirmAssistantEmailAction = actionClient
         toolCallId,
         actionType,
         contentOverride,
+        sendAtOverride,
       },
     }) =>
       confirmAssistantEmailActionForAccount({
@@ -32,6 +33,7 @@ export const confirmAssistantEmailAction = actionClient
         toolCallId,
         actionType,
         contentOverride,
+        sendAtOverride,
         waitForPersistence: true,
         emailAccountId,
         provider,

@@ -112,6 +112,10 @@ export const confirmAssistantEmailActionBody =
   confirmAssistantActionBaseBody.extend({
     actionType: assistantPendingEmailActionTypeSchema,
     contentOverride: z.string().trim().min(1).optional(),
+    // Overrides the pending send_email action's send time: an ISO datetime
+    // schedules at that time, null forces an immediate send, undefined keeps
+    // the pending action's own sendAt.
+    sendAtOverride: z.string().datetime().nullable().optional(),
   });
 export type ConfirmAssistantEmailActionBody = z.infer<
   typeof confirmAssistantEmailActionBody

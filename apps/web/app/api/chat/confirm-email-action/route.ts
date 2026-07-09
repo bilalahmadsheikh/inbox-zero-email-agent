@@ -36,6 +36,7 @@ export const POST = withEmailAccount(
       toolCallId: data.toolCallId,
       actionType: data.actionType,
       contentOverride: data.contentOverride,
+      sendAtOverride: data.sendAtOverride,
       waitForPersistence: true,
       persistenceWaitMs: MOBILE_PENDING_ACTION_PERSIST_WAIT_MS,
       emailAccountId,

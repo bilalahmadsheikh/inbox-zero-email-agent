@@ -287,7 +287,7 @@ describe("aiProcessAssistantChat", () => {
 
     expect(systemPrompt).toContain("Email capabilities:");
     expect(systemPrompt).toContain(
-      "Email sending actions are disabled in this environment. sendEmail, replyEmail, and forwardEmail tools are unavailable.",
+      "Email sending actions are disabled in this environment. sendEmail, replyEmail, forwardEmail, and draftEmail tools are unavailable.",
     );
     expect(systemPrompt).toContain(
       "Draft reply rule actions are disabled in this environment.",
@@ -1712,6 +1712,7 @@ describe("aiProcessAssistantChat", () => {
         subject: "Subject line",
         messageHtml: "<p>Hello</p>",
         from: "user@test.com",
+        sendAt: null,
       },
       provider: "google",
       requiresConfirmation: true,
@@ -1787,6 +1788,7 @@ describe("aiProcessAssistantChat", () => {
         subject: "Subject line",
         messageHtml: "<p>Done</p>",
         from: "user@test.com",
+        sendAt: null,
       },
       provider: "google",
       requiresConfirmation: true,

@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
 import { SafeError } from "@/utils/error";
+import { MAX_SCHEDULE_AHEAD_MS } from "@/utils/actions/mail.validation";
 import { createEmailProvider } from "@/utils/email/provider";
 import { getFormattedSenderAddress } from "@/utils/email/get-formatted-sender-address";
 import type { Logger } from "@/utils/logger";
@@ -71,6 +72,7 @@ export async function confirmAssistantEmailActionForAccount({
   toolCallId,
   actionType,
   contentOverride,
+  sendAtOverride,
   waitForPersistence,
   persistenceWaitMs,
   emailAccountId,
@@ -82,6 +84,7 @@ export async function confirmAssistantEmailActionForAccount({
   toolCallId: string;
   actionType: AssistantPendingEmailActionType;
   contentOverride?: string;
+  sendAtOverride?: string | null;
   waitForPersistence?: boolean;
   persistenceWaitMs?: number;
   emailAccountId: string;
@@ -121,6 +124,7 @@ export async function confirmAssistantEmailActionForAccount({
       emailProvider,
       emailAccountId,
       contentOverride,
+      sendAtOverride,
     });
   } catch (error) {
     await clearPendingPartProcessing({
@@ -413,11 +417,13 @@ async function executeAssistantEmailAction({
   emailProvider,
   emailAccountId,
   contentOverride,
+  sendAtOverride,
 }: {
   output: AssistantPendingEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
   emailAccountId: string;
   contentOverride?: string;
+  sendAtOverride?: string | null;
 }): Promise<AssistantEmailConfirmationResult> {
   const confirmedAt = new Date().toISOString();
 
@@ -429,6 +435,7 @@ async function executeAssistantEmailAction({
         emailAccountId,
         confirmedAt,
         contentOverride,
+        sendAtOverride,
       });
     case "reply_email":
       return confirmPendingReplyEmailAction({
@@ -455,12 +462,14 @@ async function confirmPendingSendEmailAction({
   emailAccountId,
   confirmedAt,
   contentOverride,
+  sendAtOverride,
 }: {
   output: PendingSendEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
   emailAccountId: string;
   confirmedAt: string;
   contentOverride?: string;
+  sendAtOverride?: string | null;
 }) {
   const from =
     output.pendingAction.from ||
@@ -470,12 +479,20 @@ async function confirmPendingSendEmailAction({
     ? convertNewlinesToBr(escapeHtml(contentOverride))
     : output.pendingAction.messageHtml;
 
-  if (output.pendingAction.sendAt) {
+  // The card's Send now / Schedule buttons can override the pending sendAt:
+  // null forces an immediate send, a datetime picks a new schedule.
+  const requestedSendAt =
+    sendAtOverride === undefined ? output.pendingAction.sendAt : sendAtOverride;
+
+  if (requestedSendAt) {
+    const requested = new Date(requestedSendAt).getTime();
+    if (requested > Date.now() + MAX_SCHEDULE_AHEAD_MS) {
+      throw new SafeError("Send time can be at most 90 days in the future");
+    }
+
     // If the confirmation card sat past the requested time, deliver on the
     // next sweep rather than erroring on an already-approved email.
-    const sendAt = new Date(
-      Math.max(new Date(output.pendingAction.sendAt).getTime(), Date.now()),
-    );
+    const sendAt = new Date(Math.max(requested, Date.now()));
 
     const scheduledEmail = await prisma.scheduledEmail.create({
       data: {

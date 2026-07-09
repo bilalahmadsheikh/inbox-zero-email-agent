@@ -35,12 +35,17 @@ export function getAvailableActionsForRuleEditor({
 }
 
 export function getExtraAvailableActionsForRuleEditor(
-  _existingActionTypes: ActionType[] = [],
+  existingActionTypes: ActionType[] = [],
 ) {
   return [
     ActionType.DIGEST,
     ...(env.NEXT_PUBLIC_WEBHOOK_ACTION_ENABLED !== false
       ? [ActionType.CALL_WEBHOOK]
+      : []),
+    ActionType.CANCEL_SCHEDULED,
+    ...(env.NEXT_PUBLIC_EMAIL_SEND_ENABLED !== false ||
+    existingActionTypes.includes(ActionType.SEND_SCHEDULED)
+      ? [ActionType.SEND_SCHEDULED]
       : []),
   ] as ActionType[];
 }

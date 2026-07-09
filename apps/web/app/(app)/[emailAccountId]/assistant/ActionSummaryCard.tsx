@@ -224,6 +224,18 @@ export function ActionSummaryCard({
       tooltipText = `Sends an automated notification from ${BRAND_NAME} (not from your email) informing the sender their email was filtered as cold outreach.`;
       break;
 
+    case ActionType.CANCEL_SCHEDULED:
+      summaryContent = "Cancel scheduled emails to sender";
+      tooltipText =
+        "Cancels any of your pending scheduled emails addressed to the sender of the matched email.";
+      break;
+
+    case ActionType.SEND_SCHEDULED:
+      summaryContent = "Send scheduled emails to sender now";
+      tooltipText =
+        "Immediately sends any of your pending scheduled emails addressed to the sender of the matched email, instead of waiting for their scheduled time.";
+      break;
+
     default:
       summaryContent = actionTypeLabel;
   }

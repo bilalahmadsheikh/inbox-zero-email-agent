@@ -4,8 +4,11 @@ import prisma from "@/utils/__mocks__/prisma";
 import { createTestLogger } from "@/__tests__/helpers";
 import { createEmailProvider } from "@/utils/email/provider";
 import {
+  cancelScheduledEmailTool,
+  draftEmailTool,
   forwardEmailTool,
   getAccountOverviewTool,
+  rescheduleScheduledEmailTool,
   getSenderCategorizationStatusTool,
   getSenderCategoryOverviewTool,
   manageInboxTool,
@@ -199,6 +202,168 @@ describe("chat inbox tools", () => {
       error: "Invalid sendEmail input: to must include valid email address(es)",
     });
     expect(createEmailProvider).not.toHaveBeenCalled();
+  });
+
+  it("creates a mailbox draft when the user asks for a draft", async () => {
+    const mockCreateDraft = vi.fn().mockResolvedValue({ id: "draft-123" });
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      createDraft: mockCreateDraft,
+    } as any);
+
+    const toolInstance = draftEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      cc: "copy@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+    });
+
+    expect(mockCreateDraft).toHaveBeenCalledWith({
+      to: "recipient@example.com",
+      cc: "copy@example.com",
+      bcc: undefined,
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      replyToMessageId: undefined,
+    });
+    expect(result).toEqual({
+      success: true,
+      draftId: "draft-123",
+      to: "recipient@example.com",
+      subject: "Hello",
+    });
+  });
+
+  it("rejects draftEmail input when recipient has no email address", async () => {
+    const toolInstance = draftEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "Jack Cohen",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+    });
+
+    expect(result).toEqual({
+      error:
+        "Invalid draftEmail input: to must include valid email address(es)",
+    });
+    expect(createEmailProvider).not.toHaveBeenCalled();
+  });
+
+  it("cancels a pending scheduled email by id", async () => {
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+
+    const toolInstance = cancelScheduledEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({ id: "sched-1" });
+
+    expect(prisma.scheduledEmail.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "sched-1",
+        emailAccountId: "email-account-1",
+        status: "PENDING",
+      },
+      data: { status: "CANCELLED" },
+    });
+    expect(result).toEqual({ success: true, id: "sched-1" });
+  });
+
+  it("returns an error when cancelling a scheduled email that is not pending", async () => {
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 0 });
+
+    const toolInstance = cancelScheduledEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({ id: "sched-gone" });
+
+    expect(result).toEqual({
+      error:
+        "Scheduled email not found or no longer pending. Use listScheduledEmails to see the current queue.",
+    });
+  });
+
+  it("rejects rescheduling a scheduled email to a near-now time", async () => {
+    const toolInstance = rescheduleScheduledEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      id: "sched-1",
+      sendAt: new Date().toISOString(),
+    });
+
+    expect(prisma.scheduledEmail.updateMany).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      error:
+        "sendAt must be at least a minute in the future. Recompute it from the current time in context and try again.",
+    });
+  });
+
+  it("reschedules a pending scheduled email to a future time", async () => {
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+
+    const toolInstance = rescheduleScheduledEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      logger,
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      id: "sched-1",
+      sendAt,
+    });
+
+    expect(prisma.scheduledEmail.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "sched-1",
+        emailAccountId: "email-account-1",
+        status: "PENDING",
+      },
+      data: { sendAt: new Date(sendAt) },
+    });
+    expect(result).toEqual({ success: true, id: "sched-1", sendAt });
+  });
+
+  it("returns an error when draft creation fails", async () => {
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      createDraft: vi.fn().mockRejectedValue(new Error("provider down")),
+    } as any);
+
+    const toolInstance = draftEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+    });
+
+    expect(result).toEqual({ error: "Failed to create draft" });
   });
 
   it("prepares threaded reply flow without sending immediately", async () => {

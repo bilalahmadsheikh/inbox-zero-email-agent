@@ -11,15 +11,19 @@ import type { DeleteRuleTool } from "@/utils/ai/assistant/tools/rules/delete-rul
 import type { GetAssistantCapabilitiesTool } from "@/utils/ai/assistant/tools/settings/get-assistant-capabilities-tool";
 import type { UpdateAssistantSettingsTool } from "@/utils/ai/assistant/tools/settings/update-assistant-settings-tool";
 import type {
+  CancelScheduledEmailTool,
+  DraftEmailTool,
   ForwardEmailTool,
   GetAccountOverviewTool,
   GetSenderCategorizationStatusTool,
   GetSenderCategoryOverviewTool,
+  ListScheduledEmailsTool,
   ManageInboxTool,
   ManageSenderCategoryTool,
   ReadAttachmentTool,
   ReadEmailTool,
   ReplyEmailTool,
+  RescheduleScheduledEmailTool,
   SearchInboxTool,
   SendEmailTool,
   StartSenderCategorizationTool,
@@ -61,6 +65,10 @@ export type ChatTools = {
   sendEmail: SendEmailTool;
   replyEmail: ReplyEmailTool;
   forwardEmail: ForwardEmailTool;
+  draftEmail: DraftEmailTool;
+  listScheduledEmails: ListScheduledEmailsTool;
+  cancelScheduledEmail: CancelScheduledEmailTool;
+  rescheduleScheduledEmail: RescheduleScheduledEmailTool;
   getCalendarEvents: GetCalendarEventsTool;
   readAttachment: ReadAttachmentTool;
 };

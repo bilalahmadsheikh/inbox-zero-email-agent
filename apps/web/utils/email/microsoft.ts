@@ -25,6 +25,7 @@ import type { ThreadsQuery } from "@/utils/threads/validation";
 import { getLatestNonDraftMessage } from "@/utils/email/latest-message";
 import { getMessageTimestamp } from "@/utils/email/message-timestamp";
 import {
+  buildGraphRecipients,
   draftEmail,
   forwardEmail,
   replyToEmail,
@@ -545,6 +546,8 @@ export class OutlookProvider implements EmailProvider {
 
   async createDraft(params: {
     to: string;
+    cc?: string;
+    bcc?: string;
     subject: string;
     messageHtml: string;
     replyToMessageId?: string;
@@ -552,6 +555,17 @@ export class OutlookProvider implements EmailProvider {
     this.logger.info("Creating draft", {
       replyToMessageId: params.replyToMessageId,
     });
+
+    const toRecipients = buildGraphRecipients(params.to) ?? [
+      { emailAddress: { address: params.to } },
+    ];
+    const ccRecipients = buildGraphRecipients(params.cc);
+    const bccRecipients = buildGraphRecipients(params.bcc);
+    const recipientFields = {
+      toRecipients,
+      ...(ccRecipients ? { ccRecipients } : {}),
+      ...(bccRecipients ? { bccRecipients } : {}),
+    };
 
     // For threading, use createReply on the replyToMessageId
     if (params.replyToMessageId) {
@@ -573,7 +587,7 @@ export class OutlookProvider implements EmailProvider {
             .patch({
               body: { contentType: "html", content: params.messageHtml },
               subject: params.subject,
-              toRecipients: [{ emailAddress: { address: params.to } }],
+              ...recipientFields,
             }),
         this.logger,
       );
@@ -591,7 +605,7 @@ export class OutlookProvider implements EmailProvider {
           .post({
             subject: params.subject,
             body: { contentType: "html", content: params.messageHtml },
-            toRecipients: [{ emailAddress: { address: params.to } }],
+            ...recipientFields,
           }),
       this.logger,
     );

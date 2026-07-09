@@ -27,6 +27,10 @@ import {
 import { isMessagingDraftActionType } from "@/utils/actions/draft-reply";
 import { checkHasAccess } from "@/utils/premium/server";
 import { handlePreviousDraftDeletion } from "@/utils/ai/choose-rule/draft-management";
+import {
+  cancelScheduledEmailsToSender,
+  releaseScheduledEmailsToSender,
+} from "@/utils/scheduled-send/rule-actions";
 
 const MODULE = "ai-actions";
 
@@ -101,6 +105,11 @@ export const runActionFunction = async (options: {
       return move_folder(opts);
     case ActionType.NOTIFY_SENDER:
       return notify_sender(opts);
+    case ActionType.CANCEL_SCHEDULED:
+      return cancel_scheduled(opts);
+    case ActionType.SEND_SCHEDULED:
+      ensureEmailSendingEnabled();
+      return send_scheduled(opts);
     default:
       throw new Error(`Unknown action: ${action}`);
   }
@@ -511,6 +520,28 @@ const move_folder: ActionFunction<{
     );
   }
 };
+
+const cancel_scheduled: ActionFunction<Record<string, unknown>> = async ({
+  email,
+  emailAccount,
+  logger,
+}) =>
+  cancelScheduledEmailsToSender({
+    emailAccountId: emailAccount.id,
+    from: email.headers.from,
+    logger,
+  });
+
+const send_scheduled: ActionFunction<Record<string, unknown>> = async ({
+  email,
+  emailAccount,
+  logger,
+}) =>
+  releaseScheduledEmailsToSender({
+    emailAccountId: emailAccount.id,
+    from: email.headers.from,
+    logger,
+  });
 
 const notify_sender: ActionFunction<Record<string, unknown>> = async ({
   email,

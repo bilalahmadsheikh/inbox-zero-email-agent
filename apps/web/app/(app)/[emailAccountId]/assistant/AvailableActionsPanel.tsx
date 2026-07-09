@@ -29,6 +29,8 @@ const actionNames: Record<ActionType, string> = {
   [ActionType.DIGEST]: "Add to digest",
   [ActionType.NOTIFY_MESSAGING_CHANNEL]: "Notify",
   [ActionType.NOTIFY_SENDER]: "Notify sender",
+  [ActionType.CANCEL_SCHEDULED]: "Cancel scheduled emails",
+  [ActionType.SEND_SCHEDULED]: "Send scheduled emails now",
 };
 
 const actionTooltips: Partial<Record<ActionType, string>> = {
@@ -36,6 +38,10 @@ const actionTooltips: Partial<Record<ActionType, string>> = {
     "For developers: trigger external integrations by sending email data to a custom URL",
   [ActionType.DIGEST]:
     "Group emails together and receive them as a daily summary",
+  [ActionType.CANCEL_SCHEDULED]:
+    "Cancel your pending scheduled emails to the sender, e.g. drop a queued follow-up because they already wrote back",
+  [ActionType.SEND_SCHEDULED]:
+    "Send your pending scheduled emails to the sender immediately instead of waiting for their scheduled time",
 };
 
 export function AvailableActionsPanel() {

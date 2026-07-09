@@ -48,6 +48,8 @@ const ruleActionTypeSchema = z.enum([
   ActionType.MOVE_FOLDER,
   ActionType.NOTIFY_MESSAGING_CHANNEL,
   ActionType.NOTIFY_SENDER,
+  ActionType.CANCEL_SCHEDULED,
+  ActionType.SEND_SCHEDULED,
 ]);
 
 const actionSchema = z

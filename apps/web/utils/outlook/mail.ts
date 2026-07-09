@@ -489,7 +489,7 @@ async function sendReplyUsingCreateReply(
   };
 }
 
-function buildGraphRecipients(
+export function buildGraphRecipients(
   recipientList?: string,
 ): GraphRecipient[] | undefined {
   if (!recipientList) return;

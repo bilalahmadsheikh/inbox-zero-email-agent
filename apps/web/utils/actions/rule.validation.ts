@@ -84,6 +84,8 @@ const zodActionType = z.enum([
   ActionType.DIGEST,
   ActionType.MOVE_FOLDER,
   ActionType.NOTIFY_SENDER,
+  ActionType.CANCEL_SCHEDULED,
+  ActionType.SEND_SCHEDULED,
 ]);
 
 const zodConditionType = z.enum([ConditionType.AI, ConditionType.STATIC]);

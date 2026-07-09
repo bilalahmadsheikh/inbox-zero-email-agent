@@ -1020,6 +1020,22 @@ export function getRuleActionTypeOptions({
           },
         ]
       : []),
+    ...(extraActions.has(ActionType.CANCEL_SCHEDULED)
+      ? [
+          {
+            label: ACTION_TYPE_LABELS[ActionType.CANCEL_SCHEDULED],
+            value: ActionType.CANCEL_SCHEDULED,
+          },
+        ]
+      : []),
+    ...(extraActions.has(ActionType.SEND_SCHEDULED)
+      ? [
+          {
+            label: ACTION_TYPE_LABELS[ActionType.SEND_SCHEDULED],
+            value: ActionType.SEND_SCHEDULED,
+          },
+        ]
+      : []),
     ...((systemType === SystemType.COLD_EMAIL &&
       env.NEXT_PUBLIC_IS_RESEND_CONFIGURED) ||
     existingActionTypes.includes(ActionType.NOTIFY_SENDER)

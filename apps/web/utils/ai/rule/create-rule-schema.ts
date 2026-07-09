@@ -219,6 +219,22 @@ export const createRuleActionSchema = (
           ),
         ]
       : []),
+    ...(allowedActionTypes.has(ActionType.CANCEL_SCHEDULED)
+      ? [
+          createActionObjectSchema(
+            ActionType.CANCEL_SCHEDULED,
+            optionalFieldsSchema,
+          ),
+        ]
+      : []),
+    ...(allowedActionTypes.has(ActionType.SEND_SCHEDULED)
+      ? [
+          createActionObjectSchema(
+            ActionType.SEND_SCHEDULED,
+            optionalFieldsSchema,
+          ),
+        ]
+      : []),
   ];
 
   return z.union(actionSchemas) as z.ZodType<RuleAction>;
@@ -278,6 +294,10 @@ function getActionTypeDescription(type: ActionType) {
       return "Call a webhook for the matching email. Only use this when the user explicitly asks for a webhook, external HTTP callback, or integration URL and provides the webhook URL. Do not use this for ordinary labeling, archiving, categorization, notifications, folders, or other email automation.";
     case ActionType.MOVE_FOLDER:
       return "Move the matching email to a folder.";
+    case ActionType.CANCEL_SCHEDULED:
+      return "Cancel any pending scheduled emails queued to the sender of the matching email. Use when the user wants a queued follow-up dropped because the person already wrote back.";
+    case ActionType.SEND_SCHEDULED:
+      return "Immediately send any pending scheduled emails queued to the sender of the matching email, instead of waiting for their scheduled time. Use when the user wants a prepared, scheduled email released as soon as the person writes back.";
     default:
       return "Action type to apply to the matching email.";
   }

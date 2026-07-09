@@ -709,6 +709,8 @@ export class GmailProvider implements EmailProvider {
 
   async createDraft(params: {
     to: string;
+    cc?: string;
+    bcc?: string;
     subject: string;
     messageHtml: string;
     replyToMessageId?: string;
@@ -734,6 +736,8 @@ export class GmailProvider implements EmailProvider {
 
     const encodedMessage = await createMail({
       to: params.to,
+      cc: params.cc,
+      bcc: params.bcc,
       subject: params.subject,
       text: convertEmailHtmlToText({ htmlText: params.messageHtml }),
       html: params.messageHtml,

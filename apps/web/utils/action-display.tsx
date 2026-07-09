@@ -4,12 +4,14 @@ import { sortActionsByPriority } from "@/utils/action-sort";
 import {
   ArchiveIcon,
   BellIcon,
+  CalendarClockIcon,
   FolderInputIcon,
   ForwardIcon,
   ReplyIcon,
   ShieldCheckIcon,
   SendIcon,
   TagIcon,
+  TimerOffIcon,
   WebhookIcon,
   FileTextIcon,
   MailIcon,
@@ -107,6 +109,10 @@ export function getActionDisplay(
         : "Notify";
     case ActionType.NOTIFY_SENDER:
       return "Notify Sender";
+    case ActionType.CANCEL_SCHEDULED:
+      return "Cancel Scheduled Emails to Sender";
+    case ActionType.SEND_SCHEDULED:
+      return "Send Scheduled Emails to Sender Now";
     default: {
       const exhaustiveCheck: never = action.type;
       return exhaustiveCheck;
@@ -130,6 +136,8 @@ export const ACTION_TYPE_LABELS = {
   [ActionType.CALL_WEBHOOK]: "Call webhook",
   [ActionType.DIGEST]: "Add to digest",
   [ActionType.NOTIFY_SENDER]: "Notify sender",
+  [ActionType.CANCEL_SCHEDULED]: "Cancel scheduled emails to sender",
+  [ActionType.SEND_SCHEDULED]: "Send scheduled emails to sender now",
 } satisfies Record<ActionType, string>;
 
 export function getActionIcon(actionType: ActionType) {
@@ -163,6 +171,10 @@ export function getActionIcon(actionType: ActionType) {
       return BellIcon;
     case ActionType.NOTIFY_SENDER:
       return BellIcon;
+    case ActionType.CANCEL_SCHEDULED:
+      return TimerOffIcon;
+    case ActionType.SEND_SCHEDULED:
+      return CalendarClockIcon;
     default: {
       const exhaustiveCheck: never = actionType;
       return exhaustiveCheck;

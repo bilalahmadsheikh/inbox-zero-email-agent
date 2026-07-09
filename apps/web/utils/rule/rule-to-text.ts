@@ -86,6 +86,12 @@ export function ruleToText(rule: RuleWithActions): string {
           actions.push(`Move to folder "${action.folderName}"`);
         }
         break;
+      case ActionType.CANCEL_SCHEDULED:
+        actions.push("Cancel scheduled emails to the sender");
+        break;
+      case ActionType.SEND_SCHEDULED:
+        actions.push("Send scheduled emails to the sender now");
+        break;
     }
   });
 

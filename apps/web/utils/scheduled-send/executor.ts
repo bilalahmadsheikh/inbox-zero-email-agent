@@ -1,4 +1,5 @@
 import prisma from "@/utils/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import { ScheduledEmailStatus } from "@/generated/prisma/enums";
 import { createEmailProvider } from "@/utils/email/provider";
 import type { SendEmailBody } from "@/utils/gmail/mail";
@@ -90,6 +91,8 @@ export async function processScheduledEmails(logger: Logger) {
 
       emailLogger.info("Scheduled email sent");
       sent += 1;
+
+      await queueNextOccurrence(scheduledEmail, emailLogger);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const isFinal = attempts >= MAX_ATTEMPTS;
@@ -115,4 +118,59 @@ export async function processScheduledEmails(logger: Logger) {
   }
 
   return { sent, failed, skipped, total: dueEmails.length };
+}
+
+// For recurring follow-ups, queue the next occurrence as a fresh PENDING row
+// so per-send history is preserved and a CANCEL_SCHEDULED rule (or manual
+// cancel) ends the chain by cancelling the pending row.
+async function queueNextOccurrence(
+  scheduledEmail: {
+    id: string;
+    emailAccountId: string;
+    to: string;
+    cc: string | null;
+    bcc: string | null;
+    replyTo: string | null;
+    subject: string;
+    messageHtml: string;
+    replyToEmail: unknown;
+    threadId: string | null;
+    repeatEveryMinutes: number | null;
+    maxOccurrences: number | null;
+    occurrence: number;
+  },
+  logger: Logger,
+) {
+  const { repeatEveryMinutes, maxOccurrences, occurrence } = scheduledEmail;
+  if (!repeatEveryMinutes || !maxOccurrences) return;
+  if (occurrence >= maxOccurrences) return;
+
+  try {
+    const next = await prisma.scheduledEmail.create({
+      data: {
+        emailAccountId: scheduledEmail.emailAccountId,
+        to: scheduledEmail.to,
+        cc: scheduledEmail.cc,
+        bcc: scheduledEmail.bcc,
+        replyTo: scheduledEmail.replyTo,
+        subject: scheduledEmail.subject,
+        messageHtml: scheduledEmail.messageHtml,
+        replyToEmail:
+          (scheduledEmail.replyToEmail as Prisma.InputJsonValue) ?? undefined,
+        threadId: scheduledEmail.threadId,
+        sendAt: new Date(Date.now() + repeatEveryMinutes * 60_000),
+        repeatEveryMinutes,
+        maxOccurrences,
+        occurrence: occurrence + 1,
+      },
+    });
+
+    logger.info("Queued next scheduled email occurrence", {
+      nextScheduledEmailId: next.id,
+      occurrence: occurrence + 1,
+      maxOccurrences,
+    });
+  } catch (error) {
+    logger.error("Failed to queue next scheduled email occurrence", { error });
+  }
 }

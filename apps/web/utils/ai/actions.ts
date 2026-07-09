@@ -529,6 +529,7 @@ const cancel_scheduled: ActionFunction<Record<string, unknown>> = async ({
   cancelScheduledEmailsToSender({
     emailAccountId: emailAccount.id,
     from: email.headers.from,
+    threadId: email.threadId,
     logger,
   });
 
@@ -540,6 +541,7 @@ const send_scheduled: ActionFunction<Record<string, unknown>> = async ({
   releaseScheduledEmailsToSender({
     emailAccountId: emailAccount.id,
     from: email.headers.from,
+    threadId: email.threadId,
     logger,
   });
 

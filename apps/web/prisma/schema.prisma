@@ -780,10 +780,17 @@ model ScheduledEmail {
   subject      String
   messageHtml  String
   replyToEmail Json? // threading info matching sendEmailBody.replyToEmail
+  threadId     String? // provider thread this follow-up belongs to (threaded sends + thread-scoped cancel)
 
   sendAt   DateTime
   status   ScheduledEmailStatus @default(PENDING)
   attempts Int                  @default(0)
+
+  // Recurring follow-ups: after a send, the executor queues the next
+  // occurrence until maxOccurrences (total sends) is reached.
+  repeatEveryMinutes Int?
+  maxOccurrences     Int?
+  occurrence         Int  @default(1)
 
   sentMessageId String?
   sentThreadId  String?
@@ -791,6 +798,7 @@ model ScheduledEmail {
 
   @@index([status, sendAt])
   @@index([emailAccountId, status])
+  @@index([emailAccountId, threadId])
 }
 
 // Notes:

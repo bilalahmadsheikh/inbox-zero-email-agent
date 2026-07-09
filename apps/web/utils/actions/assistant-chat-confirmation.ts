@@ -444,6 +444,7 @@ async function executeAssistantEmailAction({
         emailAccountId,
         confirmedAt,
         contentOverride,
+        sendAtOverride,
       });
     case "forward_email":
       return confirmPendingForwardEmailAction({
@@ -503,6 +504,8 @@ async function confirmPendingSendEmailAction({
         subject: output.pendingAction.subject,
         messageHtml,
         sendAt,
+        repeatEveryMinutes: output.pendingAction.repeatEveryMinutes ?? null,
+        maxOccurrences: output.pendingAction.repeatCount ?? null,
       },
     });
 
@@ -550,12 +553,14 @@ async function confirmPendingReplyEmailAction({
   emailAccountId,
   confirmedAt,
   contentOverride,
+  sendAtOverride,
 }: {
   output: PendingReplyEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
   emailAccountId: string;
   confirmedAt: string;
   contentOverride?: string;
+  sendAtOverride?: string | null;
 }) {
   const sourceMessage = await emailProvider.getMessage(
     output.pendingAction.messageId,
@@ -565,6 +570,21 @@ async function confirmPendingReplyEmailAction({
     output.reference?.threadId,
   );
   const from = await getFormattedSenderAddress({ emailAccountId });
+
+  const requestedSendAt =
+    sendAtOverride === undefined ? output.pendingAction.sendAt : sendAtOverride;
+
+  if (requestedSendAt) {
+    return scheduleReplyEmail({
+      output,
+      message,
+      emailAccountId,
+      confirmedAt,
+      contentOverride,
+      requestedSendAt,
+    });
+  }
+
   const replyOptions = from ? { from } : undefined;
   const sentAfter = new Date();
   await emailProvider.replyToEmail(
@@ -1929,4 +1949,83 @@ function getPendingActionContentPatch(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+// Queues a threaded reply in the ScheduledEmail table instead of sending it;
+// the scheduled-send cron threads it onto the conversation via replyToEmail.
+async function scheduleReplyEmail({
+  output,
+  message,
+  emailAccountId,
+  confirmedAt,
+  contentOverride,
+  requestedSendAt,
+}: {
+  output: PendingReplyEmailToolOutput;
+  message: {
+    id: string;
+    threadId?: string | null;
+    subject?: string | null;
+    headers: {
+      from?: string;
+      subject?: string;
+      references?: string;
+      "reply-to"?: string;
+      "message-id"?: string;
+    };
+  };
+  emailAccountId: string;
+  confirmedAt: string;
+  contentOverride?: string;
+  requestedSendAt: string;
+}) {
+  const requested = new Date(requestedSendAt).getTime();
+  if (requested > Date.now() + MAX_SCHEDULE_AHEAD_MS) {
+    throw new SafeError("Send time can be at most 90 days in the future");
+  }
+  // If the confirmation card sat past the requested time, deliver on the
+  // next sweep rather than erroring on an already-approved email.
+  const sendAt = new Date(Math.max(requested, Date.now()));
+
+  const to = message.headers["reply-to"] || message.headers.from;
+  if (!to) throw new SafeError("Could not determine the reply recipient");
+
+  const baseSubject = message.subject || message.headers.subject || "";
+  const subject = /^re:/i.test(baseSubject.trim())
+    ? baseSubject
+    : `Re: ${baseSubject}`;
+
+  const content = contentOverride || output.pendingAction.content;
+  const messageHtml = convertNewlinesToBr(escapeHtml(content));
+
+  const scheduledEmail = await prisma.scheduledEmail.create({
+    data: {
+      emailAccountId,
+      to,
+      subject,
+      messageHtml,
+      replyToEmail: {
+        threadId: message.threadId || "",
+        headerMessageId: message.headers["message-id"] || "",
+        ...(message.headers.references
+          ? { references: message.headers.references }
+          : {}),
+        messageId: message.id,
+      },
+      threadId: message.threadId || null,
+      sendAt,
+      repeatEveryMinutes: output.pendingAction.repeatEveryMinutes ?? null,
+      maxOccurrences: output.pendingAction.repeatCount ?? null,
+    },
+  });
+
+  return {
+    actionType: output.actionType,
+    messageId: null,
+    threadId: message.threadId || null,
+    to,
+    subject,
+    confirmedAt,
+    scheduledFor: scheduledEmail.sendAt.toISOString(),
+  };
 }

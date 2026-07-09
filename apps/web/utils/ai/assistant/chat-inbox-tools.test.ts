@@ -261,6 +261,103 @@ describe("chat inbox tools", () => {
     expect(createEmailProvider).not.toHaveBeenCalled();
   });
 
+  it("rejects repeat fields without sendAt", async () => {
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      repeatEveryMinutes: 5,
+      repeatCount: 3,
+    });
+
+    expect(result).toEqual({
+      error:
+        "repeatEveryMinutes and repeatCount require sendAt: schedule the first send.",
+    });
+  });
+
+  it("carries repeat fields into the pending send action", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      sendAt,
+      repeatEveryMinutes: 5,
+      repeatCount: 3,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        sendAt,
+        repeatEveryMinutes: 5,
+        repeatCount: 3,
+      }),
+    });
+  });
+
+  it("carries sendAt and repeat fields into the pending reply action", async () => {
+    const getMessage = vi.fn().mockResolvedValue({
+      id: "msg-1",
+      threadId: "thread-1",
+      headers: {
+        from: "sender@example.com",
+        subject: "Original subject",
+        "message-id": "<abc@mail.example.com>",
+      },
+      subject: "Original subject",
+    });
+    vi.mocked(createEmailProvider).mockResolvedValue({ getMessage } as any);
+
+    const toolInstance = replyEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      messageId: "msg-1",
+      content: "Just following up!",
+      sendAt,
+      repeatEveryMinutes: 10,
+      repeatCount: 2,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      actionType: "reply_email",
+      pendingAction: expect.objectContaining({
+        messageId: "msg-1",
+        sendAt,
+        repeatEveryMinutes: 10,
+        repeatCount: 2,
+      }),
+      reference: expect.objectContaining({ threadId: "thread-1" }),
+    });
+  });
+
   it("cancels a pending scheduled email by id", async () => {
     prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
 

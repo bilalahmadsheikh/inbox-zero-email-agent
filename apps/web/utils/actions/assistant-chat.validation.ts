@@ -39,6 +39,8 @@ export const pendingSendEmailToolOutputSchema = z.object({
     messageHtml: z.string().trim().min(1),
     from: z.string().nullish(),
     sendAt: z.string().nullish(),
+    repeatEveryMinutes: z.number().nullish(),
+    repeatCount: z.number().nullish(),
   }),
   confirmationResult: confirmationResultSchema.optional(),
 });
@@ -55,6 +57,9 @@ export const pendingReplyEmailToolOutputSchema = z.object({
   pendingAction: z.object({
     messageId: z.string().trim().min(1),
     content: z.string().trim().min(1),
+    sendAt: z.string().nullish(),
+    repeatEveryMinutes: z.number().nullish(),
+    repeatCount: z.number().nullish(),
   }),
   reference: z
     .object({

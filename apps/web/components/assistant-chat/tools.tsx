@@ -635,6 +635,15 @@ function EmailActionResult({
         minute: "2-digit",
       })
     : null;
+  const repeatEveryMinutes = getPendingNumber(
+    pendingAction,
+    "repeatEveryMinutes",
+  );
+  const repeatCount = getPendingNumber(pendingAction, "repeatCount");
+  const repeatLabel =
+    repeatEveryMinutes && repeatCount
+      ? `repeats every ${repeatEveryMinutes} min, ${repeatCount} sends total`
+      : null;
 
   const messageId =
     confirmationResult?.messageId ||
@@ -732,6 +741,7 @@ function EmailActionResult({
           {scheduledForLabel && (
             <div className="mt-0.5 text-xs text-muted-foreground">
               Scheduled for: {scheduledForLabel}
+              {repeatLabel ? ` · ${repeatLabel}` : ""}
             </div>
           )}
         </div>
@@ -838,7 +848,7 @@ function EmailActionResult({
 
           {!isConfirmed && requiresConfirmation && (
             <div className="flex items-center gap-2">
-              {actionType === "send_email" &&
+              {(actionType === "send_email" || actionType === "reply_email") &&
                 isPersistedMessage &&
                 (pendingSendAt ? (
                   <Button
@@ -936,9 +946,9 @@ function EmailActionResult({
                     <SendIcon className="hidden size-3.5 sm:inline" />
                     {pendingSendAt
                       ? "Schedule"
-                      : actionType === "send_email"
-                        ? "Send now"
-                        : "Send"}
+                      : actionType === "forward_email"
+                        ? "Send"
+                        : "Send now"}
                   </>
                 )}
               </Button>
@@ -2221,6 +2231,15 @@ function getPendingString(
 ) {
   if (!source) return;
   return trimToNonEmptyString(source[key]);
+}
+
+function getPendingNumber(
+  source: Record<string, unknown> | undefined,
+  key: string,
+) {
+  if (!source) return null;
+  const value = source[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function getPendingOrOutputString({

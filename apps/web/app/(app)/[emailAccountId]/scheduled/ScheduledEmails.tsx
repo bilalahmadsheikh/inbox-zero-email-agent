@@ -125,6 +125,7 @@ function ScheduledEmailsTable({
             <TableCell className="max-w-64 truncate">{email.subject}</TableCell>
             <TableCell className="whitespace-nowrap">
               {formatSendAt(email.sendAt)}
+              {formatRepeatInfo(email)}
             </TableCell>
             <TableCell>
               <ScheduledEmailStatusBadge
@@ -177,4 +178,28 @@ function formatSendAt(sendAt: string | Date) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatRepeatInfo(email: {
+  repeatEveryMinutes: number | null;
+  maxOccurrences: number | null;
+  occurrence: number;
+  threadId: string | null;
+}) {
+  const parts: string[] = [];
+  if (email.repeatEveryMinutes && email.maxOccurrences) {
+    parts.push(
+      `every ${email.repeatEveryMinutes} min (${email.occurrence}/${email.maxOccurrences})`,
+    );
+  }
+  if (email.threadId) {
+    parts.push("in thread");
+  }
+  if (parts.length === 0) return null;
+
+  return (
+    <span className="ml-1 text-xs text-muted-foreground">
+      · {parts.join(" · ")}
+    </span>
+  );
 }

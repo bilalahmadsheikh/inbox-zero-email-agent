@@ -1,33 +1,30 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { ScheduledEmailStatus } from "@/generated/prisma/enums";
 import { extractEmailAddress } from "@/utils/email";
 import type { Logger } from "@/utils/logger";
 import prisma from "@/utils/prisma";
 
 // Rule-action helpers operating on the ScheduledEmail queue. Both match
-// pending scheduled emails whose recipients include the sender of the
-// email that triggered the rule.
+// pending scheduled emails belonging to the triggering email's thread, plus
+// unthreaded ones addressed to its sender. Thread-scoped follow-ups are only
+// touched by emails arriving in their own thread.
 
 export async function cancelScheduledEmailsToSender({
   emailAccountId,
   from,
+  threadId,
   logger,
 }: {
   emailAccountId: string;
   from: string;
+  threadId?: string | null;
   logger: Logger;
 }): Promise<{ cancelledCount: number }> {
-  const sender = extractEmailAddress(from);
-  if (!sender) {
-    logger.warn("Cancel scheduled action: could not extract sender address");
-    return { cancelledCount: 0 };
-  }
+  const where = buildMatchingWhere({ emailAccountId, from, threadId, logger });
+  if (!where) return { cancelledCount: 0 };
 
   const result = await prisma.scheduledEmail.updateMany({
-    where: {
-      emailAccountId,
-      status: ScheduledEmailStatus.PENDING,
-      to: { contains: sender, mode: "insensitive" },
-    },
+    where,
     data: { status: ScheduledEmailStatus.CANCELLED },
   });
 
@@ -41,26 +38,21 @@ export async function cancelScheduledEmailsToSender({
 export async function releaseScheduledEmailsToSender({
   emailAccountId,
   from,
+  threadId,
   logger,
 }: {
   emailAccountId: string;
   from: string;
+  threadId?: string | null;
   logger: Logger;
 }): Promise<{ releasedCount: number }> {
-  const sender = extractEmailAddress(from);
-  if (!sender) {
-    logger.warn("Release scheduled action: could not extract sender address");
-    return { releasedCount: 0 };
-  }
+  const where = buildMatchingWhere({ emailAccountId, from, threadId, logger });
+  if (!where) return { releasedCount: 0 };
 
   // Pull sendAt up to now; the scheduled-send cron delivers it within a
   // minute using its normal claim/retry machinery.
   const result = await prisma.scheduledEmail.updateMany({
-    where: {
-      emailAccountId,
-      status: ScheduledEmailStatus.PENDING,
-      to: { contains: sender, mode: "insensitive" },
-    },
+    where,
     data: { sendAt: new Date() },
   });
 
@@ -69,4 +61,43 @@ export async function releaseScheduledEmailsToSender({
   });
 
   return { releasedCount: result.count };
+}
+
+function buildMatchingWhere({
+  emailAccountId,
+  from,
+  threadId,
+  logger,
+}: {
+  emailAccountId: string;
+  from: string;
+  threadId?: string | null;
+  logger: Logger;
+}): Prisma.ScheduledEmailWhereInput | null {
+  const sender = extractEmailAddress(from);
+
+  const matchers: Prisma.ScheduledEmailWhereInput[] = [
+    ...(threadId ? [{ threadId }] : []),
+    ...(sender
+      ? [
+          {
+            threadId: null,
+            to: { contains: sender, mode: "insensitive" as const },
+          },
+        ]
+      : []),
+  ];
+
+  if (matchers.length === 0) {
+    logger.warn(
+      "Scheduled email rule action: no sender address or thread to match",
+    );
+    return null;
+  }
+
+  return {
+    emailAccountId,
+    status: ScheduledEmailStatus.PENDING,
+    OR: matchers,
+  };
 }

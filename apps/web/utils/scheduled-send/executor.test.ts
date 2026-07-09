@@ -22,6 +22,10 @@ function dueEmail(overrides: Record<string, unknown> = {}) {
     subject: "Hello",
     messageHtml: "<p>Hi</p>",
     replyToEmail: null,
+    threadId: null,
+    repeatEveryMinutes: null,
+    maxOccurrences: null,
+    occurrence: 1,
     attempts: 0,
     emailAccount: { account: { provider: "google" } },
     ...overrides,
@@ -70,6 +74,76 @@ describe("processScheduledEmails", () => {
         }),
       }),
     );
+  });
+
+  it("queues the next occurrence after sending a recurring email", async () => {
+    prisma.scheduledEmail.findMany.mockResolvedValue([
+      dueEmail({
+        threadId: "t1",
+        repeatEveryMinutes: 5,
+        maxOccurrences: 3,
+        occurrence: 1,
+        // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+      }) as any,
+    ]);
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+    // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+    prisma.scheduledEmail.create.mockResolvedValue({ id: "se2" } as any);
+    sendEmailWithHtml.mockResolvedValue({ messageId: "m1", threadId: "t1" });
+
+    await processScheduledEmails(logger);
+
+    expect(prisma.scheduledEmail.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        emailAccountId: "ea1",
+        to: "someone@example.com",
+        threadId: "t1",
+        repeatEveryMinutes: 5,
+        maxOccurrences: 3,
+        occurrence: 2,
+        sendAt: expect.any(Date),
+      }),
+    });
+    const nextSendAt =
+      prisma.scheduledEmail.create.mock.calls[0][0].data.sendAt;
+    expect(
+      Math.abs((nextSendAt as Date).getTime() - (Date.now() + 5 * 60_000)),
+    ).toBeLessThan(5000);
+  });
+
+  it("does not queue another occurrence once the chain is complete", async () => {
+    prisma.scheduledEmail.findMany.mockResolvedValue([
+      dueEmail({
+        repeatEveryMinutes: 5,
+        maxOccurrences: 3,
+        occurrence: 3,
+        // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+      }) as any,
+    ]);
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+    sendEmailWithHtml.mockResolvedValue({ messageId: "m1", threadId: "t1" });
+
+    await processScheduledEmails(logger);
+
+    expect(prisma.scheduledEmail.create).not.toHaveBeenCalled();
+  });
+
+  it("does not queue occurrences after a failed send", async () => {
+    prisma.scheduledEmail.findMany.mockResolvedValue([
+      dueEmail({
+        repeatEveryMinutes: 5,
+        maxOccurrences: 3,
+        occurrence: 1,
+        attempts: 2,
+        // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+      }) as any,
+    ]);
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+    sendEmailWithHtml.mockRejectedValue(new Error("provider down"));
+
+    await processScheduledEmails(logger);
+
+    expect(prisma.scheduledEmail.create).not.toHaveBeenCalled();
   });
 
   it("skips emails another sweep already claimed", async () => {

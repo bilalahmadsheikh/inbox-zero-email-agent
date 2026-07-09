@@ -104,6 +104,33 @@ const recipientFieldsSchema = {
   cc: ccRecipientFieldSchema,
   bcc: bccRecipientFieldSchema,
 };
+const sendAtFieldSchema = z
+  .string()
+  .datetime()
+  .optional()
+  .describe(
+    "Only when the user explicitly asks to schedule for later: the UTC instant to send, as an ISO 8601 string (e.g. 2026-07-09T04:00:00Z). Convert natural language like 'tomorrow at 9am' using the user's timezone and the current time from context. Must be at least 1 minute in the future and at most 90 days out. Omit entirely for immediate sends. Never set this to the current time or near-current time for immediate sends.",
+  );
+const repeatFieldsSchema = {
+  repeatEveryMinutes: z
+    .number()
+    .int()
+    .min(1)
+    .max(1440)
+    .optional()
+    .describe(
+      "Only for recurring follow-up reminders: minutes between resends after the first send. Requires sendAt and repeatCount. The queue resends the same message until repeatCount sends have gone out; pair with a CANCEL_SCHEDULED rule so a reply stops the chain.",
+    ),
+  repeatCount: z
+    .number()
+    .int()
+    .min(2)
+    .max(10)
+    .optional()
+    .describe(
+      "Only for recurring follow-up reminders: total number of sends including the first (2-10). Requires sendAt and repeatEveryMinutes.",
+    ),
+};
 const sendEmailToolInputSchema = z
   .object({
     ...recipientFieldsSchema,
@@ -113,13 +140,8 @@ const sendEmailToolInputSchema = z
       .trim()
       .min(1)
       .describe("HTML body content for the email draft."),
-    sendAt: z
-      .string()
-      .datetime()
-      .optional()
-      .describe(
-        "Only when the user explicitly asks to schedule the email for later: the UTC instant to send it, as an ISO 8601 string (e.g. 2026-07-09T04:00:00Z). Convert natural language like 'tomorrow at 9am' using the user's timezone and the current time from context. Must be at least 1 minute in the future and at most 90 days out. Omit entirely for immediate sends. Never set this to the current time or near-current time for immediate sends.",
-      ),
+    sendAt: sendAtFieldSchema,
+    ...repeatFieldsSchema,
   })
   .strict();
 const draftEmailToolInputSchema = z
@@ -154,6 +176,8 @@ const replyEmailToolInputSchema = z
       .min(1)
       .max(10_000)
       .describe("Reply body content to include in the draft."),
+    sendAt: sendAtFieldSchema,
+    ...repeatFieldsSchema,
   })
   .strict();
 const forwardEmailToolInputSchema = z
@@ -1273,6 +1297,9 @@ export const sendEmailTool = ({
         return { error: getSendEmailValidationError(parsedInput.error) };
       }
 
+      const repeatError = getRepeatValidationError(parsedInput.data);
+      if (repeatError) return { error: repeatError };
+
       const normalizedInput = normalizeSendEmailInput(parsedInput.data);
 
       try {
@@ -1548,7 +1575,7 @@ export const replyEmailTool = ({
 }) =>
   tool({
     description:
-      "Prepare a reply to an existing email by message ID. This does NOT send immediately — it returns a confirmation payload for the user to approve. Do not recreate replies with sendEmail.",
+      "Prepare a reply to an existing email by message ID, either immediate or scheduled for later via sendAt (with optional repeatEveryMinutes/repeatCount for recurring follow-up reminders in the thread). This does NOT send immediately — it returns a confirmation payload for the user to approve. Scheduled replies are threaded onto the original conversation. Do not recreate replies with sendEmail.",
     inputSchema: replyEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "reply_email", email, logger });
@@ -1558,6 +1585,11 @@ export const replyEmailTool = ({
         return { error: getReplyEmailValidationError(parsedInput.error) };
       }
 
+      const repeatError = getRepeatValidationError(parsedInput.data);
+      if (repeatError) return { error: repeatError };
+
+      const normalizedInput = normalizeSendEmailInput(parsedInput.data);
+
       try {
         const emailProvider = await createEmailProvider({
           emailAccountId,
@@ -1565,10 +1597,10 @@ export const replyEmailTool = ({
           logger,
         });
         const message = await emailProvider.getMessage(
-          parsedInput.data.messageId,
+          normalizedInput.messageId,
         );
 
-        return createPendingReplyEmailOutput(parsedInput.data, message);
+        return createPendingReplyEmailOutput(normalizedInput, message);
       } catch (error) {
         logger.error("Failed to prepare reply from chat", { error });
         return { error: "Failed to prepare reply" };
@@ -1677,20 +1709,43 @@ function createPendingSendEmailOutput(
       messageHtml: input.messageHtml,
       from,
       sendAt: input.sendAt || null,
+      repeatEveryMinutes: input.repeatEveryMinutes || null,
+      repeatCount: input.repeatCount || null,
     },
   };
 }
 
-function normalizeSendEmailInput(
-  input: z.infer<typeof sendEmailToolInputSchema>,
-) {
-  if (!input.sendAt) return input;
+function normalizeSendEmailInput<
+  T extends { sendAt?: string; repeatEveryMinutes?: number },
+>(input: T): T | Omit<T, "sendAt"> {
+  // Recurring chains keep their sendAt: the queue needs a first occurrence.
+  if (!input.sendAt || input.repeatEveryMinutes) return input;
 
   const sendAt = new Date(input.sendAt);
   if (sendAt.getTime() >= Date.now() + MIN_SCHEDULE_AHEAD_MS) return input;
 
   const { sendAt: _sendAt, ...immediateInput } = input;
   return immediateInput;
+}
+
+function getRepeatValidationError(input: {
+  sendAt?: string;
+  repeatEveryMinutes?: number;
+  repeatCount?: number;
+}) {
+  const hasRepeat =
+    input.repeatEveryMinutes !== undefined || input.repeatCount !== undefined;
+  if (!hasRepeat) return null;
+  if (!input.sendAt) {
+    return "repeatEveryMinutes and repeatCount require sendAt: schedule the first send.";
+  }
+  if (
+    input.repeatEveryMinutes === undefined ||
+    input.repeatCount === undefined
+  ) {
+    return "repeatEveryMinutes and repeatCount must be provided together.";
+  }
+  return null;
 }
 
 function createPendingReplyEmailOutput(
@@ -1705,6 +1760,9 @@ function createPendingReplyEmailOutput(
     pendingAction: {
       messageId: input.messageId,
       content: input.content,
+      sendAt: input.sendAt || null,
+      repeatEveryMinutes: input.repeatEveryMinutes || null,
+      repeatCount: input.repeatCount || null,
     },
     reference: {
       messageId: message.id,

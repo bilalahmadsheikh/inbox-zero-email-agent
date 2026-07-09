@@ -295,9 +295,9 @@ function getActionTypeDescription(type: ActionType) {
     case ActionType.MOVE_FOLDER:
       return "Move the matching email to a folder.";
     case ActionType.CANCEL_SCHEDULED:
-      return "Cancel any pending scheduled emails queued to the sender of the matching email. Use when the user wants a queued follow-up dropped because the person already wrote back.";
+      return "Cancel any pending scheduled emails queued to the sender of the matching email. Only affects emails the user already scheduled (via compose or chat); it never composes or schedules anything. Use when the user wants a queued follow-up dropped because the person already wrote back. Do not combine with SEND_SCHEDULED in the same rule - they contradict each other.";
     case ActionType.SEND_SCHEDULED:
-      return "Immediately send any pending scheduled emails queued to the sender of the matching email, instead of waiting for their scheduled time. Use when the user wants a prepared, scheduled email released as soon as the person writes back.";
+      return "Immediately send any pending scheduled emails queued to the sender of the matching email, instead of waiting for their scheduled time. Only affects emails the user already scheduled (via compose or chat); it never composes or schedules anything. Do not combine with CANCEL_SCHEDULED in the same rule - they contradict each other.";
     default:
       return "Action type to apply to the matching email.";
   }

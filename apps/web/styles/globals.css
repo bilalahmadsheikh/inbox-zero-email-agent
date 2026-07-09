@@ -27,8 +27,8 @@
     --secondary: 44 32% 91%; /* champagne */
     --secondary-foreground: 156 42% 14%; /* deep green */
 
-    --accent: 41 52% 82%; /* restrained gold */
-    --accent-foreground: 156 42% 14%; /* deep green */
+    --accent: 214 95% 93%; /* light blue (hover highlight) */
+    --accent-foreground: 224 64% 33%; /* deep blue */
 
     --destructive: 0 100% 50%;
     --destructive-foreground: 210 40% 98%;
@@ -51,6 +51,25 @@
     --chart-3: oklch(0.58 0.14 238);
     --chart-4: oklch(0.62 0.16 25);
     --chart-5: oklch(0.48 0.09 302);
+
+    /* Theme-aware blue palettes (RGB triplets). Default = Tailwind blue and
+       the app's new-blue accents; .premium remaps both to a gold ramp. */
+    --theme-blue-50: 239 246 255;
+    --theme-blue-100: 219 234 254;
+    --theme-blue-200: 191 219 254;
+    --theme-blue-300: 147 197 253;
+    --theme-blue-400: 96 165 250;
+    --theme-blue-500: 59 130 246;
+    --theme-blue-600: 37 99 235;
+    --theme-blue-700: 29 78 216;
+    --theme-blue-800: 30 64 175;
+    --theme-blue-900: 30 58 138;
+    --theme-blue-950: 23 37 84;
+    --theme-new-blue-50: 239 246 255;
+    --theme-new-blue-100: 216 233 255;
+    --theme-new-blue-150: 214 232 252;
+    --theme-new-blue-200: 195 222 252;
+    --theme-new-blue-600: 0 110 255;
   }
 
   .dark {
@@ -86,6 +105,64 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 240 4.9% 83.9%;
+  }
+
+  /* App tokens for the premium theme, matching the landing page's premium
+     palette exactly: background #0d2118 (the dominant green of the landing
+     texture), surfaces = the landing's ivory-tinted overlays composited over
+     it, gold #d6af55 primary, ivory #fff8ea text. */
+  .premium {
+    --background: 153 43% 9%;
+    --foreground: 40 100% 96%;
+    --card: 150 22% 16%;
+    --card-foreground: 40 100% 96%;
+    --popover: 150 22% 16%;
+    --popover-foreground: 40 100% 96%;
+    --primary: 42 61% 59%;
+    --primary-foreground: 154 50% 5%;
+    --secondary: 152 30% 12%;
+    --secondary-foreground: 40 100% 96%;
+    --muted: 152 30% 12%;
+    --muted-foreground: 40 18% 74%;
+    --accent: 150 22% 18%;
+    --accent-foreground: 42 100% 75%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
+    --border: 65 25% 20%;
+    --input: 65 25% 20%;
+    --ring: 42 61% 59%;
+    --chart-1: oklch(0.8 0.11 85);
+    --chart-2: oklch(0.65 0.1 162);
+    --chart-3: oklch(0.55 0.12 238);
+    --chart-4: oklch(0.6 0.15 25);
+    --chart-5: oklch(0.5 0.09 302);
+    --sidebar-background: 154 50% 6%;
+    --sidebar-foreground: 40 30% 88%;
+    --sidebar-primary: 42 61% 59%;
+    --sidebar-primary-foreground: 154 50% 5%;
+    --sidebar-accent: 152 30% 12%;
+    --sidebar-accent-foreground: 40 100% 96%;
+    --sidebar-border: 65 20% 16%;
+    --sidebar-ring: 42 61% 59%;
+
+    /* Gold ramp anchored on the landing gold #d6af55, replacing hardcoded
+       blues so accents follow the premium theme. */
+    --theme-blue-50: 253 249 237;
+    --theme-blue-100: 248 238 209;
+    --theme-blue-200: 240 220 165;
+    --theme-blue-300: 231 202 128;
+    --theme-blue-400: 224 189 104;
+    --theme-blue-500: 214 175 85;
+    --theme-blue-600: 191 149 59;
+    --theme-blue-700: 158 121 45;
+    --theme-blue-800: 121 92 34;
+    --theme-blue-900: 88 66 25;
+    --theme-blue-950: 51 38 14;
+    --theme-new-blue-50: 253 249 237;
+    --theme-new-blue-100: 248 238 209;
+    --theme-new-blue-150: 244 229 187;
+    --theme-new-blue-200: 240 220 165;
+    --theme-new-blue-600: 191 149 59;
   }
 }
 
@@ -271,4 +348,25 @@
 
 .landing-theme {
   background: var(--landing-page-texture), var(--landing-bg);
+}
+
+/* In premium, the app's main content surface uses the landing page's green
+   texture, with an extra gold sheen for more depth. */
+.premium .premium-page-bg {
+  background:
+    radial-gradient(
+      1200px 700px at 85% -10%,
+      rgba(214, 175, 85, 0.14),
+      transparent 60%
+    ),
+    linear-gradient(135deg, rgba(214, 175, 85, 0.16), transparent 34%),
+    linear-gradient(180deg, #07150f 0%, #0d2118 48%, #07120e 100%);
+  background-attachment: fixed;
+}
+
+/* The active sidebar item gets the premium gold treatment; hover states stay
+   on the subtle green sidebar-accent. */
+.premium [data-sidebar="menu-button"][data-active="true"] {
+  color: hsl(var(--sidebar-primary-foreground));
+  background-color: hsl(var(--sidebar-primary));
 }

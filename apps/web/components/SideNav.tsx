@@ -32,6 +32,7 @@ import {
   ZapIcon,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useComposeModal } from "@/providers/ComposeModalProvider";
 import {
   Sidebar,
@@ -281,11 +282,14 @@ export function SideNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="gap-0 pb-0">
         {state.includes("left-sidebar") ? (
-          <div className="flex items-center rounded-md pl-2 pr-0.5 py-3 text-foreground justify-between">
+          <div className="relative flex items-center justify-center rounded-md px-2 py-3 text-foreground">
             <Link href="/setup">
-              <Logo className="h-3.5" />
+              <Logo className="h-7" />
             </Link>
-            <SidebarTrigger name="left-sidebar" />
+            <SidebarTrigger
+              name="left-sidebar"
+              className="absolute right-0.5"
+            />
           </div>
         ) : (
           <div className="pb-2">
@@ -343,6 +347,10 @@ export function SideNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarFooter className="pb-4">
         <SideNavMenu items={visibleBottomLinks} activeHref={path} />
+
+        {state.includes("left-sidebar") ? (
+          <ThemeToggle className="mx-2 mb-1" />
+        ) : null}
 
         <NavUser />
       </SidebarFooter>

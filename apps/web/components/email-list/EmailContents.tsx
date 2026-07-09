@@ -23,7 +23,7 @@ export function HtmlEmail({ html }: { html: string }) {
   const [renderHtml, setRenderHtml] = useState(() => sanitizedHtml);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { theme } = useTheme();
-  const isDarkMode = theme === "dark";
+  const isDarkMode = theme === "dark" || theme === "premium";
 
   useEffect(() => {
     let cancelled = false;

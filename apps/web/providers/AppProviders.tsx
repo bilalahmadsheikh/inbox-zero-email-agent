@@ -9,7 +9,11 @@ import { ChatProvider } from "@/providers/ChatProvider";
 
 export function AppProviders(props: { children: React.ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light">
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="light"
+      themes={["light", "dark", "premium"]}
+    >
       <Provider store={jotaiStore}>
         <ChatProvider>
           <ComposeModalProvider>{props.children}</ComposeModalProvider>

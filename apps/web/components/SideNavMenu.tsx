@@ -62,7 +62,7 @@ export function SideNavMenu({
                     children: (
                       <div className="max-w-52">
                         <p className="font-medium">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-primary-foreground/75">
                           {item.description}
                         </p>
                       </div>

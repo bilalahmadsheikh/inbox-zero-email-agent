@@ -172,6 +172,8 @@ export function getActionColor(actionType: ActionType): Color {
       return "purple";
     case ActionType.NOTIFY_MESSAGING_CHANNEL:
     case ActionType.NOTIFY_SENDER:
+    case ActionType.CANCEL_SCHEDULED:
+    case ActionType.SEND_SCHEDULED:
       return "purple";
     default: {
       const exhaustiveCheck: never = actionType;

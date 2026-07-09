@@ -138,6 +138,8 @@ export const actionInputs: Record<
   [ActionType.NOTIFY_SENDER]: {
     fields: [],
   },
+  [ActionType.CANCEL_SCHEDULED]: { fields: [] },
+  [ActionType.SEND_SCHEDULED]: { fields: [] },
 };
 
 export function getActionFields(fields: Action | ExecutedAction | undefined) {
@@ -296,7 +298,9 @@ export function sanitizeActionFields(
         url: action.url ?? null,
       };
     }
-    case ActionType.NOTIFY_SENDER: {
+    case ActionType.NOTIFY_SENDER:
+    case ActionType.CANCEL_SCHEDULED:
+    case ActionType.SEND_SCHEDULED: {
       return base;
     }
     default:

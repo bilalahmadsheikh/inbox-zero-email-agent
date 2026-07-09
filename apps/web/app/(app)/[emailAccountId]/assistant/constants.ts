@@ -5,8 +5,10 @@ import {
   SendIcon,
   ForwardIcon,
   ArchiveIcon,
+  CalendarClockIcon,
   MailOpenIcon,
   ShieldCheckIcon,
+  TimerOffIcon,
   WebhookIcon,
   FileTextIcon,
   FolderInputIcon,
@@ -31,6 +33,8 @@ export const ACTION_TYPE_TEXT_COLORS = {
   [ActionType.MOVE_FOLDER]: "text-emerald-500",
   [ActionType.NOTIFY_MESSAGING_CHANNEL]: "text-sky-500",
   [ActionType.NOTIFY_SENDER]: "text-amber-500",
+  [ActionType.CANCEL_SCHEDULED]: "text-rose-500",
+  [ActionType.SEND_SCHEDULED]: "text-indigo-500",
 } as const;
 
 export const ACTION_TYPE_ICONS = {
@@ -49,4 +53,6 @@ export const ACTION_TYPE_ICONS = {
   [ActionType.MOVE_FOLDER]: FolderInputIcon,
   [ActionType.NOTIFY_MESSAGING_CHANNEL]: BellIcon,
   [ActionType.NOTIFY_SENDER]: BellIcon,
+  [ActionType.CANCEL_SCHEDULED]: TimerOffIcon,
+  [ActionType.SEND_SCHEDULED]: CalendarClockIcon,
 } as const;

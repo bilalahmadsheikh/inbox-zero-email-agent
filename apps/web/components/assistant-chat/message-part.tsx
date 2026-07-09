@@ -363,6 +363,73 @@ export function MessagePart({
     });
   }
 
+  if (part.type === "tool-draftEmail") {
+    return renderToolStatus({
+      part,
+      loadingText: "Creating draft...",
+      renderSuccess: ({ toolCallId, output }) => {
+        const subject = (output as { subject?: string } | null)?.subject;
+        return (
+          <BasicToolInfo
+            key={toolCallId}
+            text={
+              subject
+                ? `Saved draft to your Drafts folder: "${subject}"`
+                : "Saved draft to your Drafts folder"
+            }
+          />
+        );
+      },
+    });
+  }
+
+  if (part.type === "tool-listScheduledEmails") {
+    return renderToolStatus({
+      part,
+      loadingText: "Checking scheduled emails...",
+      renderSuccess: ({ toolCallId, output }) => {
+        const count = (output as { scheduledEmails?: unknown[] } | null)
+          ?.scheduledEmails?.length;
+        return (
+          <BasicToolInfo
+            key={toolCallId}
+            text={`Found ${count ?? 0} scheduled email${count === 1 ? "" : "s"}`}
+          />
+        );
+      },
+    });
+  }
+
+  if (part.type === "tool-cancelScheduledEmail") {
+    return renderToolStatus({
+      part,
+      loadingText: "Cancelling scheduled email...",
+      renderSuccess: ({ toolCallId }) => (
+        <BasicToolInfo key={toolCallId} text="Cancelled scheduled email" />
+      ),
+    });
+  }
+
+  if (part.type === "tool-rescheduleScheduledEmail") {
+    return renderToolStatus({
+      part,
+      loadingText: "Rescheduling email...",
+      renderSuccess: ({ toolCallId, output }) => {
+        const sendAt = (output as { sendAt?: string } | null)?.sendAt;
+        return (
+          <BasicToolInfo
+            key={toolCallId}
+            text={
+              sendAt
+                ? `Rescheduled email for ${new Date(sendAt).toLocaleString()}`
+                : "Rescheduled email"
+            }
+          />
+        );
+      },
+    });
+  }
+
   if (part.type === "tool-getUserRulesAndSettings") {
     return renderToolStatus({
       part,

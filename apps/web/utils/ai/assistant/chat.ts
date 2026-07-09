@@ -22,15 +22,19 @@ import { deleteRuleTool } from "./tools/rules/delete-rule-tool";
 import { getAssistantCapabilitiesTool } from "./tools/settings/get-assistant-capabilities-tool";
 import { updateAssistantSettingsTool } from "./tools/settings/update-assistant-settings-tool";
 import {
+  cancelScheduledEmailTool,
+  draftEmailTool,
   forwardEmailTool,
   getAccountOverviewTool,
   getSenderCategorizationStatusTool,
   getSenderCategoryOverviewTool,
+  listScheduledEmailsTool,
   manageInboxTool,
   manageSenderCategoryTool,
   readAttachmentTool,
   readEmailTool,
   replyEmailTool,
+  rescheduleScheduledEmailTool,
   searchInboxTool,
   sendEmailTool,
   startSenderCategorizationTool,
@@ -268,6 +272,10 @@ export async function aiProcessAssistantChat({
       ? {
           sendEmail: sendEmailTool(toolOptions),
           replyEmail: replyEmailTool(toolOptions),
+          draftEmail: draftEmailTool(toolOptions),
+          listScheduledEmails: listScheduledEmailsTool(toolOptions),
+          cancelScheduledEmail: cancelScheduledEmailTool(toolOptions),
+          rescheduleScheduledEmail: rescheduleScheduledEmailTool(toolOptions),
         }
       : {}),
 
@@ -594,7 +602,8 @@ function getEmailCapabilitiesPolicy({
   const enabledEmailSendingLines = [
     "- sendEmail, replyEmail, and forwardEmail prepare a pending action only. No email is sent yet.",
     "- These pending actions are app-side confirmations, not provider Drafts-folder saves.",
-    '- When the user asks to "draft" an email or reply, use sendEmail, replyEmail, or forwardEmail. The pending-action confirmation flow acts as the draft.',
+    '- When the user asks to "draft" an email or a reply for them to review and send themselves, use draftEmail. It saves a real draft to their Drafts folder immediately and sends nothing.',
+    "- After draftEmail, briefly confirm the draft is saved in their Drafts folder, ready to review and send from their email client.",
     "- When replying to a thread, write the reply in the same language as the latest message in the thread.",
     '- When the user asks to forward an existing email, activate "forward" and use forwardEmail with a messageId from searchInbox results. Do not recreate forwards with sendEmail.',
     "- When the user asks to reply to an existing email, use replyEmail with a messageId from searchInbox results. Do not recreate replies with sendEmail.",
@@ -618,7 +627,7 @@ function getEmailCapabilitiesPolicy({
         ...enabledEmailSendingLines.slice(2),
       ]
     : [
-        "- Email sending actions are disabled in this environment. sendEmail, replyEmail, and forwardEmail tools are unavailable.",
+        "- Email sending actions are disabled in this environment. sendEmail, replyEmail, forwardEmail, and draftEmail tools are unavailable.",
         "- If the user asks to send, reply, forward, or draft in chat, clearly explain that this environment cannot prepare or send those actions.",
         "- Do not claim that an email was prepared, replied to, forwarded, drafted, or sent when send tools are unavailable.",
       ];

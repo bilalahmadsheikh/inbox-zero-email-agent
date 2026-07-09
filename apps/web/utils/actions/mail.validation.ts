@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { sendEmailBody } from "@/utils/gmail/mail";
 
-const MIN_SCHEDULE_AHEAD_MS = 60 * 1000;
-const MAX_SCHEDULE_AHEAD_MS = 90 * 24 * 60 * 60 * 1000;
+export const MIN_SCHEDULE_AHEAD_MS = 60 * 1000;
+export const MAX_SCHEDULE_AHEAD_MS = 90 * 24 * 60 * 60 * 1000;
 
 // Attachments are omitted: scheduled sends store content in the database
 // until send time, and attachment payloads don't belong there.

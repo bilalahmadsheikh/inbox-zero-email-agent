@@ -10,7 +10,11 @@ import {
   splitRecipientList,
 } from "@/utils/email";
 import { getRuleLabel } from "@/utils/rule/consts";
-import { SystemType } from "@/generated/prisma/enums";
+import { ScheduledEmailStatus, SystemType } from "@/generated/prisma/enums";
+import {
+  MAX_SCHEDULE_AHEAD_MS,
+  MIN_SCHEDULE_AHEAD_MS,
+} from "@/utils/actions/mail.validation";
 import type { EmailProvider } from "@/utils/email/types";
 import type { ParsedMessage } from "@/utils/types";
 import { getEmailForLLM } from "@/utils/get-email-from-message";
@@ -51,7 +55,6 @@ import { microsoftGraphPageTokenSchema } from "@/utils/outlook/page-token";
 const SEARCH_INBOX_MAX_RESULTS = 20;
 const OUTLOOK_EMPTY_PAGE_AUTOPAGINATION_LIMIT = 5;
 const MAX_SENDER_CATEGORIZATION_WAIT_MS = 1500;
-const MIN_SCHEDULE_LEAD_MS = 60 * 1000;
 const OUTLOOK_SCOPE_SUFFIX_TERMS = new Set([
   "category",
   "folder",
@@ -116,6 +119,23 @@ const sendEmailToolInputSchema = z
       .optional()
       .describe(
         "Only when the user explicitly asks to schedule the email for later: the UTC instant to send it, as an ISO 8601 string (e.g. 2026-07-09T04:00:00Z). Convert natural language like 'tomorrow at 9am' using the user's timezone and the current time from context. Must be at least 1 minute in the future and at most 90 days out. Omit entirely for immediate sends. Never set this to the current time or near-current time for immediate sends.",
+      ),
+  })
+  .strict();
+const draftEmailToolInputSchema = z
+  .object({
+    ...recipientFieldsSchema,
+    subject: z.string().trim().min(1).max(300).describe("Email subject line."),
+    messageHtml: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("HTML body content for the draft."),
+    replyToMessageId: z
+      .string()
+      .optional()
+      .describe(
+        "Only when drafting a reply to an existing email: the messageId of the email being replied to (from searchInbox results), so the draft is threaded onto that conversation. Omit for standalone drafts.",
       ),
   })
   .strict();
@@ -1243,7 +1263,7 @@ export const sendEmailTool = ({
 }) =>
   tool({
     description:
-      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely.",
+      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely. If the user asks for a draft to review and send themselves, use draftEmail instead.",
     inputSchema: sendEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "send_email", email, logger });
@@ -1274,6 +1294,246 @@ export const sendEmailTool = ({
   });
 
 export type SendEmailTool = InferUITool<ReturnType<typeof sendEmailTool>>;
+
+export const draftEmailTool = ({
+  email,
+  emailAccountId,
+  provider,
+  logger,
+}: {
+  email: string;
+  emailAccountId: string;
+  provider: string;
+  logger: Logger;
+}) =>
+  tool({
+    description:
+      "Create an email draft saved to the user's Drafts folder without sending anything. Use whenever the user asks to draft, write up, or prepare an email for them to review and send themselves - including when they have not decided whether to send now or later. The draft is created immediately; there is no confirmation step and nothing is sent. Use sendEmail instead only when the user clearly wants the email sent, immediately or scheduled.",
+    inputSchema: draftEmailToolInputSchema,
+    execute: async (input) => {
+      trackToolCall({ tool: "draft_email", email, logger });
+
+      const parsedInput = draftEmailToolInputSchema.safeParse(input);
+      if (!parsedInput.success) {
+        return { error: getDraftEmailValidationError(parsedInput.error) };
+      }
+
+      try {
+        const emailProvider = await createEmailProvider({
+          emailAccountId,
+          provider,
+          logger,
+        });
+        const draft = await emailProvider.createDraft({
+          to: parsedInput.data.to,
+          cc: parsedInput.data.cc ?? undefined,
+          bcc: parsedInput.data.bcc ?? undefined,
+          subject: parsedInput.data.subject,
+          messageHtml: parsedInput.data.messageHtml,
+          replyToMessageId: parsedInput.data.replyToMessageId,
+        });
+        return {
+          success: true as const,
+          draftId: draft.id,
+          to: parsedInput.data.to,
+          subject: parsedInput.data.subject,
+        };
+      } catch (error) {
+        logger.error("Failed to create draft from chat", { error });
+        return { error: "Failed to create draft" };
+      }
+    },
+  });
+
+export type DraftEmailTool = InferUITool<ReturnType<typeof draftEmailTool>>;
+
+const cancelScheduledEmailToolInputSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The scheduled email id, as returned by listScheduledEmails."),
+  })
+  .strict();
+const rescheduleScheduledEmailToolInputSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("The scheduled email id, as returned by listScheduledEmails."),
+    sendAt: z
+      .string()
+      .datetime()
+      .describe(
+        "The new UTC send time as an ISO 8601 string (e.g. 2026-07-09T04:00:00Z). Convert natural language using the user's timezone and the current time from context. Must be at least 1 minute in the future and at most 90 days out.",
+      ),
+  })
+  .strict();
+
+export const listScheduledEmailsTool = ({
+  email,
+  emailAccountId,
+  logger,
+}: {
+  email: string;
+  emailAccountId: string;
+  logger: Logger;
+}) =>
+  tool({
+    description:
+      "List the user's pending scheduled emails (queued to send later), soonest first. Returns each one's id, recipients, subject, and send time. Use this when the user asks what is scheduled, or to find the id before cancelling or rescheduling one.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      trackToolCall({ tool: "list_scheduled_emails", email, logger });
+
+      try {
+        const scheduledEmails = await prisma.scheduledEmail.findMany({
+          where: {
+            emailAccountId,
+            status: ScheduledEmailStatus.PENDING,
+          },
+          orderBy: { sendAt: "asc" },
+          take: 25,
+          select: { id: true, to: true, subject: true, sendAt: true },
+        });
+
+        return {
+          scheduledEmails: scheduledEmails.map((scheduled) => ({
+            ...scheduled,
+            sendAt: scheduled.sendAt.toISOString(),
+          })),
+        };
+      } catch (error) {
+        logger.error("Failed to list scheduled emails", { error });
+        return { error: "Failed to list scheduled emails" };
+      }
+    },
+  });
+
+export type ListScheduledEmailsTool = InferUITool<
+  ReturnType<typeof listScheduledEmailsTool>
+>;
+
+export const cancelScheduledEmailTool = ({
+  email,
+  emailAccountId,
+  logger,
+}: {
+  email: string;
+  emailAccountId: string;
+  logger: Logger;
+}) =>
+  tool({
+    description:
+      "Cancel one of the user's pending scheduled emails so it is never sent. Takes the scheduled email id from listScheduledEmails. Only pending emails can be cancelled; already sent or cancelled ones cannot.",
+    inputSchema: cancelScheduledEmailToolInputSchema,
+    execute: async (input) => {
+      trackToolCall({ tool: "cancel_scheduled_email", email, logger });
+
+      const parsedInput = cancelScheduledEmailToolInputSchema.safeParse(input);
+      if (!parsedInput.success) {
+        return { error: "Invalid cancelScheduledEmail input: id is required" };
+      }
+
+      try {
+        const result = await prisma.scheduledEmail.updateMany({
+          where: {
+            id: parsedInput.data.id,
+            emailAccountId,
+            status: ScheduledEmailStatus.PENDING,
+          },
+          data: { status: ScheduledEmailStatus.CANCELLED },
+        });
+
+        if (result.count === 0) {
+          return {
+            error:
+              "Scheduled email not found or no longer pending. Use listScheduledEmails to see the current queue.",
+          };
+        }
+
+        return { success: true as const, id: parsedInput.data.id };
+      } catch (error) {
+        logger.error("Failed to cancel scheduled email", { error });
+        return { error: "Failed to cancel scheduled email" };
+      }
+    },
+  });
+
+export type CancelScheduledEmailTool = InferUITool<
+  ReturnType<typeof cancelScheduledEmailTool>
+>;
+
+export const rescheduleScheduledEmailTool = ({
+  email,
+  emailAccountId,
+  logger,
+}: {
+  email: string;
+  emailAccountId: string;
+  logger: Logger;
+}) =>
+  tool({
+    description:
+      "Change the send time of one of the user's pending scheduled emails. Takes the scheduled email id from listScheduledEmails and the new send time. Only pending emails can be rescheduled.",
+    inputSchema: rescheduleScheduledEmailToolInputSchema,
+    execute: async (input) => {
+      trackToolCall({ tool: "reschedule_scheduled_email", email, logger });
+
+      const parsedInput =
+        rescheduleScheduledEmailToolInputSchema.safeParse(input);
+      if (!parsedInput.success) {
+        return {
+          error:
+            "Invalid rescheduleScheduledEmail input: id and a valid ISO 8601 sendAt are required",
+        };
+      }
+
+      const sendAt = new Date(parsedInput.data.sendAt);
+      if (sendAt.getTime() < Date.now() + MIN_SCHEDULE_AHEAD_MS) {
+        return {
+          error:
+            "sendAt must be at least a minute in the future. Recompute it from the current time in context and try again.",
+        };
+      }
+      if (sendAt.getTime() > Date.now() + MAX_SCHEDULE_AHEAD_MS) {
+        return { error: "sendAt can be at most 90 days in the future." };
+      }
+
+      try {
+        const result = await prisma.scheduledEmail.updateMany({
+          where: {
+            id: parsedInput.data.id,
+            emailAccountId,
+            status: ScheduledEmailStatus.PENDING,
+          },
+          data: { sendAt },
+        });
+
+        if (result.count === 0) {
+          return {
+            error:
+              "Scheduled email not found or no longer pending. Use listScheduledEmails to see the current queue.",
+          };
+        }
+
+        return {
+          success: true as const,
+          id: parsedInput.data.id,
+          sendAt: sendAt.toISOString(),
+        };
+      } catch (error) {
+        logger.error("Failed to reschedule scheduled email", { error });
+        return { error: "Failed to reschedule scheduled email" };
+      }
+    },
+  });
+
+export type RescheduleScheduledEmailTool = InferUITool<
+  ReturnType<typeof rescheduleScheduledEmailTool>
+>;
 
 export const replyEmailTool = ({
   email,
@@ -1427,7 +1687,7 @@ function normalizeSendEmailInput(
   if (!input.sendAt) return input;
 
   const sendAt = new Date(input.sendAt);
-  if (sendAt.getTime() >= Date.now() + MIN_SCHEDULE_LEAD_MS) return input;
+  if (sendAt.getTime() >= Date.now() + MIN_SCHEDULE_AHEAD_MS) return input;
 
   const { sendAt: _sendAt, ...immediateInput } = input;
   return immediateInput;
@@ -2362,6 +2622,10 @@ function getManageInboxValidationError(error: z.ZodError) {
 
 function getSendEmailValidationError(error: z.ZodError) {
   return getValidationErrorMessage("sendEmail", error);
+}
+
+function getDraftEmailValidationError(error: z.ZodError) {
+  return getValidationErrorMessage("draftEmail", error);
 }
 
 function getForwardEmailValidationError(error: z.ZodError) {

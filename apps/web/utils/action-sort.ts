@@ -21,6 +21,9 @@ const ACTION_TYPE_PRIORITY_ORDER: ActionType[] = [
 
   ActionType.DIGEST,
 
+  ActionType.SEND_SCHEDULED,
+  ActionType.CANCEL_SCHEDULED,
+
   ActionType.NOTIFY_MESSAGING_CHANNEL,
   ActionType.MARK_SPAM,
   ActionType.NOTIFY_SENDER,

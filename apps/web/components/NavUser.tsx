@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { AccountSwitcherMenuItems } from "@/components/AccountSwitcher";
 import { useAccount } from "@/providers/EmailAccountProvider";
 import { prefixPath } from "@/utils/path";
 import { logOut } from "@/utils/user";
@@ -81,11 +82,12 @@ export function NavUser() {
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          className="min-w-52 rounded-md md:data-[side=top]:w-[--radix-dropdown-menu-trigger-width]"
+          className="min-w-64 rounded-md md:data-[side=top]:w-[--radix-dropdown-menu-trigger-width]"
           side={isMobile ? "bottom" : isExpandedSidebar ? "top" : "right"}
           align={isExpandedSidebar ? "start" : "end"}
           sideOffset={4}
         >
+          <AccountSwitcherMenuItems />
           <DropdownMenuGroup>
             <DropdownMenuItem asChild>
               <Link

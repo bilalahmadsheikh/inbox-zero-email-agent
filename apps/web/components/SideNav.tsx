@@ -58,7 +58,6 @@ import {
   useIntegrationsEnabled,
   useMeetingBriefsEnabled,
 } from "@/hooks/useFeatureFlags";
-import { AccountSwitcher } from "@/components/AccountSwitcher";
 import { useAccount } from "@/providers/EmailAccountProvider";
 import { prefixPath } from "@/utils/path";
 import { isGoogleProvider } from "@/utils/email/provider-types";
@@ -280,7 +279,7 @@ export function SideNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="gap-0 pb-0">
+      <SidebarHeader className="gap-0">
         {state.includes("left-sidebar") ? (
           <div className="relative flex items-center justify-center rounded-md px-2 py-3 text-foreground">
             <Link href="/setup" className="flex items-center">
@@ -296,7 +295,6 @@ export function SideNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarTrigger name="left-sidebar" />
           </div>
         )}
-        <AccountSwitcher />
       </SidebarHeader>
 
       <SidebarContent>

@@ -7,7 +7,7 @@ interface LogoProps {
 }
 
 export function Logo({ variant = "default" }: LogoProps) {
-  const sizeClass = variant === "mobile" ? "h-11 w-auto" : "h-14 w-auto";
+  const sizeClass = variant === "mobile" ? "h-12 w-auto" : "h-16 w-auto";
 
   return (
     <Link href="/">

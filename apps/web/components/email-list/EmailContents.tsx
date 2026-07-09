@@ -1,5 +1,5 @@
 import { startTransition, useMemo, useState, useRef, useEffect } from "react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import DOMPurify from "dompurify";
 import { env } from "@/env";
 import { decodeHtmlEntities } from "@/utils/gmail/decode";

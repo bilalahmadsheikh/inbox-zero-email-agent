@@ -283,8 +283,8 @@ export function SideNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader className="gap-0 pb-0">
         {state.includes("left-sidebar") ? (
           <div className="relative flex items-center justify-center rounded-md px-2 py-3 text-foreground">
-            <Link href="/setup">
-              <Logo className="h-7" />
+            <Link href="/setup" className="flex items-center">
+              <Logo className="h-14 w-auto max-w-[200px] object-contain premium:brightness-0 premium:invert" />
             </Link>
             <SidebarTrigger
               name="left-sidebar"

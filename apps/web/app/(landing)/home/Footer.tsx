@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/new-landing/common/Logo";
 import { EXTENSION_URL } from "@/utils/config";
 import { BRAND_NAME } from "@/utils/branding";
 
@@ -152,6 +153,9 @@ export function Footer() {
 export function SelfHostedFooterLinks() {
   return (
     <>
+      <div className="mb-8 flex justify-center">
+        <Logo className="h-20 w-auto max-w-[260px] sm:h-24 sm:max-w-[320px]" />
+      </div>
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
         {selfHostedFooter.resources.map((item) => (
           <Link

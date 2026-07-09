@@ -422,6 +422,29 @@ describe("runActionFunction", () => {
     expect(client.starMessage).toHaveBeenCalledWith("message-1");
   });
 
+  it("marks the matched thread as spam for MARK_SPAM actions", async () => {
+    const client = createMockEmailProvider();
+
+    await runActionFunction({
+      client,
+      email,
+      action: {
+        id: "action-1",
+        type: ActionType.MARK_SPAM,
+      },
+      emailAccount,
+      executedRule: {
+        id: "executed-rule-1",
+        threadId: "thread-1",
+        emailAccountId: "account-1",
+        ruleId: "rule-1",
+      } as any,
+      logger,
+    });
+
+    expect(client.markSpam).toHaveBeenCalledWith("thread-1");
+  });
+
   it("marks notify messaging actions failed when missing a channel id", async () => {
     const client = createMockEmailProvider();
 

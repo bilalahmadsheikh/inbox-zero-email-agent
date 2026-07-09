@@ -16,7 +16,6 @@ export default async function LandingLayout({
       attribute="class"
       defaultTheme="light"
       enableSystem={false}
-      storageKey="landing-theme"
       themes={["light", "premium"]}
     >
       {children}

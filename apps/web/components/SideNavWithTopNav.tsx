@@ -33,7 +33,7 @@ function ContentWrapper({ children }: { children: React.ReactNode }) {
     >
       <SidebarInset
         className={cn(
-          "overflow-hidden bg-background pt-9 max-w-full",
+          "overflow-hidden bg-background premium-page-bg pt-9 max-w-full",
           noTopPadding && "pt-0",
         )}
       >

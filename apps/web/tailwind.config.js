@@ -3,7 +3,8 @@ const { fontFamily } = require("tailwindcss/defaultTheme");
 /** @type {import('tailwindcss').Config} */
 /* eslint-disable max-len */
 module.exports = {
-  darkMode: ["class"],
+  // The premium theme is dark, so dark: utilities apply under it too
+  darkMode: ["variant", ["&:is(.dark *)", "&:is(.premium *)"]],
   content: [
     "./app/**/*.{js,ts,jsx,tsx}",
     "./pages/**/*.{js,ts,jsx,tsx}",
@@ -50,6 +51,21 @@ module.exports = {
         title: ["var(--font-title)", ...fontFamily.sans],
       },
       colors: {
+        // Theme-aware blue: identical to Tailwind's default blue in classic
+        // and dark, remapped to a gold ramp under .premium (see globals.css)
+        blue: {
+          50: "rgb(var(--theme-blue-50) / <alpha-value>)",
+          100: "rgb(var(--theme-blue-100) / <alpha-value>)",
+          200: "rgb(var(--theme-blue-200) / <alpha-value>)",
+          300: "rgb(var(--theme-blue-300) / <alpha-value>)",
+          400: "rgb(var(--theme-blue-400) / <alpha-value>)",
+          500: "rgb(var(--theme-blue-500) / <alpha-value>)",
+          600: "rgb(var(--theme-blue-600) / <alpha-value>)",
+          700: "rgb(var(--theme-blue-700) / <alpha-value>)",
+          800: "rgb(var(--theme-blue-800) / <alpha-value>)",
+          900: "rgb(var(--theme-blue-900) / <alpha-value>)",
+          950: "rgb(var(--theme-blue-950) / <alpha-value>)",
+        },
         // shadcn/ui
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -112,11 +128,11 @@ module.exports = {
             600: "#17A34A",
           },
           blue: {
-            50: "#EFF6FF",
-            100: "#D8E9FF",
-            150: "#D6E8FC",
-            200: "#C3DEFC",
-            600: "#006EFF",
+            50: "rgb(var(--theme-new-blue-50) / <alpha-value>)",
+            100: "rgb(var(--theme-new-blue-100) / <alpha-value>)",
+            150: "rgb(var(--theme-new-blue-150) / <alpha-value>)",
+            200: "rgb(var(--theme-new-blue-200) / <alpha-value>)",
+            600: "rgb(var(--theme-new-blue-600) / <alpha-value>)",
           },
           indigo: {
             50: "#EFF3FF",
@@ -212,5 +228,10 @@ module.exports = {
     require("tailwindcss-animate"),
     require("@headlessui/tailwindcss"),
     require("@tailwindcss/typography"),
+    // premium: variant for styles specific to the premium theme (dark:
+    // applies to both dark and premium, so use this to target premium alone)
+    require("tailwindcss/plugin")(({ addVariant }) => {
+      addVariant("premium", "&:is(.premium *)");
+    }),
   ],
 };

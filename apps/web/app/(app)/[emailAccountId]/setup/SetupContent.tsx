@@ -65,15 +65,22 @@ function FeatureCard({
           className={cn(
             "p-px rounded-lg shadow-sm bg-gradient-to-b mb-4 inline-flex",
             "from-new-blue-150 to-new-blue-200",
+            "premium:bg-none premium:shadow-none",
           )}
         >
           <div
             className={cn(
               "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[7px] bg-gradient-to-b shadow-sm transition-transform",
               "from-new-blue-50 to-new-blue-100",
+              "premium:border premium:border-primary/70 premium:bg-none premium:shadow-none",
             )}
           >
-            <Icon className={cn("h-4 w-4", "text-new-blue-600")} />
+            <Icon
+              className={cn(
+                "h-4 w-4",
+                "text-new-blue-600 premium:text-primary",
+              )}
+            />
           </div>
         </div>
         <h3 className="mb-2 text-lg font-medium text-foreground">{title}</h3>
@@ -183,15 +190,19 @@ const StepItem = ({
             className={cn(
               "p-px rounded-lg shadow-sm bg-gradient-to-b mr-3 flex flex-shrink-0 items-center justify-center",
               "from-new-blue-150 to-new-blue-200",
+              "premium:bg-none premium:shadow-none",
             )}
           >
             <div
               className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-[7px] bg-gradient-to-b shadow-sm",
                 "from-new-blue-50 to-new-blue-100",
+                "premium:border premium:border-primary/70 premium:bg-none premium:shadow-none",
               )}
             >
-              <div className="text-new-blue-600">{icon}</div>
+              <div className="text-new-blue-600 premium:text-primary">
+                {icon}
+              </div>
             </div>
           </div>
           <div>
@@ -216,7 +227,7 @@ const StepItem = ({
                 <button
                   type="button"
                   onClick={onActionClick}
-                  className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-600 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-400 dark:hover:bg-blue-900/75"
+                  className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-600 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-400 dark:hover:bg-blue-900/75 premium:border premium:border-primary/70 premium:!bg-transparent premium:!text-primary premium:hover:!bg-primary/10"
                 >
                   {actionText}
                 </button>
@@ -224,7 +235,7 @@ const StepItem = ({
                 <Link
                   href={href}
                   {...linkProps}
-                  className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-600 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-400 dark:hover:bg-blue-900/75"
+                  className="rounded-md bg-blue-100 px-3 py-1 text-sm text-blue-600 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-400 dark:hover:bg-blue-900/75 premium:border premium:border-primary/70 premium:!bg-transparent premium:!text-primary premium:hover:!bg-primary/10"
                 >
                   {actionText}
                 </Link>

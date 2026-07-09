@@ -154,7 +154,12 @@ describe("chat inbox tools", () => {
     });
   });
 
-  it("rejects scheduled sends whose sendAt is in the past", async () => {
+  it("treats near-now sendAt as an immediate send", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+
     const toolInstance = sendEmailTool({
       email: TEST_EMAIL,
       emailAccountId: "email-account-1",
@@ -166,13 +171,14 @@ describe("chat inbox tools", () => {
       to: "recipient@example.com",
       subject: "Hello",
       messageHtml: "<p>Hi there</p>",
-      sendAt: new Date(Date.now() - 1000).toISOString(),
+      sendAt: new Date().toISOString(),
     });
 
-    expect(result).toMatchObject({
-      error: expect.stringContaining("future"),
-    });
     expect(createEmailProvider).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({ sendAt: null }),
+    });
   });
 
   it("rejects sendEmail input when recipient has no email address", async () => {

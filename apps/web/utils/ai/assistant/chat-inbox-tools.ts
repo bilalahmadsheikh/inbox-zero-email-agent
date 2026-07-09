@@ -51,6 +51,7 @@ import { microsoftGraphPageTokenSchema } from "@/utils/outlook/page-token";
 const SEARCH_INBOX_MAX_RESULTS = 20;
 const OUTLOOK_EMPTY_PAGE_AUTOPAGINATION_LIMIT = 5;
 const MAX_SENDER_CATEGORIZATION_WAIT_MS = 1500;
+const MIN_SCHEDULE_LEAD_MS = 60 * 1000;
 const OUTLOOK_SCOPE_SUFFIX_TERMS = new Set([
   "category",
   "folder",
@@ -114,7 +115,7 @@ const sendEmailToolInputSchema = z
       .datetime()
       .optional()
       .describe(
-        "Only when the user asks to schedule the email for later: the UTC instant to send it, as an ISO 8601 string (e.g. 2026-07-09T04:00:00Z). Convert natural language like 'tomorrow at 9am' using the user's timezone and the current time from context. Must be at least 2 minutes in the future and at most 90 days out. Omit entirely for immediate sends.",
+        "Only when the user explicitly asks to schedule the email for later: the UTC instant to send it, as an ISO 8601 string (e.g. 2026-07-09T04:00:00Z). Convert natural language like 'tomorrow at 9am' using the user's timezone and the current time from context. Must be at least 1 minute in the future and at most 90 days out. Omit entirely for immediate sends. Never set this to the current time or near-current time for immediate sends.",
       ),
   })
   .strict();
@@ -1242,7 +1243,7 @@ export const sendEmailTool = ({
 }) =>
   tool({
     description:
-      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately — it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time.",
+      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely.",
     inputSchema: sendEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "send_email", email, logger });
@@ -1252,15 +1253,7 @@ export const sendEmailTool = ({
         return { error: getSendEmailValidationError(parsedInput.error) };
       }
 
-      if (parsedInput.data.sendAt) {
-        const sendAt = new Date(parsedInput.data.sendAt);
-        if (sendAt.getTime() < Date.now() + 60 * 1000) {
-          return {
-            error:
-              "sendAt must be at least a minute in the future. Recompute it from the current time in context and try again.",
-          };
-        }
-      }
+      const normalizedInput = normalizeSendEmailInput(parsedInput.data);
 
       try {
         const from =
@@ -1269,7 +1262,7 @@ export const sendEmailTool = ({
             fallbackEmail: email,
           })) || email;
         return createPendingSendEmailOutput(
-          parsedInput.data,
+          normalizedInput,
           from || null,
           provider,
         );
@@ -1426,6 +1419,18 @@ function createPendingSendEmailOutput(
       sendAt: input.sendAt || null,
     },
   };
+}
+
+function normalizeSendEmailInput(
+  input: z.infer<typeof sendEmailToolInputSchema>,
+) {
+  if (!input.sendAt) return input;
+
+  const sendAt = new Date(input.sendAt);
+  if (sendAt.getTime() >= Date.now() + MIN_SCHEDULE_LEAD_MS) return input;
+
+  const { sendAt: _sendAt, ...immediateInput } = input;
+  return immediateInput;
 }
 
 function createPendingReplyEmailOutput(

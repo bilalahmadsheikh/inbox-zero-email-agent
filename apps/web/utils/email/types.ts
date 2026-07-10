@@ -304,6 +304,7 @@ export interface EmailProvider {
   ): Promise<void>;
   watchEmails(): Promise<{
     expirationDate: Date;
+    historyId?: string;
     subscriptionId?: string;
   } | null>;
 }

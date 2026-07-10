@@ -1,7 +1,12 @@
 "use client";
 
 import { cn } from "@/utils/index";
-import { createElement, memo, type ComponentProps } from "react";
+import {
+  createElement,
+  memo,
+  type ComponentProps,
+  type HTMLAttributes,
+} from "react";
 import { Streamdown } from "streamdown";
 import {
   InlineEmailCard,
@@ -32,6 +37,7 @@ const allowedTags = {
   ],
 };
 const components = {
+  p: AssistantMarkdownParagraph,
   emails: InlineEmailList,
   email: InlineEmailCard,
   "email-detail": InlineEmailDetail,
@@ -39,6 +45,12 @@ const components = {
   "rule-suggestion": InlineRuleSuggestionCard,
 };
 const literalTagContent = ["email", "email-detail", "rule-suggestion"];
+function AssistantMarkdownParagraph({
+  children,
+  ...props
+}: HTMLAttributes<HTMLElement>) {
+  return createElement("div", props, children);
+}
 
 export const AssistantInlineEmailResponse = memo(
   ({ className, children, ...props }: AssistantInlineEmailResponseProps) =>
@@ -59,7 +71,7 @@ export const AssistantInlineEmailResponse = memo(
         normalizeHtmlIndentation: true,
         ...props,
       },
-      normalizeSelfClosingAllowedTags(children),
+      normalizeAllowedTagBlocks(normalizeSelfClosingAllowedTags(children)),
     ),
 );
 
@@ -80,4 +92,20 @@ function normalizeSelfClosingAllowedTags(
     (_match, tagName: string, attributes = "") =>
       `<${tagName}${attributes}></${tagName}>`,
   );
+}
+
+const allowedTagPatternSource = Object.keys(allowedTags)
+  .sort((a, b) => b.length - a.length)
+  .join("|");
+const blockAllowedTagPattern = new RegExp(
+  `(<(${allowedTagPatternSource})(?:\\s(?:[^"'<>]|"[^"]*"|'[^']*')*)?>[\\s\\S]*?<\\/\\2>)`,
+  "gi",
+);
+
+function normalizeAllowedTagBlocks(
+  children: AssistantInlineEmailResponseProps["children"],
+) {
+  if (typeof children !== "string") return children;
+
+  return children.replace(blockAllowedTagPattern, "\n\n$1\n\n");
 }

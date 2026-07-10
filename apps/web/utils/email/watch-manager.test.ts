@@ -93,4 +93,57 @@ describe("ensureEmailAccountsWatched", () => {
       },
     ]);
   });
+
+  it("stores the Gmail watch history cursor when setting up watch", async () => {
+    const expirationDate = new Date("2026-07-10T13:00:00.000Z");
+
+    vi.mocked(prisma.emailAccount.findMany).mockResolvedValue([
+      {
+        id: "email-account-id",
+        email: "account@example.com",
+        watchEmailsExpirationDate: null,
+        watchEmailsSubscriptionId: null,
+        account: {
+          provider: "google",
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+          expires_at: Date.now() + 3_600_000,
+          disconnectedAt: null,
+        },
+        user: {
+          id: "user-id",
+          aiApiKey: null,
+          premium: null,
+        },
+      },
+    ] as any);
+
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      name: "google",
+      watchEmails: vi.fn().mockResolvedValue({
+        expirationDate,
+        historyId: "123456",
+      }),
+    } as any);
+
+    const results = await ensureEmailAccountsWatched({
+      userIds: ["user-id"],
+      logger,
+    });
+
+    expect(prisma.emailAccount.update).toHaveBeenCalledWith({
+      where: { id: "email-account-id" },
+      data: {
+        watchEmailsExpirationDate: expirationDate,
+        lastSyncedHistoryId: "123456",
+      },
+    });
+    expect(results).toEqual([
+      {
+        emailAccountId: "email-account-id",
+        status: "success",
+        expirationDate,
+      },
+    ]);
+  });
 });

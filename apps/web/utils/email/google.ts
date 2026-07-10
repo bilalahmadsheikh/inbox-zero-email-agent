@@ -1517,13 +1517,14 @@ export class GmailProvider implements EmailProvider {
 
   async watchEmails(): Promise<{
     expirationDate: Date;
+    historyId?: string;
     subscriptionId?: string;
   } | null> {
     const res = await watchGmail(this.client);
 
     if (res.expiration) {
       const expirationDate = new Date(+res.expiration);
-      return { expirationDate };
+      return { expirationDate, historyId: res.historyId || undefined };
     }
     return null;
   }

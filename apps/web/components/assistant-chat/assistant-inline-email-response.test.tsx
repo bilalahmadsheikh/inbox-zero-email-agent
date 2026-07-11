@@ -172,6 +172,56 @@ describe("AssistantInlineEmailResponse", () => {
     );
   });
 
+  it("renders inline email detail blocks outside markdown paragraphs", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    mockUseThread.mockReturnValue({
+      data: {
+        thread: {
+          id: "thread-1",
+          messages: [
+            {
+              id: "message-1",
+              threadId: "thread-1",
+              subject: "Rendered detail subject",
+              snippet: "Rendered detail snippet",
+              date: "2026-03-11T11:00:00.000Z",
+              historyId: "history-1",
+              inline: [],
+              headers: {
+                from: "Sender <sender@example.com>",
+                to: "user@example.com",
+                date: "2026-03-11T11:00:00.000Z",
+                subject: "Rendered detail subject",
+              },
+              textPlain: "Rendered detail body",
+            },
+          ],
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    render(
+      createElement(
+        AssistantInlineEmailResponse,
+        null,
+        'This one matters <email-detail threadid="thread-1">Focus on the action item.</email-detail>',
+      ),
+    );
+
+    expect(screen.getByText("Rendered detail body")).toBeTruthy();
+    expect(
+      consoleErrorSpy.mock.calls.some((call) =>
+        String(call[0]).includes("cannot contain a nested <div>"),
+      ),
+    ).toBe(false);
+
+    consoleErrorSpy.mockRestore();
+  });
   it("renders inline rule suggestions and can ask chat to create one", async () => {
     render(
       createElement(

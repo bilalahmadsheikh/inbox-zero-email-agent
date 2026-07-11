@@ -242,7 +242,12 @@ async function watchEmails({
       if (result) {
         await prisma.emailAccount.update({
           where: { id: emailAccountId },
-          data: { watchEmailsExpirationDate: result.expirationDate },
+          data: {
+            watchEmailsExpirationDate: result.expirationDate,
+            ...(result.historyId
+              ? { lastSyncedHistoryId: result.historyId }
+              : {}),
+          },
         });
         return { success: true, expirationDate: result.expirationDate };
       }

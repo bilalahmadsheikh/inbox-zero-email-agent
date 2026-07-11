@@ -72,6 +72,97 @@ describe("sendEmailWithHtml", () => {
     });
   });
 
+  it("parses formatted recipients when sending a threaded reply", async () => {
+    const createReplyPost = vi.fn(
+      async () =>
+        ({
+          id: "reply-draft-1",
+          conversationId: "conversation-1",
+        }) as Message,
+    );
+    const patchDraft = vi.fn(async () => ({}));
+    const sendPost = vi.fn(async () => ({}));
+
+    const client = createMockOutlookClient((path) => {
+      if (path === "/me/messages/original-1/createReply")
+        return { post: createReplyPost };
+      if (path === "/me/messages/reply-draft-1")
+        return { patch: patchDraft, get: async () => ({}) };
+      if (path === "/me/messages/reply-draft-1/send") return { post: sendPost };
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+
+    await sendEmailWithHtml(
+      client,
+      {
+        to: "Da Reap <dareap@example.com>",
+        subject: "Re: Meeting",
+        messageHtml: "<p>Following up</p>",
+        replyToEmail: {
+          threadId: "conversation-1",
+          headerMessageId: "<abc@mail.example.com>",
+          messageId: "original-1",
+        },
+      },
+      createTestLogger(),
+    );
+
+    expect(patchDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toRecipients: [
+          {
+            emailAddress: {
+              address: "dareap@example.com",
+              name: "Da Reap",
+            },
+          },
+        ],
+      }),
+    );
+    expect(sendPost).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to an unthreaded send when the original reply message is gone", async () => {
+    const createReplyPost = vi.fn(async () => {
+      throw new Error("ErrorItemNotFound");
+    });
+    const draftPost = vi.fn(
+      async () =>
+        ({
+          id: "draft-1",
+          conversationId: "conversation-2",
+        }) as Message,
+    );
+    const sendPost = vi.fn(async () => ({}));
+
+    const client = createMockOutlookClient((path) => {
+      if (path === "/me/messages/original-gone/createReply")
+        return { post: createReplyPost };
+      if (path === "/me/messages") return { post: draftPost };
+      if (path === "/me/messages/draft-1/send") return { post: sendPost };
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+
+    const result = await sendEmailWithHtml(
+      client,
+      {
+        to: "recipient@example.com",
+        subject: "Re: Meeting",
+        messageHtml: "<p>Following up</p>",
+        replyToEmail: {
+          threadId: "conversation-2",
+          headerMessageId: "<abc@mail.example.com>",
+          messageId: "original-gone",
+        },
+      },
+      createTestLogger(),
+    );
+
+    expect(draftPost).toHaveBeenCalledTimes(1);
+    expect(sendPost).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ id: "", conversationId: "conversation-2" });
+  });
+
   it("decodes base64 string attachments before uploading", async () => {
     const draftPost = vi.fn(
       async () =>

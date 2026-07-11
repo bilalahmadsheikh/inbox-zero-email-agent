@@ -38,7 +38,16 @@ export async function sendEmailWithHtml(
   // For replies with a message ID, use createReply for proper threading
   // Microsoft Graph's sendMail doesn't support In-Reply-To/References headers
   if (body.replyToEmail?.messageId) {
-    return sendReplyUsingCreateReply(client, body, logger);
+    try {
+      return await sendReplyUsingCreateReply(client, body, logger);
+    } catch (error) {
+      // The original message may have been moved or deleted since the reply
+      // was queued (Graph ids change across folder moves). Deliver the email
+      // unthreaded rather than failing the send.
+      logger.warn("createReply threading failed, sending unthreaded", {
+        error,
+      });
+    }
   }
 
   const toRecipients = buildGraphRecipients(body.to);
@@ -441,6 +450,11 @@ async function sendReplyUsingCreateReply(
     logger,
   );
 
+  const toRecipients = buildGraphRecipients(body.to);
+  if (!toRecipients?.length) throw new Error("Recipient address is required");
+  const ccRecipients = buildGraphRecipients(body.cc);
+  const bccRecipients = buildGraphRecipients(body.bcc);
+
   // Update the draft with our content and recipients
   // Note: We cannot set In-Reply-To/References headers via internetMessageHeaders
   // as Microsoft Graph only allows custom headers (starting with x-) there.
@@ -456,13 +470,9 @@ async function sendReplyUsingCreateReply(
             contentType: "html",
             content: body.messageHtml,
           },
-          toRecipients: [{ emailAddress: { address: body.to } }],
-          ...(body.cc
-            ? { ccRecipients: [{ emailAddress: { address: body.cc } }] }
-            : {}),
-          ...(body.bcc
-            ? { bccRecipients: [{ emailAddress: { address: body.bcc } }] }
-            : {}),
+          toRecipients,
+          ...(ccRecipients ? { ccRecipients } : {}),
+          ...(bccRecipients ? { bccRecipients } : {}),
         }),
     logger,
   );

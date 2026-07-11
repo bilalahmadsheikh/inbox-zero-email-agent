@@ -1,5 +1,6 @@
 import type { ChangeEvent } from "react";
 import { useState } from "react";
+import { addHours, nextMonday, setHours, setMinutes } from "date-fns";
 import { useQueryState } from "nuqs";
 import type { AddToKnowledgeBaseTool } from "@/utils/ai/assistant/tools/rules/add-to-knowledge-base-tool";
 import type { CreateRuleTool } from "@/utils/ai/assistant/tools/rules/create-rule-tool";
@@ -622,8 +623,6 @@ function EmailActionResult({
   const displaySubject = decodeHtmlEntities(subject || referenceSubject);
   const body = getActionBodyText({ actionType, pendingAction });
   const [editedBody, setEditedBody] = useState(body || "");
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [customSendAt, setCustomSendAt] = useState("");
   const pendingSendAt = getPendingString(pendingAction, "sendAt");
   const scheduledFor = confirmationResult?.scheduledFor || pendingSendAt;
   const scheduledForLabel = scheduledFor
@@ -644,6 +643,11 @@ function EmailActionResult({
     repeatEveryMinutes && repeatCount
       ? `repeats every ${repeatEveryMinutes} min, ${repeatCount} sends total`
       : null;
+  const canPickTime =
+    !isConfirmed &&
+    requiresConfirmation &&
+    isPersistedMessage &&
+    (actionType === "send_email" || actionType === "reply_email");
 
   const messageId =
     confirmationResult?.messageId ||
@@ -739,9 +743,27 @@ function EmailActionResult({
             </div>
           )}
           {scheduledForLabel && (
-            <div className="mt-0.5 text-xs text-muted-foreground">
-              Scheduled for: {scheduledForLabel}
-              {repeatLabel ? ` · ${repeatLabel}` : ""}
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <span>
+                Scheduled for: {scheduledForLabel}
+                {repeatLabel ? ` · ${repeatLabel}` : ""}
+              </span>
+              {canPickTime && pendingSendAt && (
+                <ScheduleTimePicker
+                  initialValue={new Date(pendingSendAt)}
+                  disabled={isConfirming || isProcessing || isChatBusy}
+                  onSchedule={(iso) => handleSend(iso)}
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label="Change send time"
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <PencilIcon className="size-3" />
+                    </button>
+                  }
+                />
+              )}
             </div>
           )}
         </div>
@@ -848,8 +870,7 @@ function EmailActionResult({
 
           {!isConfirmed && requiresConfirmation && (
             <div className="flex items-center gap-2">
-              {(actionType === "send_email" || actionType === "reply_email") &&
-                isPersistedMessage &&
+              {canPickTime &&
                 (pendingSendAt ? (
                   <Button
                     onClick={() => handleSend(null)}
@@ -862,20 +883,11 @@ function EmailActionResult({
                     Send now
                   </Button>
                 ) : (
-                  <Popover
-                    open={scheduleOpen}
-                    onOpenChange={(open) => {
-                      setScheduleOpen(open);
-                      if (open) {
-                        setCustomSendAt(
-                          toDatetimeLocalValue(
-                            new Date(Date.now() + 60 * 60 * 1000),
-                          ),
-                        );
-                      }
-                    }}
-                  >
-                    <PopoverTrigger asChild>
+                  <ScheduleTimePicker
+                    initialValue={addHours(new Date(), 1)}
+                    disabled={isConfirming || isProcessing || isChatBusy}
+                    onSchedule={(iso) => handleSend(iso)}
+                    trigger={
                       <Button
                         disabled={isConfirming || isProcessing || isChatBusy}
                         variant="outline"
@@ -885,46 +897,8 @@ function EmailActionResult({
                         <ClockIcon className="hidden size-3.5 sm:inline" />
                         Schedule
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-3" align="end">
-                      <div className="space-y-2">
-                        <div className="text-xs font-medium text-muted-foreground">
-                          Send at
-                        </div>
-                        <input
-                          type="datetime-local"
-                          className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                          value={customSendAt}
-                          min={toDatetimeLocalValue(new Date())}
-                          onChange={(event) =>
-                            setCustomSendAt(event.target.value)
-                          }
-                        />
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          disabled={!customSendAt || isConfirming}
-                          onClick={() => {
-                            const chosen = new Date(customSendAt);
-                            if (
-                              Number.isNaN(chosen.getTime()) ||
-                              chosen.getTime() < Date.now() + 60 * 1000
-                            ) {
-                              toastError({
-                                description:
-                                  "Pick a time at least a minute in the future.",
-                              });
-                              return;
-                            }
-                            setScheduleOpen(false);
-                            handleSend(chosen.toISOString());
-                          }}
-                        >
-                          Schedule
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                    }
+                  />
                 ))}
               <Button
                 onClick={() => handleSend()}
@@ -2540,6 +2514,101 @@ function FieldLabel({
   className?: string;
 }) {
   return <RuleSummaryLabel className={className}>{children}</RuleSummaryLabel>;
+}
+
+function ScheduleTimePicker({
+  trigger,
+  initialValue,
+  disabled,
+  onSchedule,
+}: {
+  trigger: React.ReactNode;
+  initialValue: Date;
+  disabled?: boolean;
+  onSchedule: (iso: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [customSendAt, setCustomSendAt] = useState("");
+
+  const schedule = (date: Date) => {
+    setOpen(false);
+    onSchedule(date.toISOString());
+  };
+
+  const presets = [
+    { label: "In 1 hour", getDate: () => addHours(new Date(), 1) },
+    {
+      label: "Tomorrow 8:00 AM",
+      getDate: () => setMinutes(setHours(addHours(new Date(), 24), 8), 0),
+    },
+    {
+      label: "Monday 8:00 AM",
+      getDate: () => setMinutes(setHours(nextMonday(new Date()), 8), 0),
+    },
+  ];
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (disabled) return;
+        setOpen(nextOpen);
+        if (nextOpen) setCustomSendAt(toDatetimeLocalValue(initialValue));
+      }}
+    >
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent className="w-64 p-3" align="end">
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-muted-foreground">
+            Send at
+          </div>
+          <div className="grid gap-1">
+            {presets.map((preset) => (
+              <Button
+                key={preset.label}
+                variant="outline"
+                size="sm"
+                className="justify-start"
+                onClick={() => schedule(preset.getDate())}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+          <div className="text-xs font-medium text-muted-foreground">
+            Or pick a time
+          </div>
+          <input
+            type="datetime-local"
+            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+            value={customSendAt}
+            min={toDatetimeLocalValue(new Date())}
+            onChange={(event) => setCustomSendAt(event.target.value)}
+          />
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={!customSendAt}
+            onClick={() => {
+              const chosen = new Date(customSendAt);
+              if (
+                Number.isNaN(chosen.getTime()) ||
+                chosen.getTime() < Date.now() + 60 * 1000
+              ) {
+                toastError({
+                  description: "Pick a time at least a minute in the future.",
+                });
+                return;
+              }
+              schedule(chosen);
+            }}
+          >
+            Schedule
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function toDatetimeLocalValue(date: Date) {

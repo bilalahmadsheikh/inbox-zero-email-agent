@@ -24,6 +24,7 @@ import {
   getVisibleActions,
 } from "@/utils/action-display";
 import { getActionColor } from "@/components/PlanBadge";
+import { TriageBadge } from "@/components/TriageBadge";
 import { useAccount } from "@/providers/EmailAccountProvider";
 
 export function ResultsDisplay({
@@ -87,19 +88,22 @@ function ResultDisplay({
   }
 
   return (
-    <HoverCard
-      content={<ResultDisplayContent result={result} />}
-      className="w-max min-w-64 max-w-[min(32rem,calc(100vw-2rem))] overflow-visible"
-    >
-      <Badge color={rule ? "green" : "red"} className="whitespace-nowrap">
-        {rule
-          ? rule.name
-          : status === ExecutedRuleStatus.SKIPPED
-            ? "No match found"
-            : capitalCase(status)}
-        <EyeIcon className="ml-1.5 size-3.5 opacity-70" />
-      </Badge>
-    </HoverCard>
+    <div className="flex items-center gap-1">
+      <TriageBadge tier={result.triageTier} reason={result.triageReason} />
+      <HoverCard
+        content={<ResultDisplayContent result={result} />}
+        className="w-max min-w-64 max-w-[min(32rem,calc(100vw-2rem))] overflow-visible"
+      >
+        <Badge color={rule ? "green" : "red"} className="whitespace-nowrap">
+          {rule
+            ? rule.name
+            : status === ExecutedRuleStatus.SKIPPED
+              ? "No match found"
+              : capitalCase(status)}
+          <EyeIcon className="ml-1.5 size-3.5 opacity-70" />
+        </Badge>
+      </HoverCard>
+    </div>
   );
 }
 
@@ -126,6 +130,16 @@ export function ResultDisplayContent({ result }: { result: RunRulesResult }) {
           status === ExecutedRuleStatus.SKIPPED && "No match found"
         )}
       </div>
+      {result.triageTier && (
+        <div className="mt-2 flex items-center gap-2">
+          <TriageBadge tier={result.triageTier} />
+          {result.triageReason && (
+            <span className="text-sm text-muted-foreground">
+              {result.triageReason}
+            </span>
+          )}
+        </div>
+      )}
       <div className="mt-2">
         {rule ? <PrettyConditions rule={rule} /> : null}
       </div>

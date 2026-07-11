@@ -63,6 +63,8 @@ async function getExecutedRules({
         actionItems: true,
         status: true,
         reason: true,
+        triageTier: true,
+        triageReason: true,
         matchMetadata: true,
         automated: true,
         createdAt: true,

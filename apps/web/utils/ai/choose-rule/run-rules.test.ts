@@ -680,6 +680,78 @@ describe("runRules draft attribution persistence", () => {
   });
 });
 
+describe("runRules triage persistence", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("persists the triage tier and reason on executed rules", async () => {
+    const archiveRule = createRule("newsletter-rule", null, [
+      getAction({ id: "archive-action-1", type: ActionType.ARCHIVE }),
+    ]);
+
+    vi.mocked(findMatchingRules).mockResolvedValue({
+      matches: [
+        { rule: archiveRule, matchReasons: [{ type: ConditionType.AI }] },
+      ],
+      reasoning: "Matched newsletter rule",
+      triage: { tier: "FYI", reason: "Weekly newsletter, no action needed" },
+    } as any);
+    prisma.executedRule.findFirst.mockResolvedValue(null);
+    vi.mocked(getActionItemsWithAiArgs).mockResolvedValue([
+      getAction({ id: "archive-action-1", type: ActionType.ARCHIVE }) as any,
+    ]);
+
+    const createSpy = mockExecutedRuleCreate({ rule: archiveRule });
+
+    const results = await runRulesWithDefaults({ rules: [archiveRule] });
+
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          triageTier: "FYI",
+          triageReason: "Weekly newsletter, no action needed",
+        }),
+      }),
+    );
+    expect(results[0]).toMatchObject({
+      triageTier: "FYI",
+      triageReason: "Weekly newsletter, no action needed",
+    });
+  });
+
+  it("persists triage on skipped executions when no rules match", async () => {
+    vi.mocked(findMatchingRules).mockResolvedValue({
+      matches: [],
+      reasoning: "No rules matched",
+      triage: {
+        tier: "URGENT",
+        reason: "Sender reports the production database is down",
+      },
+    } as any);
+    prisma.executedRule.findFirst.mockResolvedValue(null);
+    prisma.executedRule.create.mockResolvedValue({ id: "skip-1" } as any);
+
+    const results = await runRulesWithDefaults({
+      rules: [createRule("some-rule", null)],
+    });
+
+    expect(prisma.executedRule.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: ExecutedRuleStatus.SKIPPED,
+          triageTier: "URGENT",
+          triageReason: "Sender reports the production database is down",
+        }),
+      }),
+    );
+    expect(results[0]).toMatchObject({
+      triageTier: "URGENT",
+      triageReason: "Sender reports the production database is down",
+    });
+  });
+});
+
 describe("runRules outbound guardrails", () => {
   beforeEach(() => {
     vi.clearAllMocks();

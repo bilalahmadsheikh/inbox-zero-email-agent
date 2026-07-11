@@ -9,6 +9,7 @@ import {
   updateRuleSettingsBody,
   enableDraftRepliesBody,
   enableMultiRuleSelectionBody,
+  enableTriageLabelsBody,
   updateDraftReplyConfidenceBody,
   deleteRuleBody,
   createRulesOnboardingBody,
@@ -267,6 +268,16 @@ export const enableMultiRuleSelectionAction = actionClient
     await prisma.emailAccount.update({
       where: { id: emailAccountId },
       data: { multiRuleSelectionEnabled: enable },
+    });
+  });
+
+export const enableTriageLabelsAction = actionClient
+  .metadata({ name: "enableTriageLabels" })
+  .inputSchema(enableTriageLabelsBody)
+  .action(async ({ ctx: { emailAccountId }, parsedInput: { enable } }) => {
+    await prisma.emailAccount.update({
+      where: { id: emailAccountId },
+      data: { triageLabelsEnabled: enable },
     });
   });
 

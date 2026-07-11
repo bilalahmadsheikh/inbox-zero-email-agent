@@ -320,6 +320,9 @@ export type EnableMultiRuleSelectionBody = z.infer<
   typeof enableMultiRuleSelectionBody
 >;
 
+export const enableTriageLabelsBody = z.object({ enable: z.boolean() });
+export type EnableTriageLabelsBody = z.infer<typeof enableTriageLabelsBody>;
+
 export const updateDraftReplyConfidenceBody = z.object({
   confidence: z.nativeEnum(DraftReplyConfidence),
 });

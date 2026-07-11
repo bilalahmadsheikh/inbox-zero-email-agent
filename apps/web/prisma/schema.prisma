@@ -149,6 +149,7 @@ model EmailAccount {
   rulesPrompt               String? // @deprecated
   autoCategorizeSenders     Boolean              @default(false)
   multiRuleSelectionEnabled Boolean              @default(false)
+  triageLabelsEnabled       Boolean              @default(false) // apply Priority/Urgent-Important-FYI labels in the mailbox
   sensitiveDataPolicy       String?
   draftReplyConfidence      DraftReplyConfidence @default(ALL_EMAILS)
   draftCleanupDays          Int?                 @default(14)
@@ -661,6 +662,10 @@ model ExecutedRule {
   automated     Boolean
   reason        String?
   matchMetadata Json? // Stores structured match information (e.g., learned patterns, match types)
+
+  // Priority triage: every AI-processed email gets a tier and a one-line reason
+  triageTier   TriageTier?
+  triageReason String?
 
   // may be null if the rule was deleted
   ruleId String?
@@ -1700,6 +1705,12 @@ model McpTool {
   connection   McpConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@unique([connectionId, name])
+}
+
+enum TriageTier {
+  URGENT
+  IMPORTANT
+  FYI
 }
 
 enum ActionType {

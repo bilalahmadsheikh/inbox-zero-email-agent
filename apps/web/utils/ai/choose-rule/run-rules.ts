@@ -6,7 +6,9 @@ import {
   GroupItemSource,
   SystemType,
 } from "@/generated/prisma/enums";
-import type { Prisma, Rule } from "@/generated/prisma/client";
+import type { Prisma, Rule, TriageTier } from "@/generated/prisma/client";
+import type { EmailTriage } from "@/utils/ai/choose-rule/ai-choose-rule";
+import { applyTriageLabel } from "@/utils/triage/apply-triage-label";
 import type { ActionItem } from "@/utils/ai/types";
 import { findMatchingRules } from "@/utils/ai/choose-rule/match-rules";
 import {
@@ -79,6 +81,8 @@ export type RunRulesResult = {
   selectionMetadata?: RuleSelectionMetadata;
   existing?: boolean;
   createdAt: Date;
+  triageTier?: TriageTier | null;
+  triageReason?: string | null;
 };
 
 export const CONVERSATION_TRACKING_META_RULE_ID = "conversation-tracking-meta";
@@ -130,6 +134,19 @@ export async function runRules({
     modelType,
     logger,
   });
+
+  if (!isTest && results.triage) {
+    const triageTier = results.triage.tier;
+    after(() =>
+      applyTriageLabel({
+        client: provider,
+        emailAccountId: emailAccount.id,
+        messageId: message.id,
+        tier: triageTier,
+        logger,
+      }),
+    );
+  }
 
   const calendarAwareMatches = ensureConversationRuleForAiCalendarMatch({
     conversationRules,
@@ -212,6 +229,8 @@ export async function runRules({
               reason,
               matchMetadata: undefined,
               status: ExecutedRuleStatus.SKIPPED,
+              triageTier: results.triage?.tier ?? null,
+              triageReason: results.triage?.reason ?? null,
               emailAccount: { connect: { id: emailAccount.id } },
             },
           }),
@@ -226,6 +245,8 @@ export async function runRules({
         status: ExecutedRuleStatus.SKIPPED,
         selectionMetadata: results.selectionMetadata,
         createdAt: batchTimestamp,
+        triageTier: results.triage?.tier ?? null,
+        triageReason: results.triage?.reason ?? null,
       },
     ];
   }
@@ -260,6 +281,7 @@ export async function runRules({
       batchTimestamp,
       logger,
       skipArchive,
+      results.triage,
     );
 
     executedRules.push({
@@ -374,6 +396,7 @@ async function executeMatchedRule(
   batchTimestamp: Date,
   logger: Logger,
   skipArchive?: boolean,
+  triage?: EmailTriage | null,
 ) {
   const blockedActionTypes = getBlockedLowTrustStaticFromActionTypes(
     rule.from,
@@ -424,6 +447,8 @@ async function executeMatchedRule(
           automated: true,
           status: ExecutedRuleStatus.SKIPPED,
           reason: reasonToUse,
+          triageTier: triage?.tier ?? null,
+          triageReason: triage?.reason ?? null,
           matchMetadata: serializeMatchReasons(matchReasons),
           rule: rule?.id ? { connect: { id: rule.id } } : undefined,
           emailAccount: { connect: { id: emailAccount.id } },
@@ -440,6 +465,8 @@ async function executeMatchedRule(
       status: ExecutedRuleStatus.SKIPPED,
       matchReasons,
       createdAt: batchTimestamp,
+      triageTier: triage?.tier ?? null,
+      triageReason: triage?.reason ?? null,
     };
   }
 
@@ -457,6 +484,8 @@ async function executeMatchedRule(
       reason,
       matchReasons,
       createdAt: batchTimestamp,
+      triageTier: triage?.tier ?? null,
+      triageReason: triage?.reason ?? null,
     };
   }
 
@@ -504,6 +533,8 @@ async function executeMatchedRule(
           automated: true,
           status: ExecutedRuleStatus.APPLYING, // Changed from PENDING - rules are now always automated
           reason,
+          triageTier: triage?.tier ?? null,
+          triageReason: triage?.reason ?? null,
           matchMetadata: serializeMatchReasons(matchReasons),
           rule: rule?.id ? { connect: { id: rule.id } } : undefined,
           emailAccount: { connect: { id: emailAccount.id } },
@@ -613,6 +644,8 @@ async function executeMatchedRule(
     matchReasons,
     status: finalStatus,
     createdAt: batchTimestamp,
+    triageTier: triage?.tier ?? null,
+    triageReason: triage?.reason ?? null,
   };
 }
 

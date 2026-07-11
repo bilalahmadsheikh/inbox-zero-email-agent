@@ -11,6 +11,7 @@ import { LearnedPatternsSetting } from "@/app/(app)/[emailAccountId]/assistant/s
 import { PersonalSignatureSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/PersonalSignatureSetting";
 import { MultiRuleSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/MultiRuleSetting";
 import { SyncToExtensionSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/SyncToExtensionSetting";
+import { TriageLabelsSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/TriageLabelsSetting";
 import { WritingStyleSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/WritingStyleSetting";
 import { SectionHeader } from "@/components/Typography";
 import { env } from "@/env";
@@ -29,6 +30,7 @@ export function SettingsTab() {
 
       <div className="space-y-2">
         <SectionHeader>Updates</SectionHeader>
+        <TriageLabelsSetting />
         <FollowUpRemindersSetting />
         {env.NEXT_PUBLIC_DIGEST_ENABLED && <DigestSetting />}
       </div>

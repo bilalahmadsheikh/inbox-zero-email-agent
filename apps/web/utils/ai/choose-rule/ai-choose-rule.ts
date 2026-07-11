@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TriageTier } from "@/generated/prisma/enums";
 import type { EmailAccountWithAI } from "@/utils/llms/types";
 import { stringifyEmail } from "@/utils/stringify-email";
 import { isDefined, type EmailForLLM } from "@/utils/types";
@@ -21,6 +22,40 @@ type GetAiResponseOptions = {
   classificationFeedback?: ClassificationFeedbackItem[] | null;
 };
 
+export type EmailTriage = {
+  tier: TriageTier;
+  reason: string;
+};
+
+const TRIAGE_TIER_VALUES = [
+  TriageTier.URGENT,
+  TriageTier.IMPORTANT,
+  TriageTier.FYI,
+] as const;
+
+const MAX_TRIAGE_REASON_WORDS = 15;
+
+const triageSchemaFields = {
+  triageTier: z
+    .enum(TRIAGE_TIER_VALUES)
+    .describe(
+      "Priority tier for this email, independent of rule matching. URGENT: needs the user's action or attention right away. IMPORTANT: deserves attention soon. FYI: no action needed.",
+    ),
+  triageReason: z
+    .string()
+    .describe(
+      "One-line explanation (15 words max) telling the user exactly why this email got its tier. Be specific to this email.",
+    ),
+};
+
+const TRIAGE_PROMPT_SECTION = `<triage>
+  Always classify this email into a priority tier (triageTier) with a one-line reason (triageReason), even when no rule matches:
+  - URGENT: needs the user's action or attention right away (hard deadlines, emergencies, blocking requests, time-critical problems).
+  - IMPORTANT: matters to the user and deserves attention soon (real work, decisions, questions from people they know).
+  - FYI: no action needed (updates, newsletters, marketing, receipts, automated notifications).
+  The triageReason must be specific to this email, at most 15 words, and written for the user (e.g. "Boss asked for the report by 5pm today").
+</triage>`;
+
 export async function aiChooseRule<
   T extends { name: string; instructions: string; systemType?: string | null },
 >({
@@ -40,8 +75,11 @@ export async function aiChooseRule<
 }): Promise<{
   rules: { rule: T; isPrimary?: boolean }[];
   reason: string;
+  triage: EmailTriage | null;
 }> {
-  if (!rules.length) return { rules: [], reason: "No rules to evaluate" };
+  if (!rules.length) {
+    return { rules: [], reason: "No rules to evaluate", triage: null };
+  }
 
   const orderedRules = sortRulesForAutomation(rules);
 
@@ -70,16 +108,20 @@ export async function aiChooseRule<
     rulesWithMetadata,
   });
 
+  const triage = buildTriage(aiResponse);
+
   if (aiResponse.noMatchFound) {
     return {
       rules: [],
       reason: aiResponse.reasoning || "AI determined no rules matched",
+      triage,
     };
   }
 
   return {
     rules: rulesWithMetadata,
     reason: aiResponse.reasoning,
+    triage,
   };
 }
 
@@ -88,6 +130,8 @@ async function getAiResponse(options: GetAiResponseOptions): Promise<{
     matchedRules: { ruleName: string; isPrimary?: boolean }[];
     reasoning: string;
     noMatchFound: boolean;
+    triageTier?: string;
+    triageReason?: string;
   };
   modelOptions: ReturnType<typeof getModel>;
 }> {
@@ -167,6 +211,8 @@ async function getAiResponseSingleRule({
   - Rules about requiring replies should be prioritized when the email clearly needs a response.
   ${METADATA_GUIDELINE}
   </guidelines>
+
+  ${TRIAGE_PROMPT_SECTION}
 </instructions>
 
 ${getUserRulesPrompt({ rules })}
@@ -181,7 +227,9 @@ Example response format:
 {
   "reasoning": "This email is a newsletter subscription",
   "ruleName": "Newsletter",
-  "noMatchFound": false
+  "noMatchFound": false,
+  "triageTier": "FYI",
+  "triageReason": "Weekly newsletter, no response or action needed"
 }`;
 
   const prompt = `Select a rule to apply to this email that was sent to me:
@@ -205,6 +253,7 @@ ${stringifyEmail(email, 500)}
       noMatchFound: z
         .boolean()
         .describe("True if no match was found, false otherwise"),
+      ...triageSchemaFields,
     }),
   });
 
@@ -218,6 +267,8 @@ ${stringifyEmail(email, 500)}
           : [],
       noMatchFound: aiResponse.object?.noMatchFound ?? !hasRuleName,
       reasoning: aiResponse.object?.reasoning,
+      triageTier: aiResponse.object?.triageTier,
+      triageReason: aiResponse.object?.triageReason,
     },
     modelOptions,
   };
@@ -267,6 +318,8 @@ async function getAiResponseMultiRule({
   - Be concise in your reasoning - avoid repetitive explanations.
   ${METADATA_GUIDELINE}
   </guidelines>
+
+  ${TRIAGE_PROMPT_SECTION}
 </instructions>
 
 <available_rules>
@@ -283,7 +336,9 @@ Example response format (single rule):
 {
   "matchedRules": [{ "ruleName": "Newsletter", "isPrimary": true }],
   "noMatchFound": false,
-  "reasoning": "This is a newsletter subscription"
+  "reasoning": "This is a newsletter subscription",
+  "triageTier": "FYI",
+  "triageReason": "Weekly newsletter, no response or action needed"
 }
 
 Example response format (multiple rules):
@@ -293,7 +348,9 @@ Example response format (multiple rules):
     { "ruleName": "Team Emails", "isPrimary": false }
   ],
   "noMatchFound": false,
-  "reasoning": "This email requires a response and is from a team member"
+  "reasoning": "This email requires a response and is from a team member",
+  "triageTier": "IMPORTANT",
+  "triageReason": "Teammate is waiting on your answer about the launch plan"
 }`;
 
   const prompt = `Select all rules that apply to this email that was sent to me:
@@ -331,6 +388,7 @@ ${stringifyEmail(email, 500)}
       noMatchFound: z
         .boolean()
         .describe("True if no match was found, false otherwise"),
+      ...triageSchemaFields,
     }),
   });
 
@@ -338,6 +396,8 @@ ${stringifyEmail(email, 500)}
     matchedRules: aiResponse.object.matchedRules || [],
     noMatchFound: aiResponse.object?.noMatchFound ?? false,
     reasoning: aiResponse.object?.reasoning ?? "",
+    triageTier: aiResponse.object?.triageTier,
+    triageReason: aiResponse.object?.triageReason,
   };
 
   if (isOllamaProvider(modelOptions.provider)) {
@@ -411,6 +471,29 @@ function logAiChooseRuleResult<
 
 function joinLogValues(values: (string | null | undefined)[]) {
   return values.filter(isDefined).join(", ");
+}
+
+function buildTriage(aiResponse: {
+  triageTier?: string;
+  triageReason?: string;
+}): EmailTriage | null {
+  const tier = TRIAGE_TIER_VALUES.find(
+    (value) => value === aiResponse.triageTier,
+  );
+  if (!tier) return null;
+
+  return {
+    tier,
+    reason: truncateWords(
+      aiResponse.triageReason || "",
+      MAX_TRIAGE_REASON_WORDS,
+    ),
+  };
+}
+
+// Hard cap regardless of what the model produced: the reason must stay one line.
+function truncateWords(text: string, maxWords: number) {
+  return text.trim().split(/\s+/).filter(Boolean).slice(0, maxWords).join(" ");
 }
 
 function formatClassificationFeedback(

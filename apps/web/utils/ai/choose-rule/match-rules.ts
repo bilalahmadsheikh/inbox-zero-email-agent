@@ -12,7 +12,10 @@ import {
 } from "@/generated/prisma/enums";
 import { ConditionType } from "@/utils/config";
 import prisma from "@/utils/prisma";
-import { aiChooseRule } from "@/utils/ai/choose-rule/ai-choose-rule";
+import {
+  aiChooseRule,
+  type EmailTriage,
+} from "@/utils/ai/choose-rule/ai-choose-rule";
 import { getEmailForLLM } from "@/utils/get-email-from-message";
 import type { EmailAccountWithAI } from "@/utils/llms/types";
 import type { Logger } from "@/utils/logger";
@@ -68,6 +71,7 @@ type MatchingRulesResult = {
   }[];
   reasoning: string;
   selectionMetadata: RuleSelectionMetadata;
+  triage: EmailTriage | null;
 };
 
 export async function findMatchingRules({
@@ -124,6 +128,7 @@ export async function findMatchingRules({
         selectionMetadata: createRuleSelectionMetadata({
           isThread: provider.isReplyInThread(message),
         }),
+        triage: null,
       };
     }
   }
@@ -562,6 +567,7 @@ async function findMatchingRulesWithReasons(
         fullResult.reason,
       ),
       selectionMetadata,
+      triage: fullResult.triage,
     };
   }
 
@@ -569,6 +575,7 @@ async function findMatchingRulesWithReasons(
     matches,
     reasoning: getMatchesReasoning(matches),
     selectionMetadata,
+    triage: null,
   };
 }
 

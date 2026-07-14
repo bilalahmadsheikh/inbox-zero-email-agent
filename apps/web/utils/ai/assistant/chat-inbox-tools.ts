@@ -112,32 +112,6 @@ const sendAtFieldSchema = z
   .describe(
     "Only when the user explicitly asks to schedule for later: the UTC instant to send, as an ISO 8601 string (e.g. 2026-07-09T04:00:00Z). Convert natural language like 'tomorrow at 9am' using the user's timezone and the current time from context. Must be at least 1 minute in the future and at most 90 days out. Omit entirely for immediate sends. Never set this to the current time or near-current time for immediate sends.",
   );
-const repeatFieldsSchema = {
-  repeatEveryMinutes: z
-    .number()
-    .int()
-    .min(1)
-    .max(1440)
-    .optional()
-    .describe(
-      "Only when the user's CURRENT message explicitly asks for recurring or repeated reminders: minutes between resends after the first send. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send with sendAt and NO repeat fields; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. Earlier recurring emails in this conversation are never a reason to repeat a new one.",
-    ),
-  repeatCount: z
-    .number()
-    .int()
-    .min(2)
-    .max(10)
-    .optional()
-    .describe(
-      "Only when the user's CURRENT message explicitly asks for recurring or repeated reminders: total number of sends including the first (2-10). Requires sendAt, repeatEveryMinutes, and repeatRequestQuote.",
-    ),
-  repeatRequestQuote: z
-    .string()
-    .optional()
-    .describe(
-      "Required whenever repeat fields are set: the user's verbatim words from their CURRENT message that ask for repeated sends (e.g. 'every 10 minutes until she replies'). If you cannot quote such words, do not set any repeat fields.",
-    ),
-};
 const sendEmailToolInputSchema = z
   .object({
     ...recipientFieldsSchema,
@@ -148,7 +122,6 @@ const sendEmailToolInputSchema = z
       .min(1)
       .describe("HTML body content for the email draft."),
     sendAt: sendAtFieldSchema,
-    ...repeatFieldsSchema,
   })
   .strict();
 const draftEmailToolInputSchema = z
@@ -190,7 +163,6 @@ const replyEmailToolInputSchema = z
         "If true, address the reply to everyone on the original email (all original To and Cc recipients), not just the sender. Set this when the user asks to reply to everyone, reply all, or keep the whole thread included.",
       ),
     sendAt: sendAtFieldSchema,
-    ...repeatFieldsSchema,
   })
   .strict();
 const forwardEmailToolInputSchema = z
@@ -1310,9 +1282,6 @@ export const sendEmailTool = ({
         return { error: getSendEmailValidationError(parsedInput.error) };
       }
 
-      const repeatError = getRepeatValidationError(parsedInput.data);
-      if (repeatError) return { error: repeatError };
-
       const normalizedInput = normalizeSendEmailInput(parsedInput.data);
 
       try {
@@ -1592,7 +1561,7 @@ export const replyEmailTool = ({
 }) =>
   tool({
     description:
-      "Prepare a reply to an existing email by message ID, either immediate or scheduled for later via sendAt (with optional repeatEveryMinutes/repeatCount for recurring follow-up reminders in the thread). This does NOT send immediately — it returns a confirmation payload for the user to approve. Scheduled replies are threaded onto the original conversation. Do not recreate replies with sendEmail.",
+      "Prepare a reply to an existing email by message ID, either immediate or scheduled for later via sendAt. This does NOT send immediately — it returns a confirmation payload for the user to approve. Scheduled replies are threaded onto the original conversation. Do not recreate replies with sendEmail.",
     inputSchema: replyEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "reply_email", email, logger });
@@ -1601,9 +1570,6 @@ export const replyEmailTool = ({
       if (!parsedInput.success) {
         return { error: getReplyEmailValidationError(parsedInput.error) };
       }
-
-      const repeatError = getRepeatValidationError(parsedInput.data);
-      if (repeatError) return { error: repeatError };
 
       const normalizedInput = normalizeSendEmailInput(parsedInput.data);
 
@@ -1726,47 +1692,20 @@ function createPendingSendEmailOutput(
       messageHtml: input.messageHtml,
       from,
       sendAt: input.sendAt || null,
-      repeatEveryMinutes: input.repeatEveryMinutes || null,
-      repeatCount: input.repeatCount || null,
     },
   };
 }
 
-function normalizeSendEmailInput<
-  T extends { sendAt?: string; repeatEveryMinutes?: number },
->(input: T): T | Omit<T, "sendAt"> {
-  // Recurring chains keep their sendAt: the queue needs a first occurrence.
-  if (!input.sendAt || input.repeatEveryMinutes) return input;
+function normalizeSendEmailInput<T extends { sendAt?: string }>(
+  input: T,
+): T | Omit<T, "sendAt"> {
+  if (!input.sendAt) return input;
 
   const sendAt = new Date(input.sendAt);
   if (sendAt.getTime() >= Date.now() + MIN_SCHEDULE_AHEAD_MS) return input;
 
   const { sendAt: _sendAt, ...immediateInput } = input;
   return immediateInput;
-}
-
-function getRepeatValidationError(input: {
-  sendAt?: string;
-  repeatEveryMinutes?: number;
-  repeatCount?: number;
-  repeatRequestQuote?: string;
-}) {
-  const hasRepeat =
-    input.repeatEveryMinutes !== undefined || input.repeatCount !== undefined;
-  if (!hasRepeat) return null;
-  if (!input.sendAt) {
-    return "repeatEveryMinutes and repeatCount require sendAt: schedule the first send.";
-  }
-  if (
-    input.repeatEveryMinutes === undefined ||
-    input.repeatCount === undefined
-  ) {
-    return "repeatEveryMinutes and repeatCount must be provided together.";
-  }
-  if (!input.repeatRequestQuote?.trim()) {
-    return "Repeat fields require repeatRequestQuote: quote the user's exact words asking for repeated sends. If the user did not ask for repetition in their current message, retry without any repeat fields.";
-  }
-  return null;
 }
 
 function createPendingReplyEmailOutput(
@@ -1783,8 +1722,6 @@ function createPendingReplyEmailOutput(
       content: input.content,
       replyAll: input.replyAll || null,
       sendAt: input.sendAt || null,
-      repeatEveryMinutes: input.repeatEveryMinutes || null,
-      repeatCount: input.repeatCount || null,
     },
     reference: {
       messageId: message.id,

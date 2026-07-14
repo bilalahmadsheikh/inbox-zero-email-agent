@@ -75,6 +75,7 @@ export async function confirmAssistantEmailActionForAccount({
   actionType,
   contentOverride,
   sendAtOverride,
+  repeatOverride,
   waitForPersistence,
   persistenceWaitMs,
   emailAccountId,
@@ -87,6 +88,7 @@ export async function confirmAssistantEmailActionForAccount({
   actionType: AssistantPendingEmailActionType;
   contentOverride?: string;
   sendAtOverride?: string | null;
+  repeatOverride?: { everyMinutes: number; count: number } | null;
   waitForPersistence?: boolean;
   persistenceWaitMs?: number;
   emailAccountId: string;
@@ -127,6 +129,7 @@ export async function confirmAssistantEmailActionForAccount({
       emailAccountId,
       contentOverride,
       sendAtOverride,
+      repeatOverride,
     });
   } catch (error) {
     await clearPendingPartProcessing({
@@ -420,12 +423,14 @@ async function executeAssistantEmailAction({
   emailAccountId,
   contentOverride,
   sendAtOverride,
+  repeatOverride,
 }: {
   output: AssistantPendingEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
   emailAccountId: string;
   contentOverride?: string;
   sendAtOverride?: string | null;
+  repeatOverride?: { everyMinutes: number; count: number } | null;
 }): Promise<AssistantEmailConfirmationResult> {
   const confirmedAt = new Date().toISOString();
 
@@ -438,6 +443,7 @@ async function executeAssistantEmailAction({
         confirmedAt,
         contentOverride,
         sendAtOverride,
+        repeatOverride,
       });
     case "reply_email":
       return confirmPendingReplyEmailAction({
@@ -447,6 +453,7 @@ async function executeAssistantEmailAction({
         confirmedAt,
         contentOverride,
         sendAtOverride,
+        repeatOverride,
       });
     case "forward_email":
       return confirmPendingForwardEmailAction({
@@ -466,6 +473,7 @@ async function confirmPendingSendEmailAction({
   confirmedAt,
   contentOverride,
   sendAtOverride,
+  repeatOverride,
 }: {
   output: PendingSendEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
@@ -473,6 +481,7 @@ async function confirmPendingSendEmailAction({
   confirmedAt: string;
   contentOverride?: string;
   sendAtOverride?: string | null;
+  repeatOverride?: { everyMinutes: number; count: number } | null;
 }) {
   const from =
     output.pendingAction.from ||
@@ -506,8 +515,9 @@ async function confirmPendingSendEmailAction({
         subject: output.pendingAction.subject,
         messageHtml,
         sendAt,
-        repeatEveryMinutes: output.pendingAction.repeatEveryMinutes ?? null,
-        maxOccurrences: output.pendingAction.repeatCount ?? null,
+        // Recurrence comes only from the user's card choice, never the model
+        repeatEveryMinutes: repeatOverride?.everyMinutes ?? null,
+        maxOccurrences: repeatOverride?.count ?? null,
       },
     });
 
@@ -556,6 +566,7 @@ async function confirmPendingReplyEmailAction({
   confirmedAt,
   contentOverride,
   sendAtOverride,
+  repeatOverride,
 }: {
   output: PendingReplyEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
@@ -563,6 +574,7 @@ async function confirmPendingReplyEmailAction({
   confirmedAt: string;
   contentOverride?: string;
   sendAtOverride?: string | null;
+  repeatOverride?: { everyMinutes: number; count: number } | null;
 }) {
   const sourceMessage = await emailProvider.getMessage(
     output.pendingAction.messageId,
@@ -584,6 +596,7 @@ async function confirmPendingReplyEmailAction({
       confirmedAt,
       contentOverride,
       requestedSendAt,
+      repeatOverride,
       from,
     });
   }
@@ -1974,6 +1987,7 @@ async function scheduleReplyEmail({
   confirmedAt,
   contentOverride,
   requestedSendAt,
+  repeatOverride,
   from,
 }: {
   output: PendingReplyEmailToolOutput;
@@ -1988,6 +2002,7 @@ async function scheduleReplyEmail({
   confirmedAt: string;
   contentOverride?: string;
   requestedSendAt: string;
+  repeatOverride?: { everyMinutes: number; count: number } | null;
   from?: string | null;
 }) {
   const requested = new Date(requestedSendAt).getTime();
@@ -2032,8 +2047,9 @@ async function scheduleReplyEmail({
       },
       threadId: message.threadId || null,
       sendAt,
-      repeatEveryMinutes: output.pendingAction.repeatEveryMinutes ?? null,
-      maxOccurrences: output.pendingAction.repeatCount ?? null,
+      // Recurrence comes only from the user's card choice, never the model
+      repeatEveryMinutes: repeatOverride?.everyMinutes ?? null,
+      maxOccurrences: repeatOverride?.count ?? null,
     },
   });
 

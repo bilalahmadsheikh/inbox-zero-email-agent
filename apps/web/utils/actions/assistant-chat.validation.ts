@@ -122,6 +122,14 @@ export const confirmAssistantEmailActionBody =
     // schedules at that time, null forces an immediate send, undefined keeps
     // the pending action's own sendAt.
     sendAtOverride: z.string().datetime().nullable().optional(),
+    // User-chosen recurrence from the confirmation card. Recurrence can only
+    // come from here; the model cannot enable repeats.
+    repeatOverride: z
+      .object({
+        everyMinutes: z.number().int().min(1).max(1440),
+        count: z.number().int().min(2).max(10),
+      })
+      .nullish(),
   });
 export type ConfirmAssistantEmailActionBody = z.infer<
   typeof confirmAssistantEmailActionBody

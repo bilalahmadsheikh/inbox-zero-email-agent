@@ -25,6 +25,7 @@ export const confirmAssistantEmailAction = actionClient
         actionType,
         contentOverride,
         sendAtOverride,
+        repeatOverride,
       },
     }) =>
       confirmAssistantEmailActionForAccount({
@@ -34,6 +35,7 @@ export const confirmAssistantEmailAction = actionClient
         actionType,
         contentOverride,
         sendAtOverride,
+        repeatOverride,
         waitForPersistence: true,
         emailAccountId,
         provider,

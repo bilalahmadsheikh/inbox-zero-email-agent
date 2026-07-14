@@ -261,7 +261,7 @@ describe("chat inbox tools", () => {
     expect(createEmailProvider).not.toHaveBeenCalled();
   });
 
-  it("rejects repeat fields without sendAt", async () => {
+  it("rejects model-supplied repeat fields as unsupported", async () => {
     const toolInstance = sendEmailTool({
       email: TEST_EMAIL,
       emailAccountId: "email-account-1",
@@ -273,75 +273,17 @@ describe("chat inbox tools", () => {
       to: "recipient@example.com",
       subject: "Hello",
       messageHtml: "<p>Hi there</p>",
-      repeatEveryMinutes: 5,
-      repeatCount: 3,
-    });
-
-    expect(result).toEqual({
-      error:
-        "repeatEveryMinutes and repeatCount require sendAt: schedule the first send.",
-    });
-  });
-
-  it("carries explicitly requested repeat fields into the pending send action", async () => {
-    prisma.emailAccount.findUnique.mockResolvedValue({
-      name: "Test User",
-      email: TEST_EMAIL,
-    } as any);
-
-    const toolInstance = sendEmailTool({
-      email: TEST_EMAIL,
-      emailAccountId: "email-account-1",
-      provider: "google",
-      logger,
-    });
-
-    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    const result = await (toolInstance.execute as any)({
-      to: "recipient@example.com",
-      subject: "Hello",
-      messageHtml: "<p>Hi there</p>",
-      sendAt,
-      repeatEveryMinutes: 5,
-      repeatCount: 3,
-      repeatRequestQuote: "remind them every 5 minutes, 3 times",
-    });
-
-    expect(result).toMatchObject({
-      success: true,
-      pendingAction: expect.objectContaining({
-        sendAt,
-        repeatEveryMinutes: 5,
-        repeatCount: 3,
-      }),
-    });
-  });
-
-  it("rejects repeat fields without the user's verbatim repeat request", async () => {
-    const toolInstance = sendEmailTool({
-      email: TEST_EMAIL,
-      emailAccountId: "email-account-1",
-      provider: "google",
-      logger,
-    });
-
-    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    const result = await (toolInstance.execute as any)({
-      to: "recipient@example.com",
-      subject: "Hello",
-      messageHtml: "<p>Hi there</p>",
-      sendAt,
+      sendAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       repeatEveryMinutes: 1,
       repeatCount: 2,
     });
 
     expect(result).toEqual({
-      error:
-        "Repeat fields require repeatRequestQuote: quote the user's exact words asking for repeated sends. If the user did not ask for repetition in their current message, retry without any repeat fields.",
+      error: expect.stringContaining("unsupported field"),
     });
   });
 
-  it("carries sendAt and repeat fields into the pending reply action", async () => {
+  it("carries sendAt into the pending reply action", async () => {
     const getMessage = vi.fn().mockResolvedValue({
       id: "msg-1",
       threadId: "thread-1",
@@ -366,9 +308,6 @@ describe("chat inbox tools", () => {
       messageId: "msg-1",
       content: "Just following up!",
       sendAt,
-      repeatEveryMinutes: 10,
-      repeatCount: 2,
-      repeatRequestQuote: "follow up every 10 minutes, twice",
     });
 
     expect(result).toMatchObject({
@@ -377,8 +316,6 @@ describe("chat inbox tools", () => {
       pendingAction: expect.objectContaining({
         messageId: "msg-1",
         sendAt,
-        repeatEveryMinutes: 10,
-        repeatCount: 2,
       }),
       reference: expect.objectContaining({ threadId: "thread-1" }),
     });

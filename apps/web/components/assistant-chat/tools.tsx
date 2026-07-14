@@ -674,7 +674,10 @@ function EmailActionResult({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSend = async (sendAtOverride?: string | null) => {
+  const handleSend = async (
+    sendAtOverride?: string | null,
+    repeatOverride?: { everyMinutes: number; count: number } | null,
+  ) => {
     setIsConfirming(true);
     try {
       if (!chatId) {
@@ -689,6 +692,7 @@ function EmailActionResult({
         actionType,
         ...(hasEdits ? { contentOverride: editedBody } : {}),
         ...(sendAtOverride !== undefined ? { sendAtOverride } : {}),
+        ...(repeatOverride ? { repeatOverride } : {}),
       };
 
       const result = await confirmAssistantEmailAction(emailAccountId, input);
@@ -752,7 +756,7 @@ function EmailActionResult({
                 <ScheduleTimePicker
                   initialValue={new Date(pendingSendAt)}
                   disabled={isConfirming || isProcessing || isChatBusy}
-                  onSchedule={(iso) => handleSend(iso)}
+                  onSchedule={(iso, repeat) => handleSend(iso, repeat)}
                   trigger={
                     <button
                       type="button"
@@ -886,7 +890,7 @@ function EmailActionResult({
                   <ScheduleTimePicker
                     initialValue={addHours(new Date(), 1)}
                     disabled={isConfirming || isProcessing || isChatBusy}
-                    onSchedule={(iso) => handleSend(iso)}
+                    onSchedule={(iso, repeat) => handleSend(iso, repeat)}
                     trigger={
                       <Button
                         disabled={isConfirming || isProcessing || isChatBusy}
@@ -2525,14 +2529,42 @@ function ScheduleTimePicker({
   trigger: React.ReactNode;
   initialValue: Date;
   disabled?: boolean;
-  onSchedule: (iso: string) => void;
+  onSchedule: (
+    iso: string,
+    repeat: { everyMinutes: number; count: number } | null,
+  ) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [customSendAt, setCustomSendAt] = useState("");
+  const [repeatEvery, setRepeatEvery] = useState("");
+  const [repeatCount, setRepeatCount] = useState("");
+
+  const getRepeat = () => {
+    if (!repeatEvery && !repeatCount) return { repeat: null };
+    const everyMinutes = Number(repeatEvery);
+    const count = Number(repeatCount);
+    if (
+      !Number.isInteger(everyMinutes) ||
+      everyMinutes < 1 ||
+      everyMinutes > 1440 ||
+      !Number.isInteger(count) ||
+      count < 2 ||
+      count > 10
+    ) {
+      toastError({
+        description:
+          "Repeat needs an interval of 1-1440 minutes and 2-10 total sends, or leave both empty.",
+      });
+      return { invalid: true as const };
+    }
+    return { repeat: { everyMinutes, count } };
+  };
 
   const schedule = (date: Date) => {
+    const { repeat, invalid } = getRepeat();
+    if (invalid) return;
     setOpen(false);
-    onSchedule(date.toISOString());
+    onSchedule(date.toISOString(), repeat ?? null);
   };
 
   const presets = [
@@ -2585,6 +2617,31 @@ function ScheduleTimePicker({
             min={toDatetimeLocalValue(new Date())}
             onChange={(event) => setCustomSendAt(event.target.value)}
           />
+          <div className="text-xs font-medium text-muted-foreground">
+            Repeat (optional)
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={1440}
+              placeholder="Every (min)"
+              aria-label="Repeat every minutes"
+              className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              value={repeatEvery}
+              onChange={(event) => setRepeatEvery(event.target.value)}
+            />
+            <input
+              type="number"
+              min={2}
+              max={10}
+              placeholder="Sends"
+              aria-label="Total sends"
+              className="w-24 rounded-md border bg-background px-2 py-1.5 text-sm"
+              value={repeatCount}
+              onChange={(event) => setRepeatCount(event.target.value)}
+            />
+          </div>
           <Button
             size="sm"
             className="w-full"

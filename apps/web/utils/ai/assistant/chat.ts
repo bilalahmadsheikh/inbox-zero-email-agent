@@ -124,12 +124,14 @@ export async function aiProcessAssistantChat({
     userTimezone,
     currentTimestamp,
   });
+  const currentUserMessageText = getLatestUserMessageText(messages);
   const toolOptions = {
     email: user.email,
     emailAccountId,
     userId: user.userId,
     provider: user.account.provider,
     logger,
+    currentUserMessageText,
     setRuleReadState: (state: RuleReadState) => {
       ruleReadState = state;
     },
@@ -605,7 +607,7 @@ function getEmailCapabilitiesPolicy({
     '- When the user asks to "draft" an email or a reply for them to review and send themselves, use draftEmail. It saves a real draft to their Drafts folder immediately and sends nothing.',
     "- After draftEmail, briefly confirm the draft is saved in their Drafts folder, ready to review and send from their email client.",
     "- Scheduling: sendEmail schedules new emails via sendAt; replyEmail schedules threaded follow-ups inside an existing conversation via sendAt. Forwards cannot be scheduled.",
-    "- Recurring follow-up reminders are configured by the USER on the confirmation card (repeat controls inside the Schedule time picker), never by you: every email you prepare is a single send. If the user asks for recurring reminders, schedule the first send and tell them to set the repeat interval and total sends in the card's Schedule picker before confirming. You may mention this capability when relevant.",
+    "- Recurring follow-up reminders: when the user's CURRENT message explicitly asks for repeated sends, set repeatEveryMinutes and repeatCount with sendAt and quote their exact words in repeatRequestQuote (the server verifies the quote against the real message and silently drops repeats that do not match, so never fabricate it). A scheduled email is otherwise always a single send; earlier recurring emails in the conversation never justify repeating a new one. The user can review, change, or remove the recurrence on the confirmation card before confirming. If the user asked for repetition in an earlier message, ask them to restate it or use the card's repeat controls.",
     "- To stop follow-ups when the person writes back, also create a rule (createRule) with the CANCEL_SCHEDULED action and a condition matching email from that person: an email arriving in the same thread cancels that thread's pending follow-ups, and other emails from the sender cancel their unthreaded ones. SEND_SCHEDULED instead releases pending scheduled emails immediately. Never claim this is impossible.",
     "- Rules themselves never compose or schedule emails; scheduling always happens through sendEmail/replyEmail. Tell the user exactly what was scheduled; never claim a rule will send reminders on its own.",
     "- Use listScheduledEmails, cancelScheduledEmail, and rescheduleScheduledEmail to view or change the scheduled email queue when asked.",
@@ -812,4 +814,18 @@ Inline email cards:
 - The UI resolves sender, subject, and date from the threadId — don't repeat them.
 - Group <emails> blocks under markdown ## headers when triage has categories.
 - Only render email widgets when they add clarity, not for every search result.`;
+}
+
+function getLatestUserMessageText(messages: ModelMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message.role !== "user") continue;
+    if (typeof message.content === "string") return message.content || null;
+    const text = message.content
+      .map((part) => ("text" in part && part.type === "text" ? part.text : ""))
+      .filter(Boolean)
+      .join("\n");
+    return text || null;
+  }
+  return null;
 }

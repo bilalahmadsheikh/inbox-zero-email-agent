@@ -261,25 +261,108 @@ describe("chat inbox tools", () => {
     expect(createEmailProvider).not.toHaveBeenCalled();
   });
 
-  it("rejects model-supplied repeat fields as unsupported", async () => {
+  it("keeps repeats when the quote matches the user's current message", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+
     const toolInstance = sendEmailTool({
       email: TEST_EMAIL,
       emailAccountId: "email-account-1",
       provider: "google",
       logger,
+      currentUserMessageText:
+        "Please remind her every 10 minutes, 3 times total, starting in an hour.",
     });
 
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const result = await (toolInstance.execute as any)({
       to: "recipient@example.com",
       subject: "Hello",
       messageHtml: "<p>Hi there</p>",
-      sendAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      repeatEveryMinutes: 1,
-      repeatCount: 2,
+      sendAt,
+      repeatEveryMinutes: 10,
+      repeatCount: 3,
+      repeatRequestQuote: "every 10 minutes, 3 times total",
     });
 
-    expect(result).toEqual({
-      error: expect.stringContaining("unsupported field"),
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        sendAt,
+        repeatEveryMinutes: 10,
+        repeatCount: 3,
+      }),
+    });
+  });
+
+  it("strips repeats when the quote is not in the user's current message", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      currentUserMessageText:
+        "send a scheduled email saying miss you in 2 mins",
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      sendAt,
+      repeatEveryMinutes: 1,
+      repeatCount: 2,
+      repeatRequestQuote: "remind them every minute",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        sendAt,
+        repeatEveryMinutes: null,
+        repeatCount: null,
+      }),
+    });
+  });
+
+  it("strips repeats when no quote is provided", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      currentUserMessageText: "remind her every 5 minutes, 4 times",
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      sendAt,
+      repeatEveryMinutes: 5,
+      repeatCount: 4,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        repeatEveryMinutes: null,
+        repeatCount: null,
+      }),
     });
   });
 

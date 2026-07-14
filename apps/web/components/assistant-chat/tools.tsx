@@ -692,7 +692,7 @@ function EmailActionResult({
         actionType,
         ...(hasEdits ? { contentOverride: editedBody } : {}),
         ...(sendAtOverride !== undefined ? { sendAtOverride } : {}),
-        ...(repeatOverride ? { repeatOverride } : {}),
+        ...(repeatOverride !== undefined ? { repeatOverride } : {}),
       };
 
       const result = await confirmAssistantEmailAction(emailAccountId, input);
@@ -755,6 +755,11 @@ function EmailActionResult({
               {canPickTime && pendingSendAt && (
                 <ScheduleTimePicker
                   initialValue={new Date(pendingSendAt)}
+                  initialRepeat={
+                    repeatEveryMinutes && repeatCount
+                      ? { everyMinutes: repeatEveryMinutes, count: repeatCount }
+                      : null
+                  }
                   disabled={isConfirming || isProcessing || isChatBusy}
                   onSchedule={(iso, repeat) => handleSend(iso, repeat)}
                   trigger={
@@ -2525,6 +2530,7 @@ function ScheduleTimePicker({
   initialValue,
   disabled,
   onSchedule,
+  initialRepeat,
 }: {
   trigger: React.ReactNode;
   initialValue: Date;
@@ -2533,6 +2539,7 @@ function ScheduleTimePicker({
     iso: string,
     repeat: { everyMinutes: number; count: number } | null,
   ) => void;
+  initialRepeat?: { everyMinutes: number; count: number } | null;
 }) {
   const [open, setOpen] = useState(false);
   const [customSendAt, setCustomSendAt] = useState("");
@@ -2585,7 +2592,13 @@ function ScheduleTimePicker({
       onOpenChange={(nextOpen) => {
         if (disabled) return;
         setOpen(nextOpen);
-        if (nextOpen) setCustomSendAt(toDatetimeLocalValue(initialValue));
+        if (nextOpen) {
+          setCustomSendAt(toDatetimeLocalValue(initialValue));
+          setRepeatEvery(
+            initialRepeat ? String(initialRepeat.everyMinutes) : "",
+          );
+          setRepeatCount(initialRepeat ? String(initialRepeat.count) : "");
+        }
       }}
     >
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>

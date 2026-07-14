@@ -515,9 +515,15 @@ async function confirmPendingSendEmailAction({
         subject: output.pendingAction.subject,
         messageHtml,
         sendAt,
-        // Recurrence comes only from the user's card choice, never the model
-        repeatEveryMinutes: repeatOverride?.everyMinutes ?? null,
-        maxOccurrences: repeatOverride?.count ?? null,
+        // Card override wins; otherwise the quote-verified suggestion applies
+        repeatEveryMinutes: resolveRepeatEveryMinutes(
+          repeatOverride,
+          output.pendingAction.repeatEveryMinutes,
+        ),
+        maxOccurrences: resolveRepeatCount(
+          repeatOverride,
+          output.pendingAction.repeatCount,
+        ),
       },
     });
 
@@ -2047,9 +2053,15 @@ async function scheduleReplyEmail({
       },
       threadId: message.threadId || null,
       sendAt,
-      // Recurrence comes only from the user's card choice, never the model
-      repeatEveryMinutes: repeatOverride?.everyMinutes ?? null,
-      maxOccurrences: repeatOverride?.count ?? null,
+      // Card override wins; otherwise the quote-verified suggestion applies
+      repeatEveryMinutes: resolveRepeatEveryMinutes(
+        repeatOverride,
+        output.pendingAction.repeatEveryMinutes,
+      ),
+      maxOccurrences: resolveRepeatCount(
+        repeatOverride,
+        output.pendingAction.repeatCount,
+      ),
     },
   });
 
@@ -2062,4 +2074,20 @@ async function scheduleReplyEmail({
     confirmedAt,
     scheduledFor: scheduledEmail.sendAt.toISOString(),
   };
+}
+
+function resolveRepeatEveryMinutes(
+  repeatOverride: { everyMinutes: number; count: number } | null | undefined,
+  suggested: number | null | undefined,
+) {
+  if (repeatOverride !== undefined) return repeatOverride?.everyMinutes ?? null;
+  return suggested ?? null;
+}
+
+function resolveRepeatCount(
+  repeatOverride: { everyMinutes: number; count: number } | null | undefined,
+  suggested: number | null | undefined,
+) {
+  if (repeatOverride !== undefined) return repeatOverride?.count ?? null;
+  return suggested ?? null;
 }

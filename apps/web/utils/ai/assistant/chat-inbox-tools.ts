@@ -122,6 +122,30 @@ const sendEmailToolInputSchema = z
       .min(1)
       .describe("HTML body content for the email draft."),
     sendAt: sendAtFieldSchema,
+    repeatEveryMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(1440)
+      .optional()
+      .describe(
+        "Only when the user's CURRENT message explicitly asks for recurring or repeated sends: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. The quote is verified against the user's actual message and repeats are dropped if it does not match.",
+      ),
+    repeatCount: z
+      .number()
+      .int()
+      .min(2)
+      .max(10)
+      .optional()
+      .describe(
+        "Total number of sends including the first (2-10). Requires sendAt, repeatEveryMinutes, and repeatRequestQuote.",
+      ),
+    repeatRequestQuote: z
+      .string()
+      .optional()
+      .describe(
+        "The user's verbatim words from their CURRENT message asking for repeated sends. Verified server-side against the real message; if it does not appear there, the repeat fields are ignored and a single send is scheduled.",
+      ),
   })
   .strict();
 const draftEmailToolInputSchema = z
@@ -163,6 +187,30 @@ const replyEmailToolInputSchema = z
         "If true, address the reply to everyone on the original email (all original To and Cc recipients), not just the sender. Set this when the user asks to reply to everyone, reply all, or keep the whole thread included.",
       ),
     sendAt: sendAtFieldSchema,
+    repeatEveryMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(1440)
+      .optional()
+      .describe(
+        "Only when the user's CURRENT message explicitly asks for recurring or repeated sends: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. The quote is verified against the user's actual message and repeats are dropped if it does not match.",
+      ),
+    repeatCount: z
+      .number()
+      .int()
+      .min(2)
+      .max(10)
+      .optional()
+      .describe(
+        "Total number of sends including the first (2-10). Requires sendAt, repeatEveryMinutes, and repeatRequestQuote.",
+      ),
+    repeatRequestQuote: z
+      .string()
+      .optional()
+      .describe(
+        "The user's verbatim words from their CURRENT message asking for repeated sends. Verified server-side against the real message; if it does not appear there, the repeat fields are ignored and a single send is scheduled.",
+      ),
   })
   .strict();
 const forwardEmailToolInputSchema = z
@@ -1264,11 +1312,13 @@ export const sendEmailTool = ({
   emailAccountId,
   provider,
   logger,
+  currentUserMessageText,
 }: {
   email: string;
   emailAccountId: string;
   provider: string;
   logger: Logger;
+  currentUserMessageText?: string | null;
 }) =>
   tool({
     description:
@@ -1282,7 +1332,20 @@ export const sendEmailTool = ({
         return { error: getSendEmailValidationError(parsedInput.error) };
       }
 
-      const normalizedInput = normalizeSendEmailInput(parsedInput.data);
+      const repeats = resolveVerifiedRepeats(
+        parsedInput.data,
+        currentUserMessageText,
+        logger,
+      );
+      const normalizedInput = {
+        // Recurring chains keep a near-now sendAt: the queue needs a first
+        // occurrence either way.
+        ...(repeats
+          ? parsedInput.data
+          : normalizeSendEmailInput(parsedInput.data)),
+        repeatEveryMinutes: repeats?.everyMinutes,
+        repeatCount: repeats?.count,
+      };
 
       try {
         const from =
@@ -1553,11 +1616,13 @@ export const replyEmailTool = ({
   emailAccountId,
   provider,
   logger,
+  currentUserMessageText,
 }: {
   email: string;
   emailAccountId: string;
   provider: string;
   logger: Logger;
+  currentUserMessageText?: string | null;
 }) =>
   tool({
     description:
@@ -1571,7 +1636,18 @@ export const replyEmailTool = ({
         return { error: getReplyEmailValidationError(parsedInput.error) };
       }
 
-      const normalizedInput = normalizeSendEmailInput(parsedInput.data);
+      const repeats = resolveVerifiedRepeats(
+        parsedInput.data,
+        currentUserMessageText,
+        logger,
+      );
+      const normalizedInput = {
+        ...(repeats
+          ? parsedInput.data
+          : normalizeSendEmailInput(parsedInput.data)),
+        repeatEveryMinutes: repeats?.everyMinutes,
+        repeatCount: repeats?.count,
+      };
 
       try {
         const emailProvider = await createEmailProvider({
@@ -1674,7 +1750,10 @@ async function listLabelNames({
 type PendingEmailActionType = "send_email" | "reply_email" | "forward_email";
 
 function createPendingSendEmailOutput(
-  input: z.infer<typeof sendEmailToolInputSchema>,
+  input: Omit<
+    z.infer<typeof sendEmailToolInputSchema>,
+    "repeatRequestQuote"
+  > & { repeatEveryMinutes?: number; repeatCount?: number },
   from: string | null,
   provider: string,
 ) {
@@ -1692,8 +1771,81 @@ function createPendingSendEmailOutput(
       messageHtml: input.messageHtml,
       from,
       sendAt: input.sendAt || null,
+      repeatEveryMinutes: input.repeatEveryMinutes || null,
+      repeatCount: input.repeatCount || null,
     },
   };
+}
+
+// Recurrence is only honored when the model quotes the user's actual words
+// asking for it and that quote really appears in the current message.
+// Anything else is stripped so a single send is scheduled.
+function resolveVerifiedRepeats(
+  input: {
+    sendAt?: string;
+    repeatEveryMinutes?: number;
+    repeatCount?: number;
+    repeatRequestQuote?: string;
+  },
+  currentUserMessageText: string | null | undefined,
+  logger: Logger,
+): { everyMinutes: number; count: number } | null {
+  if (
+    input.repeatEveryMinutes === undefined &&
+    input.repeatCount === undefined
+  ) {
+    return null;
+  }
+
+  const stripReason = getRepeatStripReason(input, currentUserMessageText);
+  if (stripReason) {
+    logger.warn("Dropped unverified repeat request from model", {
+      reason: stripReason,
+    });
+    return null;
+  }
+
+  return {
+    everyMinutes: input.repeatEveryMinutes as number,
+    count: input.repeatCount as number,
+  };
+}
+
+function getRepeatStripReason(
+  input: {
+    sendAt?: string;
+    repeatEveryMinutes?: number;
+    repeatCount?: number;
+    repeatRequestQuote?: string;
+  },
+  currentUserMessageText: string | null | undefined,
+): string | null {
+  if (!input.sendAt) return "missing sendAt";
+  if (
+    input.repeatEveryMinutes === undefined ||
+    input.repeatCount === undefined
+  ) {
+    return "incomplete repeat fields";
+  }
+  const quote = input.repeatRequestQuote?.trim();
+  if (!quote) return "missing quote";
+  if (!currentUserMessageText) return "no user message to verify against";
+  if (
+    !normalizeForQuoteMatch(currentUserMessageText).includes(
+      normalizeForQuoteMatch(quote),
+    )
+  ) {
+    return "quote not found in the user's message";
+  }
+  return null;
+}
+
+function normalizeForQuoteMatch(text: string) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeSendEmailInput<T extends { sendAt?: string }>(
@@ -1709,7 +1861,10 @@ function normalizeSendEmailInput<T extends { sendAt?: string }>(
 }
 
 function createPendingReplyEmailOutput(
-  input: z.infer<typeof replyEmailToolInputSchema>,
+  input: Omit<
+    z.infer<typeof replyEmailToolInputSchema>,
+    "repeatRequestQuote"
+  > & { repeatEveryMinutes?: number; repeatCount?: number },
   message: ParsedMessage,
 ) {
   return {
@@ -1722,6 +1877,8 @@ function createPendingReplyEmailOutput(
       content: input.content,
       replyAll: input.replyAll || null,
       sendAt: input.sendAt || null,
+      repeatEveryMinutes: input.repeatEveryMinutes || null,
+      repeatCount: input.repeatCount || null,
     },
     reference: {
       messageId: message.id,

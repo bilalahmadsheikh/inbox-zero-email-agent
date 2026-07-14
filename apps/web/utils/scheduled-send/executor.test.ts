@@ -26,6 +26,7 @@ function dueEmail(overrides: Record<string, unknown> = {}) {
     repeatEveryMinutes: null,
     maxOccurrences: null,
     occurrence: 1,
+    chainRootId: null,
     attempts: 0,
     emailAccount: { account: { provider: "google" } },
     ...overrides,
@@ -101,6 +102,7 @@ describe("processScheduledEmails", () => {
         repeatEveryMinutes: 5,
         maxOccurrences: 3,
         occurrence: 2,
+        chainRootId: "se1",
         sendAt: expect.any(Date),
       }),
     });

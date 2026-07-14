@@ -27,3 +27,8 @@ export type ScheduleSendBody = z.infer<typeof scheduleSendBody>;
 
 export const cancelScheduledEmailBody = z.object({ id: z.string() });
 export type CancelScheduledEmailBody = z.infer<typeof cancelScheduledEmailBody>;
+
+export const deleteScheduledEmailBody = z.object({
+  id: z.string().min(1),
+});
+export type DeleteScheduledEmailBody = z.infer<typeof deleteScheduledEmailBody>;

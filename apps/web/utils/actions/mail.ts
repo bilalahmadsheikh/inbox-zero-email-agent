@@ -2,9 +2,11 @@
 
 import { z } from "zod";
 import prisma from "@/utils/prisma";
+import { cancelScheduledEmailChain } from "@/utils/scheduled-send/cancel";
 import { sendEmailBody } from "@/utils/gmail/mail";
 import {
   cancelScheduledEmailBody,
+  deleteScheduledEmailBody,
   scheduleSendBody,
 } from "@/utils/actions/mail.validation";
 import { ScheduledEmailStatus } from "@/generated/prisma/enums";
@@ -294,17 +296,39 @@ export const cancelScheduledEmailAction = actionClient
   .metadata({ name: "cancelScheduledEmail" })
   .inputSchema(cancelScheduledEmailBody)
   .action(async ({ ctx: { emailAccountId }, parsedInput }) => {
-    const result = await prisma.scheduledEmail.updateMany({
+    const result = await cancelScheduledEmailChain({
+      emailAccountId,
+      id: parsedInput.id,
+    });
+
+    if (!result.ok) {
+      const messages = {
+        not_found: "Scheduled email not found",
+        chain_finished: "This repeat chain already finished sending",
+        already_done: "This scheduled email was already sent or cancelled",
+      } as const;
+      throw new SafeError(messages[result.reason]);
+    }
+
+    return { success: true, cancelledCount: result.cancelledCount };
+  });
+
+export const deleteScheduledEmailAction = actionClient
+  .metadata({ name: "deleteScheduledEmail" })
+  .inputSchema(deleteScheduledEmailBody)
+  .action(async ({ ctx: { emailAccountId }, parsedInput }) => {
+    const result = await prisma.scheduledEmail.deleteMany({
       where: {
         id: parsedInput.id,
         emailAccountId,
-        status: ScheduledEmailStatus.PENDING,
+        status: { not: ScheduledEmailStatus.PENDING },
       },
-      data: { status: ScheduledEmailStatus.CANCELLED },
     });
 
     if (result.count === 0) {
-      throw new SafeError("Scheduled email not found or already sent");
+      throw new SafeError(
+        "Cannot delete: entry not found or still pending. Cancel it first.",
+      );
     }
 
     return { success: true };

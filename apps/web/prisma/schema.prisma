@@ -795,10 +795,12 @@ model ScheduledEmail {
   attempts Int                  @default(0)
 
   // Recurring follow-ups: after a send, the executor queues the next
-  // occurrence until maxOccurrences (total sends) is reached.
+  // occurrence until maxOccurrences (total sends) is reached. chainRootId
+  // links occurrences to the first row so a whole chain can be cancelled.
   repeatEveryMinutes Int?
   maxOccurrences     Int?
-  occurrence         Int  @default(1)
+  occurrence         Int     @default(1)
+  chainRootId        String?
 
   sentMessageId String?
   sentThreadId  String?
@@ -807,6 +809,7 @@ model ScheduledEmail {
   @@index([status, sendAt])
   @@index([emailAccountId, status])
   @@index([emailAccountId, threadId])
+  @@index([emailAccountId, chainRootId])
 }
 
 // Notes:

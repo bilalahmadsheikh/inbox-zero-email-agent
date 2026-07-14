@@ -283,7 +283,7 @@ describe("chat inbox tools", () => {
     });
   });
 
-  it("carries repeat fields into the pending send action", async () => {
+  it("carries explicitly requested repeat fields into the pending send action", async () => {
     prisma.emailAccount.findUnique.mockResolvedValue({
       name: "Test User",
       email: TEST_EMAIL,
@@ -304,6 +304,7 @@ describe("chat inbox tools", () => {
       sendAt,
       repeatEveryMinutes: 5,
       repeatCount: 3,
+      repeatRequestQuote: "remind them every 5 minutes, 3 times",
     });
 
     expect(result).toMatchObject({
@@ -313,6 +314,30 @@ describe("chat inbox tools", () => {
         repeatEveryMinutes: 5,
         repeatCount: 3,
       }),
+    });
+  });
+
+  it("rejects repeat fields without the user's verbatim repeat request", async () => {
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      sendAt,
+      repeatEveryMinutes: 1,
+      repeatCount: 2,
+    });
+
+    expect(result).toEqual({
+      error:
+        "Repeat fields require repeatRequestQuote: quote the user's exact words asking for repeated sends. If the user did not ask for repetition in their current message, retry without any repeat fields.",
     });
   });
 
@@ -343,6 +368,7 @@ describe("chat inbox tools", () => {
       sendAt,
       repeatEveryMinutes: 10,
       repeatCount: 2,
+      repeatRequestQuote: "follow up every 10 minutes, twice",
     });
 
     expect(result).toMatchObject({
@@ -358,7 +384,12 @@ describe("chat inbox tools", () => {
     });
   });
 
-  it("cancels a pending scheduled email by id", async () => {
+  it("cancels the whole chain for a pending scheduled email by id", async () => {
+    prisma.scheduledEmail.findFirst.mockResolvedValue({
+      id: "sched-1",
+      chainRootId: null,
+      repeatEveryMinutes: null,
+    } as any);
     prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
 
     const toolInstance = cancelScheduledEmailTool({
@@ -371,17 +402,21 @@ describe("chat inbox tools", () => {
 
     expect(prisma.scheduledEmail.updateMany).toHaveBeenCalledWith({
       where: {
-        id: "sched-1",
         emailAccountId: "email-account-1",
         status: "PENDING",
+        OR: [{ id: "sched-1" }, { id: "sched-1" }, { chainRootId: "sched-1" }],
       },
       data: { status: "CANCELLED" },
     });
-    expect(result).toEqual({ success: true, id: "sched-1" });
+    expect(result).toEqual({
+      success: true,
+      id: "sched-1",
+      cancelledCount: 1,
+    });
   });
 
   it("returns an error when cancelling a scheduled email that is not pending", async () => {
-    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 0 });
+    prisma.scheduledEmail.findFirst.mockResolvedValue(null);
 
     const toolInstance = cancelScheduledEmailTool({
       email: TEST_EMAIL,
@@ -393,7 +428,7 @@ describe("chat inbox tools", () => {
 
     expect(result).toEqual({
       error:
-        "Scheduled email not found or no longer pending. Use listScheduledEmails to see the current queue.",
+        "Scheduled email not found. Use listScheduledEmails to see the current queue.",
     });
   });
 

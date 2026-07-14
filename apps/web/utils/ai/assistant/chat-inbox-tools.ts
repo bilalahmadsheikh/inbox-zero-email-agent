@@ -4,6 +4,7 @@ import type { Logger } from "@/utils/logger";
 import prisma from "@/utils/prisma";
 import { posthogCaptureEvent } from "@/utils/posthog";
 import { createEmailProvider } from "@/utils/email/provider";
+import { cancelScheduledEmailChain } from "@/utils/scheduled-send/cancel";
 import {
   extractEmailAddress,
   extractUniqueEmailAddresses,
@@ -119,7 +120,7 @@ const repeatFieldsSchema = {
     .max(1440)
     .optional()
     .describe(
-      "Only for recurring follow-up reminders: minutes between resends after the first send. Requires sendAt and repeatCount. The queue resends the same message until repeatCount sends have gone out; pair with a CANCEL_SCHEDULED rule so a reply stops the chain.",
+      "Only when the user's CURRENT message explicitly asks for recurring or repeated reminders: minutes between resends after the first send. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send with sendAt and NO repeat fields; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. Earlier recurring emails in this conversation are never a reason to repeat a new one.",
     ),
   repeatCount: z
     .number()
@@ -128,7 +129,13 @@ const repeatFieldsSchema = {
     .max(10)
     .optional()
     .describe(
-      "Only for recurring follow-up reminders: total number of sends including the first (2-10). Requires sendAt and repeatEveryMinutes.",
+      "Only when the user's CURRENT message explicitly asks for recurring or repeated reminders: total number of sends including the first (2-10). Requires sendAt, repeatEveryMinutes, and repeatRequestQuote.",
+    ),
+  repeatRequestQuote: z
+    .string()
+    .optional()
+    .describe(
+      "Required whenever repeat fields are set: the user's verbatim words from their CURRENT message that ask for repeated sends (e.g. 'every 10 minutes until she replies'). If you cannot quote such words, do not set any repeat fields.",
     ),
 };
 const sendEmailToolInputSchema = z
@@ -1471,23 +1478,27 @@ export const cancelScheduledEmailTool = ({
       }
 
       try {
-        const result = await prisma.scheduledEmail.updateMany({
-          where: {
-            id: parsedInput.data.id,
-            emailAccountId,
-            status: ScheduledEmailStatus.PENDING,
-          },
-          data: { status: ScheduledEmailStatus.CANCELLED },
+        const result = await cancelScheduledEmailChain({
+          emailAccountId,
+          id: parsedInput.data.id,
         });
 
-        if (result.count === 0) {
-          return {
-            error:
-              "Scheduled email not found or no longer pending. Use listScheduledEmails to see the current queue.",
-          };
+        if (!result.ok) {
+          const errors = {
+            not_found:
+              "Scheduled email not found. Use listScheduledEmails to see the current queue.",
+            chain_finished:
+              "This repeat chain already finished sending; there is nothing left to cancel.",
+            already_done: "This scheduled email was already sent or cancelled.",
+          } as const;
+          return { error: errors[result.reason] };
         }
 
-        return { success: true as const, id: parsedInput.data.id };
+        return {
+          success: true as const,
+          id: parsedInput.data.id,
+          cancelledCount: result.cancelledCount,
+        };
       } catch (error) {
         logger.error("Failed to cancel scheduled email", { error });
         return { error: "Failed to cancel scheduled email" };
@@ -1738,6 +1749,7 @@ function getRepeatValidationError(input: {
   sendAt?: string;
   repeatEveryMinutes?: number;
   repeatCount?: number;
+  repeatRequestQuote?: string;
 }) {
   const hasRepeat =
     input.repeatEveryMinutes !== undefined || input.repeatCount !== undefined;
@@ -1750,6 +1762,9 @@ function getRepeatValidationError(input: {
     input.repeatCount === undefined
   ) {
     return "repeatEveryMinutes and repeatCount must be provided together.";
+  }
+  if (!input.repeatRequestQuote?.trim()) {
+    return "Repeat fields require repeatRequestQuote: quote the user's exact words asking for repeated sends. If the user did not ask for repetition in their current message, retry without any repeat fields.";
   }
   return null;
 }

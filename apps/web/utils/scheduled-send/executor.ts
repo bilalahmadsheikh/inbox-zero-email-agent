@@ -138,6 +138,7 @@ async function queueNextOccurrence(
     repeatEveryMinutes: number | null;
     maxOccurrences: number | null;
     occurrence: number;
+    chainRootId: string | null;
   },
   logger: Logger,
 ) {
@@ -162,6 +163,7 @@ async function queueNextOccurrence(
         repeatEveryMinutes,
         maxOccurrences,
         occurrence: occurrence + 1,
+        chainRootId: scheduledEmail.chainRootId ?? scheduledEmail.id,
       },
     });
 

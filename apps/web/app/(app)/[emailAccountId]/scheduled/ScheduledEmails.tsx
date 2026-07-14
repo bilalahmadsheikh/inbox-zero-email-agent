@@ -2,7 +2,7 @@
 
 import { useAction } from "next-safe-action/hooks";
 import useSWR from "swr";
-import { ClockIcon } from "lucide-react";
+import { ClockIcon, Trash2Icon } from "lucide-react";
 import type { GetScheduledEmailsResponse } from "@/app/api/user/scheduled-emails/route";
 import { LoadingContent } from "@/components/LoadingContent";
 import { toastError, toastSuccess } from "@/components/Toast";
@@ -23,16 +23,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cancelScheduledEmailAction } from "@/utils/actions/mail";
+import {
+  cancelScheduledEmailAction,
+  deleteScheduledEmailAction,
+} from "@/utils/actions/mail";
 import { getActionErrorMessage } from "@/utils/error";
 import { useAccount } from "@/providers/EmailAccountProvider";
 
 type ScheduledEmailRow = GetScheduledEmailsResponse["upcoming"][number];
 
+const REFRESH_INTERVAL_MS = 15_000;
+
 export function ScheduledEmails() {
   const { emailAccountId } = useAccount();
   const { data, isLoading, error, mutate } = useSWR<GetScheduledEmailsResponse>(
     "/api/user/scheduled-emails",
+    { refreshInterval: REFRESH_INTERVAL_MS },
   );
 
   const { execute: cancelEmail, isExecuting: isCancelling } = useAction(
@@ -44,6 +50,21 @@ export function ScheduledEmails() {
       },
       onError: (error) => {
         toastError({ description: getActionErrorMessage(error.error) });
+        mutate();
+      },
+    },
+  );
+
+  const { execute: deleteEmail, isExecuting: isDeleting } = useAction(
+    deleteScheduledEmailAction.bind(null, emailAccountId),
+    {
+      onSuccess: () => {
+        toastSuccess({ description: "History entry deleted." });
+        mutate();
+      },
+      onError: (error) => {
+        toastError({ description: getActionErrorMessage(error.error) });
+        mutate();
       },
     },
   );
@@ -58,7 +79,8 @@ export function ScheduledEmails() {
           </CardTitle>
           <CardDescription>
             Emails queued to send later. They are delivered automatically within
-            a minute of their scheduled time.
+            a minute of their scheduled time. Cancelling a recurring email stops
+            all of its remaining sends.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -73,7 +95,7 @@ export function ScheduledEmails() {
                 <ScheduledEmailsTable
                   emails={data.upcoming}
                   onCancel={(id) => cancelEmail({ id })}
-                  isCancelling={isCancelling}
+                  isBusy={isCancelling}
                 />
               )
             )}
@@ -90,7 +112,11 @@ export function ScheduledEmails() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ScheduledEmailsTable emails={data.history} />
+            <ScheduledEmailsTable
+              emails={data.history}
+              onDelete={(id) => deleteEmail({ id })}
+              isBusy={isDeleting}
+            />
           </CardContent>
         </Card>
       )}
@@ -101,11 +127,13 @@ export function ScheduledEmails() {
 function ScheduledEmailsTable({
   emails,
   onCancel,
-  isCancelling,
+  onDelete,
+  isBusy,
 }: {
   emails: ScheduledEmailRow[];
   onCancel?: (id: string) => void;
-  isCancelling?: boolean;
+  onDelete?: (id: string) => void;
+  isBusy?: boolean;
 }) {
   return (
     <Table>
@@ -113,9 +141,10 @@ function ScheduledEmailsTable({
         <TableRow>
           <TableHead>To</TableHead>
           <TableHead>Subject</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead>Send at</TableHead>
           <TableHead>Status</TableHead>
-          {onCancel && <TableHead className="w-24" />}
+          {(onCancel || onDelete) && <TableHead className="w-24" />}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -123,25 +152,52 @@ function ScheduledEmailsTable({
           <TableRow key={email.id}>
             <TableCell className="max-w-48 truncate">{email.to}</TableCell>
             <TableCell className="max-w-64 truncate">{email.subject}</TableCell>
+            <TableCell>
+              <ScheduleTypeBadges email={email} />
+            </TableCell>
             <TableCell className="whitespace-nowrap">
               {formatSendAt(email.sendAt)}
-              {formatRepeatInfo(email)}
             </TableCell>
             <TableCell>
-              <ScheduledEmailStatusBadge
-                status={email.status}
-                error={email.error}
-              />
+              <div className="space-y-1">
+                <ScheduledEmailStatusBadge status={email.status} />
+                {email.status === "FAILED" && email.error && (
+                  <div
+                    className="max-w-56 truncate text-xs text-muted-foreground"
+                    title={email.error}
+                  >
+                    {email.error}
+                  </div>
+                )}
+              </div>
             </TableCell>
             {onCancel && (
               <TableCell>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={isCancelling}
+                  disabled={isBusy}
+                  title={
+                    email.repeatEveryMinutes
+                      ? "Stops this and all remaining repeats"
+                      : undefined
+                  }
                   onClick={() => onCancel(email.id)}
                 >
                   Cancel
+                </Button>
+              </TableCell>
+            )}
+            {onDelete && (
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={isBusy}
+                  aria-label="Delete history entry"
+                  onClick={() => onDelete(email.id)}
+                >
+                  <Trash2Icon className="size-4 text-muted-foreground" />
                 </Button>
               </TableCell>
             )}
@@ -152,22 +208,47 @@ function ScheduledEmailsTable({
   );
 }
 
+function ScheduleTypeBadges({ email }: { email: ScheduledEmailRow }) {
+  const badges: React.ReactNode[] = [];
+
+  if (email.repeatEveryMinutes && email.maxOccurrences) {
+    badges.push(
+      <Badge key="recurring" variant="secondary" className="whitespace-nowrap">
+        Recurring · every {email.repeatEveryMinutes} min ({email.occurrence}/
+        {email.maxOccurrences})
+      </Badge>,
+    );
+  }
+
+  if (email.threadId) {
+    badges.push(
+      <Badge key="thread" variant="outline" className="whitespace-nowrap">
+        Thread reply
+      </Badge>,
+    );
+  }
+
+  if (badges.length === 0) {
+    badges.push(
+      <Badge key="one-time" variant="outline" className="whitespace-nowrap">
+        One-time
+      </Badge>,
+    );
+  }
+
+  return <div className="flex flex-wrap gap-1">{badges}</div>;
+}
+
 function ScheduledEmailStatusBadge({
   status,
-  error,
 }: {
   status: ScheduledEmailRow["status"];
-  error: string | null;
 }) {
   if (status === "PENDING") return <Badge variant="secondary">Scheduled</Badge>;
   if (status === "SENDING") return <Badge variant="secondary">Sending…</Badge>;
   if (status === "SENT") return <Badge variant="green">Sent</Badge>;
   if (status === "CANCELLED") return <Badge variant="outline">Cancelled</Badge>;
-  return (
-    <Badge variant="destructive" title={error ?? undefined}>
-      Failed
-    </Badge>
-  );
+  return <Badge variant="destructive">Failed</Badge>;
 }
 
 function formatSendAt(sendAt: string | Date) {
@@ -178,28 +259,4 @@ function formatSendAt(sendAt: string | Date) {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function formatRepeatInfo(email: {
-  repeatEveryMinutes: number | null;
-  maxOccurrences: number | null;
-  occurrence: number;
-  threadId: string | null;
-}) {
-  const parts: string[] = [];
-  if (email.repeatEveryMinutes && email.maxOccurrences) {
-    parts.push(
-      `every ${email.repeatEveryMinutes} min (${email.occurrence}/${email.maxOccurrences})`,
-    );
-  }
-  if (email.threadId) {
-    parts.push("in thread");
-  }
-  if (parts.length === 0) return null;
-
-  return (
-    <span className="ml-1 text-xs text-muted-foreground">
-      · {parts.join(" · ")}
-    </span>
-  );
 }

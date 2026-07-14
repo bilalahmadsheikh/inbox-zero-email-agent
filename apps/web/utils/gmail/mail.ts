@@ -161,7 +161,15 @@ export async function replyToEmail(
   >,
   reply: string,
   from?: string,
-  options?: { replyTo?: string; attachments?: Attachment[] },
+  options?: {
+    replyTo?: string;
+    attachments?: Attachment[];
+    to?: string;
+    cc?: string;
+    bcc?: string;
+    replyAll?: boolean;
+    userEmails?: string | string[];
+  },
 ) {
   ensureEmailSendingEnabled();
 
@@ -174,14 +182,31 @@ export async function replyToEmail(
     message,
   });
 
-  // Only replying to the original sender
+  // A caller-supplied `to` is already fully resolved (e.g. redirected away
+  // from the current user when replying to their own sent message), so use
+  // it as-is rather than re-deriving from headers.
+  const recipients = options?.to
+    ? { to: options.to, cc: [] }
+    : options?.replyAll
+      ? buildReplyAllRecipients(
+          message.headers,
+          undefined,
+          options.userEmails || "",
+        )
+      : { to: message.headers["reply-to"] || message.headers.from, cc: [] };
+
+  const ccList = mergeAndDedupeRecipients(recipients.cc, options?.cc);
+  const bccList = mergeAndDedupeRecipients([], options?.bcc);
+
   const raw = await createRawMailMessage({
-    to: message.headers["reply-to"] || message.headers.from,
+    to: recipients.to,
     from,
     replyTo: options?.replyTo,
     subject: formatReplySubject(message.headers.subject),
     messageText,
     messageHtml: html,
+    cc: formatCcList(ccList),
+    bcc: formatCcList(bccList),
     attachments: options?.attachments,
     replyToEmail: {
       threadId: message.threadId,

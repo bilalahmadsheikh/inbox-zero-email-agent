@@ -176,6 +176,12 @@ const replyEmailToolInputSchema = z
       .min(1)
       .max(10_000)
       .describe("Reply body content to include in the draft."),
+    replyAll: z
+      .boolean()
+      .nullish()
+      .describe(
+        "If true, address the reply to everyone on the original email (all original To and Cc recipients), not just the sender. Set this when the user asks to reply to everyone, reply all, or keep the whole thread included.",
+      ),
     sendAt: sendAtFieldSchema,
     ...repeatFieldsSchema,
   })
@@ -1760,6 +1766,7 @@ function createPendingReplyEmailOutput(
     pendingAction: {
       messageId: input.messageId,
       content: input.content,
+      replyAll: input.replyAll || null,
       sendAt: input.sendAt || null,
       repeatEveryMinutes: input.repeatEveryMinutes || null,
       repeatCount: input.repeatCount || null,

@@ -28,6 +28,7 @@ type RuleActionFieldValues = {
   webhookUrl?: string | null;
   cc?: string | null;
   bcc?: string | null;
+  replyAll?: boolean | null;
   folderName?: string | null;
 };
 
@@ -55,6 +56,7 @@ export function buildProviderRuleActionFields({
     webhookUrl: fields.webhookUrl ?? null,
     cc: fields.cc ?? null,
     bcc: fields.bcc ?? null,
+    replyAll: fields.replyAll ?? null,
     ...(providerRuleActionFieldBuilders[provider]?.(fields) ?? {}),
   };
 }

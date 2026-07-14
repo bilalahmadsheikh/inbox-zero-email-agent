@@ -150,6 +150,7 @@ export function getActionFields(fields: Action | ExecutedAction | undefined) {
     to?: string;
     cc?: string;
     bcc?: string;
+    replyAll?: boolean;
     url?: string;
     folderName?: string;
     folderId?: string;
@@ -162,6 +163,7 @@ export function getActionFields(fields: Action | ExecutedAction | undefined) {
   if (fields?.to) res.to = fields.to;
   if (fields?.cc) res.cc = fields.cc;
   if (fields?.bcc) res.bcc = fields.bcc;
+  if (fields?.replyAll) res.replyAll = fields.replyAll;
   if (fields?.url) res.url = fields.url;
   if (fields?.folderName) res.folderName = fields.folderName;
   if (fields?.folderId) res.folderId = fields.folderId;
@@ -179,6 +181,7 @@ type ActionFieldsSelection = {
   to: string | null;
   cc: string | null;
   bcc: string | null;
+  replyAll: boolean | null;
   url: string | null;
   folderName: string | null;
   folderId: string | null;
@@ -214,6 +217,7 @@ export function sanitizeActionFields(
     to: null,
     cc: null,
     bcc: null,
+    replyAll: null,
     url: null,
     folderName: null,
     folderId: null,
@@ -253,6 +257,7 @@ export function sanitizeActionFields(
         content: action.content ?? null,
         cc: action.cc ?? null,
         bcc: action.bcc ?? null,
+        replyAll: action.replyAll ?? null,
       };
     }
     case ActionType.SEND_EMAIL: {

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildReplyAllRecipients,
   formatCcList,
+  getReplyRecipients,
   mergeAndDedupeRecipients,
 } from "./reply-all";
 import type { ParsedMessageHeaders } from "@/utils/types";
@@ -489,5 +490,88 @@ describe("mergeAndDedupeRecipients", () => {
       '"Doe, Jane" <jane@example.com>',
       '"Smith, Bob" <bob@example.com>',
     ]);
+  });
+});
+
+describe("getReplyRecipients", () => {
+  it("replies only to the sender when replyAll is false", () => {
+    const headers: ParsedMessageHeaders = {
+      from: "sender@example.com",
+      to: "me@company.com, colleague@company.com",
+      cc: "manager@company.com",
+      subject: "Test",
+      date: "2024-01-01",
+    };
+
+    const result = getReplyRecipients(headers, {
+      sentFromUser: false,
+      replyAll: false,
+      userEmail: "me@company.com",
+    });
+
+    expect(result.to).toBe("sender@example.com");
+    expect(result.cc).toBe("manager@company.com");
+  });
+
+  it("replies to all original recipients when replyAll is true", () => {
+    const headers: ParsedMessageHeaders = {
+      from: "sender@example.com",
+      to: "me@company.com, colleague@company.com",
+      cc: "manager@company.com",
+      subject: "Test",
+      date: "2024-01-01",
+    };
+
+    const result = getReplyRecipients(headers, {
+      sentFromUser: false,
+      replyAll: true,
+      userEmail: "me@company.com",
+    });
+
+    expect(result.to).toBe("sender@example.com");
+    expect(result.cc).toContain("colleague@company.com");
+    expect(result.cc).toContain("manager@company.com");
+  });
+
+  it("addresses the original recipients, not yourself, when reply-all-ing your own sent message", () => {
+    // headers.from is you here, since you sent this message
+    const headers: ParsedMessageHeaders = {
+      from: "me@company.com",
+      to: "alice@example.com, bob@example.com",
+      cc: "carol@example.com",
+      subject: "Following up",
+      date: "2024-01-01",
+    };
+
+    const result = getReplyRecipients(headers, {
+      sentFromUser: true,
+      replyAll: true,
+      userEmail: "me@company.com",
+    });
+
+    expect(result.to).not.toContain("me@company.com");
+    expect(result.to).toBe("alice@example.com");
+    expect(result.cc).toContain("bob@example.com");
+    expect(result.cc).toContain("carol@example.com");
+    expect(result.cc).not.toContain("me@company.com");
+  });
+
+  it("addresses the original recipients when plain-replying to your own sent message", () => {
+    const headers: ParsedMessageHeaders = {
+      from: "me@company.com",
+      to: "alice@example.com, bob@example.com",
+      cc: "carol@example.com",
+      subject: "Following up",
+      date: "2024-01-01",
+    };
+
+    const result = getReplyRecipients(headers, {
+      sentFromUser: true,
+      replyAll: false,
+      userEmail: "me@company.com",
+    });
+
+    expect(result.to).toBe("alice@example.com, bob@example.com");
+    expect(result.cc).toBe("carol@example.com");
   });
 });

@@ -150,6 +150,7 @@ export type RuleActionFields = {
   to?: string | null;
   cc?: string | null;
   bcc?: string | null;
+  replyAll?: boolean | null;
   subject?: string | null;
   content?: string | null;
   webhookUrl?: string | null;
@@ -361,6 +362,13 @@ function createActionFieldShape(provider: string) {
     ),
     cc: optionalStringField("The cc email address to send the email to"),
     bcc: optionalStringField("The bcc email address to send the email to"),
+    replyAll: z
+      .boolean()
+      .nullish()
+      .transform((value) => value ?? null)
+      .describe(
+        "Only relevant for REPLY actions. If true, address the reply to everyone on the original email (all original To and Cc recipients), not just the sender. Use this when the user asks to reply to everyone, reply all, or keep the whole thread included.",
+      ),
     subject: optionalStringField("The subject of the email"),
     content: optionalStringField("The content of the email"),
     webhookUrl: optionalStringField(

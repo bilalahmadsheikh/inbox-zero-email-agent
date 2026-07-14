@@ -304,6 +304,7 @@ const reply: ActionFunction<{
   content?: string | null;
   cc?: string | null;
   bcc?: string | null;
+  replyAll?: boolean | null;
   staticAttachments?: ActionItem["staticAttachments"];
 }> = async ({ client, email, args, emailAccount, executedRule, logger }) => {
   if (!args.content) return;
@@ -332,7 +333,13 @@ const reply: ActionFunction<{
       textHtml: email.textHtml,
     },
     args.content,
-    { attachments },
+    {
+      attachments,
+      cc: args.cc ?? undefined,
+      bcc: args.bcc ?? undefined,
+      replyAll: args.replyAll ?? false,
+      userEmails: emailAccount.email,
+    },
   );
 };
 

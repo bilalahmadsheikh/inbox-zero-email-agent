@@ -85,6 +85,7 @@ describe.runIf(isAiTest)("aiChooseRule", () => {
           to: null,
           cc: null,
           bcc: null,
+          replyAll: null,
           url: null,
           folderName: null,
           delayInMinutes: null,

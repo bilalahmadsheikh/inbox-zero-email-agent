@@ -5,10 +5,12 @@ import { SafeError } from "@/utils/error";
 import { MAX_SCHEDULE_AHEAD_MS } from "@/utils/actions/mail.validation";
 import { createEmailProvider } from "@/utils/email/provider";
 import { getFormattedSenderAddress } from "@/utils/email/get-formatted-sender-address";
+import { getReplyRecipients } from "@/utils/email/reply-all";
 import type { Logger } from "@/utils/logger";
 import prisma from "@/utils/prisma";
 import { sleep } from "@/utils/sleep";
 import { convertNewlinesToBr, escapeHtml, truncate } from "@/utils/string";
+import type { ParsedMessageHeaders } from "@/utils/types";
 import { isDuplicateError } from "@/utils/prisma-helpers";
 import {
   type AssistantEmailConfirmationResult,
@@ -582,10 +584,22 @@ async function confirmPendingReplyEmailAction({
       confirmedAt,
       contentOverride,
       requestedSendAt,
+      from,
     });
   }
 
-  const replyOptions = from ? { from } : undefined;
+  const sentFromUser = message.labelIds?.includes("SENT");
+  const recipients = getReplyRecipients(message.headers, {
+    sentFromUser,
+    replyAll: !!output.pendingAction.replyAll,
+    userEmail: from ?? undefined,
+  });
+
+  const replyOptions = {
+    ...(from ? { from } : {}),
+    to: recipients.to,
+    cc: recipients.cc,
+  };
   const sentAfter = new Date();
   await emailProvider.replyToEmail(
     message,
@@ -603,7 +617,7 @@ async function confirmPendingReplyEmailAction({
     actionType: output.actionType,
     messageId,
     threadId: message.threadId || null,
-    to: message.headers["reply-to"] || message.headers.from || null,
+    to: recipients.to || null,
     subject: message.subject || message.headers.subject || null,
     confirmedAt,
   };
@@ -1960,24 +1974,21 @@ async function scheduleReplyEmail({
   confirmedAt,
   contentOverride,
   requestedSendAt,
+  from,
 }: {
   output: PendingReplyEmailToolOutput;
   message: {
     id: string;
     threadId?: string | null;
     subject?: string | null;
-    headers: {
-      from?: string;
-      subject?: string;
-      references?: string;
-      "reply-to"?: string;
-      "message-id"?: string;
-    };
+    labelIds?: string[] | null;
+    headers: ParsedMessageHeaders;
   };
   emailAccountId: string;
   confirmedAt: string;
   contentOverride?: string;
   requestedSendAt: string;
+  from?: string | null;
 }) {
   const requested = new Date(requestedSendAt).getTime();
   if (requested > Date.now() + MAX_SCHEDULE_AHEAD_MS) {
@@ -1987,7 +1998,13 @@ async function scheduleReplyEmail({
   // next sweep rather than erroring on an already-approved email.
   const sendAt = new Date(Math.max(requested, Date.now()));
 
-  const to = message.headers["reply-to"] || message.headers.from;
+  const sentFromUser = message.labelIds?.includes("SENT");
+  const recipients = getReplyRecipients(message.headers, {
+    sentFromUser,
+    replyAll: !!output.pendingAction.replyAll,
+    userEmail: from ?? undefined,
+  });
+  const { to, cc } = recipients;
   if (!to) throw new SafeError("Could not determine the reply recipient");
 
   const baseSubject = message.subject || message.headers.subject || "";
@@ -2002,6 +2019,7 @@ async function scheduleReplyEmail({
     data: {
       emailAccountId,
       to,
+      cc,
       subject,
       messageHtml,
       replyToEmail: {

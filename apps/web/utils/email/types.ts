@@ -243,6 +243,11 @@ export interface EmailProvider {
       replyTo?: string;
       from?: string;
       attachments?: MailAttachment[];
+      to?: string;
+      cc?: string;
+      bcc?: string;
+      replyAll?: boolean;
+      userEmails?: string | string[];
     },
   ): Promise<void>;
   searchMessages(options: {

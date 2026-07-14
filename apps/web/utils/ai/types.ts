@@ -29,6 +29,7 @@ export type ActionItem = {
   to?: ExecutedAction["to"];
   cc?: ExecutedAction["cc"];
   bcc?: ExecutedAction["bcc"];
+  replyAll?: ExecutedAction["replyAll"];
   url?: ExecutedAction["url"];
   folderName?: ExecutedAction["folderName"];
   folderId?: ExecutedAction["folderId"];

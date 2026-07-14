@@ -841,6 +841,7 @@ async function mapActionFields(
         to,
         cc: a.fields?.cc,
         bcc: a.fields?.bcc,
+        replyAll: a.fields?.replyAll,
         subject: a.fields?.subject,
         content: a.fields?.content,
         url: a.fields?.webhookUrl,

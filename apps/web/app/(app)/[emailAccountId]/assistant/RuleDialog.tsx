@@ -200,6 +200,7 @@ function transformRuleForDuplication(
       to: action.to ? { value: action.to } : undefined,
       cc: action.cc ? { value: action.cc } : undefined,
       bcc: action.bcc ? { value: action.bcc } : undefined,
+      replyAll: action.replyAll ?? undefined,
       url: action.url ? { value: action.url } : undefined,
       folderName: action.folderName ? { value: action.folderName } : undefined,
       folderId: action.folderId ? { value: action.folderId } : undefined,

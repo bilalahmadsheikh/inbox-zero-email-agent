@@ -10,6 +10,7 @@ import { escapeHtml } from "@/utils/string";
 import { forwardEmailHtml, forwardEmailSubject } from "@/utils/gmail/forward";
 import {
   buildReplyAllRecipients,
+  formatCcList,
   mergeAndDedupeRecipients,
 } from "@/utils/email/reply-all";
 import { withOutlookRetry } from "@/utils/outlook/retry";
@@ -112,7 +113,16 @@ export async function replyToEmail(
   message: EmailForAction,
   reply: string,
   logger: Logger,
-  options?: { replyTo?: string; from?: string; attachments?: Attachment[] },
+  options?: {
+    replyTo?: string;
+    from?: string;
+    attachments?: Attachment[];
+    to?: string;
+    cc?: string;
+    bcc?: string;
+    replyAll?: boolean;
+    userEmails?: string | string[];
+  },
 ) {
   ensureEmailSendingEnabled();
 
@@ -121,12 +131,17 @@ export async function replyToEmail(
     message,
   });
 
-  // Use createReply to create a properly threaded draft
+  // Use createReply/createReplyAll to create a properly threaded draft
   // Microsoft Graph's sendMail doesn't support setting In-Reply-To/References headers
   // Only createReply/createReplyAll endpoints ensure proper threading
   const replyDraft: Message = await withOutlookRetry(
     () =>
-      client.getClient().api(`/me/messages/${message.id}/createReply`).post({}),
+      client
+        .getClient()
+        .api(
+          `/me/messages/${message.id}/${options?.replyAll || options?.to ? "createReplyAll" : "createReply"}`,
+        )
+        .post({}),
     logger,
   );
 
@@ -134,6 +149,36 @@ export async function replyToEmail(
     options?.from,
     replyDraft.from?.emailAddress?.address,
   );
+
+  // A caller-supplied `to` is already fully resolved (e.g. redirected away
+  // from the current user when replying to their own sent message), so use
+  // it as-is instead of recomputing reply-all recipients from headers.
+  // createReplyAll already populates cc with the other original recipients;
+  // recompute so any manually-specified cc/bcc gets merged in too.
+  let toRecipients: GraphRecipient[] | undefined;
+  let ccRecipients: GraphRecipient[] | undefined;
+  let bccRecipients: GraphRecipient[] | undefined;
+  if (options?.to) {
+    toRecipients = buildGraphRecipients(options.to);
+    ccRecipients = buildGraphRecipients(
+      formatCcList(mergeAndDedupeRecipients([], options?.cc)),
+    );
+    bccRecipients = buildGraphRecipients(
+      formatCcList(mergeAndDedupeRecipients([], options?.bcc)),
+    );
+  } else if (options?.replyAll || options?.cc || options?.bcc) {
+    const replyAllCc = options?.replyAll
+      ? buildReplyAllRecipients(
+          message.headers,
+          undefined,
+          options.userEmails || "",
+        ).cc
+      : [];
+    const ccList = mergeAndDedupeRecipients(replyAllCc, options?.cc);
+    const bccList = mergeAndDedupeRecipients([], options?.bcc);
+    ccRecipients = buildGraphRecipients(formatCcList(ccList));
+    bccRecipients = buildGraphRecipients(formatCcList(bccList));
+  }
 
   // Update the draft with our content
   await withOutlookRetry(
@@ -152,6 +197,9 @@ export async function replyToEmail(
                 replyTo: [{ emailAddress: { address: options.replyTo } }],
               }
             : {}),
+          ...(toRecipients ? { toRecipients } : {}),
+          ...(ccRecipients ? { ccRecipients } : {}),
+          ...(bccRecipients ? { bccRecipients } : {}),
         }),
     logger,
   );

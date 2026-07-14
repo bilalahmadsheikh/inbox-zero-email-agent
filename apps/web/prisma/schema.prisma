@@ -610,6 +610,7 @@ model Action {
   to                String?
   cc                String?
   bcc               String?
+  replyAll          Boolean? // For REPLY actions: address the reply to all original recipients, not just the sender
   url               String?
   folderName        String?
   folderId          String?
@@ -707,6 +708,7 @@ model ExecutedAction {
   to                  String?
   cc                  String?
   bcc                 String?
+  replyAll            Boolean? // For REPLY actions: address the reply to all original recipients, not just the sender
   url                 String?
   folderName          String?
   folderId            String?
@@ -749,6 +751,7 @@ model ScheduledAction {
   to                  String?
   cc                  String?
   bcc                 String?
+  replyAll            Boolean? // For REPLY actions: address the reply to all original recipients, not just the sender
   url                 String?
   folderName          String?
   folderId            String?

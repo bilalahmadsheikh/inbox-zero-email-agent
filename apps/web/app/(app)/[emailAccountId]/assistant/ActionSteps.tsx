@@ -565,8 +565,29 @@ function ActionCard({
     );
   };
 
+  const replyAllChecked = !!watch(`actions.${index}.replyAll`);
+
   const fieldsContent = (
     <>
+      {actionType === ActionType.REPLY && (
+        <div className="mt-2 flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={replyAllChecked}
+            onCheckedChange={(checked) =>
+              setValue(`actions.${index}.replyAll`, checked === true)
+            }
+            aria-label="Reply all"
+            id={`actions.${index}.replyAll`}
+          />
+          <label
+            htmlFor={`actions.${index}.replyAll`}
+            className="cursor-pointer text-muted-foreground"
+          >
+            Reply all — include everyone on the original email, not just the
+            sender
+          </label>
+        </div>
+      )}
       {renderFieldRows(nonExpandableFields, renderField)}
       {isDraftReplyActionType(rawActionType)
         ? // Draft reply actions always show all configurable fields.

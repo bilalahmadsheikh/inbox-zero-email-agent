@@ -1,6 +1,47 @@
 import type { ParsedMessageHeaders } from "@/utils/types";
 import { extractEmailAddress, splitRecipientList } from "@/utils/email";
 
+export interface ReplyRecipients {
+  cc?: string;
+  to: string;
+}
+
+/**
+ * Resolves the To/Cc recipients for a reply, for both plain "Reply" and
+ * "Reply all". Handles replying to your own sent message: the original
+ * "from" is you, so reply-all must address the original recipients instead
+ * of yourself.
+ */
+export function getReplyRecipients(
+  headers: ParsedMessageHeaders,
+  {
+    sentFromUser,
+    replyAll,
+    userEmail,
+  }: { sentFromUser?: boolean; replyAll: boolean; userEmail?: string },
+): ReplyRecipients {
+  if (!replyAll) {
+    return {
+      // If following an email from yourself, use original recipients, otherwise reply to sender
+      to: sentFromUser ? headers.to : headers.from,
+      // Keep original CC
+      cc: headers.cc,
+    };
+  }
+
+  const overrideTo = sentFromUser
+    ? splitRecipientList(headers.to || "")[0]
+    : undefined;
+
+  const { to, cc } = buildReplyAllRecipients(
+    headers,
+    overrideTo,
+    userEmail || "",
+  );
+
+  return { to, cc: formatCcList(cc) };
+}
+
 export interface ReplyAllRecipients {
   cc: string[];
   to: string;

@@ -74,6 +74,7 @@ export function SideNavWithTopNav({
       sidebarNames={["left-sidebar", "chat-sidebar"]}
     >
       <MobileHeader />
+      <ProductionVersionBadge />
       <SideNav name="left-sidebar" />
       <ContentWrapper>{children}</ContentWrapper>
       {!isAssistantRoute ? <SidebarRight name="chat-sidebar" /> : null}
@@ -91,5 +92,13 @@ function MobileHeader() {
         />
       </div>
     </header>
+  );
+}
+
+function ProductionVersionBadge() {
+  return (
+    <div className="pointer-events-none fixed top-2 right-3 z-50 rounded border border-border bg-background/90 px-2 py-0.5 font-medium text-[11px] text-muted-foreground shadow-sm backdrop-blur">
+      In Production Version 1.5
+    </div>
   );
 }

@@ -1,0 +1,45 @@
+name: Trigger Devaicon deploy
+
+# Devaicon/email-agent's own deployment only fires on pushes it receives
+# directly. When a contributor pushes to a different remote (e.g. origin),
+# Devaicon/email-agent never sees that push and its deploy never re-fires.
+# This relays activity over as an empty, no-op commit so its deployment
+# wakes up without actually syncing code (code sync stays a manual/PR
+# decision).
+on:
+  push:
+    branches:
+      - main
+      - development
+      - production
+  # Lets you manually fire a run from the Actions tab (pick the branch via
+  # the "Use workflow from" dropdown) to verify the token/permissions work
+  # without waiting for or faking a real push.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-devaicon-deploy:
+    # Skip when this push IS one of the auto-generated trigger commits
+    # below, so the empty push doesn't re-trigger itself in a loop.
+    # (head_commit only exists on push events, so manual runs always pass.)
+    if: "github.event_name != 'push' || !contains(github.event.head_commit.message, '[trigger-devaicon-deploy]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.ref_name }}
+
+      - name: Push empty trigger commit to Devaicon/email-agent
+        env:
+          DEVAICON_DEPLOY_TOKEN: ${{ secrets.DEVAICON_DEPLOY_TOKEN }}
+        run: |
+          git config user.name "Abdul-Muqadim2000"
+          git config user.email "127100941+Abdul-Muqadim2000@users.noreply.github.com"
+          git commit --allow-empty -m "chore: trigger Devaicon deploy [trigger-devaicon-deploy]"
+          git push "https://x-access-token:${DEVAICON_DEPLOY_TOKEN}@github.com/Devaicon/email-agent.git" "HEAD:${{ github.ref_name }}"

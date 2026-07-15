@@ -32,6 +32,10 @@ import {
 } from "@/utils/outlook/message";
 import { findUnsubscribeLink } from "@/utils/parse/parseHtml.server";
 import { sleep } from "@/utils/sleep";
+import {
+  verifyRecurrenceRequest,
+  verifyScheduledSendIntent,
+} from "@/utils/ai/assistant/verify-recurrence-request";
 import { archiveCategory } from "@/utils/categorize/senders/archive-category";
 import { getCategoryOverview } from "@/utils/categorize/senders/get-category-overview";
 import { startBulkCategorization } from "@/utils/categorize/senders/start-bulk-categorization";
@@ -129,7 +133,7 @@ const sendEmailToolInputSchema = z
       .max(1440)
       .optional()
       .describe(
-        "Only when the user's CURRENT message explicitly asks for recurring or repeated sends: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. The quote is verified against the user's actual message and repeats are dropped if it does not match.",
+        "Only when the user's CURRENT message explicitly asks for recurring or repeated sends: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies the message actually requests recurrence and drops these fields otherwise.",
       ),
     repeatCount: z
       .number()
@@ -144,7 +148,7 @@ const sendEmailToolInputSchema = z
       .string()
       .optional()
       .describe(
-        "The user's verbatim words from their CURRENT message asking for repeated sends. Verified server-side against the real message; if it does not appear there, the repeat fields are ignored and a single send is scheduled.",
+        "The user's verbatim words from their CURRENT message that themselves ask for repetition (e.g. 'every 10 minutes', 'remind them 3 times') — not a time, date, or unrelated phrase that merely appears near the scheduling request. The server independently verifies both that this quote appears in the real message and that the message actually requests recurrence; repeat fields are dropped otherwise.",
       ),
   })
   .strict();
@@ -194,7 +198,7 @@ const replyEmailToolInputSchema = z
       .max(1440)
       .optional()
       .describe(
-        "Only when the user's CURRENT message explicitly asks for recurring or repeated sends: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. The quote is verified against the user's actual message and repeats are dropped if it does not match.",
+        "Only when the user's CURRENT message explicitly asks for recurring or repeated sends: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies the message actually requests recurrence and drops these fields otherwise.",
       ),
     repeatCount: z
       .number()
@@ -209,7 +213,7 @@ const replyEmailToolInputSchema = z
       .string()
       .optional()
       .describe(
-        "The user's verbatim words from their CURRENT message asking for repeated sends. Verified server-side against the real message; if it does not appear there, the repeat fields are ignored and a single send is scheduled.",
+        "The user's verbatim words from their CURRENT message that themselves ask for repetition (e.g. 'every 10 minutes', 'remind them 3 times') — not a time, date, or unrelated phrase that merely appears near the scheduling request. The server independently verifies both that this quote appears in the real message and that the message actually requests recurrence; repeat fields are dropped otherwise.",
       ),
   })
   .strict();
@@ -1332,17 +1336,31 @@ export const sendEmailTool = ({
         return { error: getSendEmailValidationError(parsedInput.error) };
       }
 
-      const repeats = resolveVerifiedRepeats(
-        parsedInput.data,
+      const verifiedSendAt = await resolveVerifiedSendAt({
+        sendAt: parsedInput.data.sendAt,
+        emailSubject: parsedInput.data.subject,
+        emailContentSnippet: parsedInput.data.messageHtml,
+        emailAccountId,
         currentUserMessageText,
+        logger,
+      });
+      const inputWithVerifiedSendAt = {
+        ...parsedInput.data,
+        sendAt: verifiedSendAt,
+      };
+
+      const repeats = await resolveVerifiedRepeats(
+        inputWithVerifiedSendAt,
+        currentUserMessageText,
+        emailAccountId,
         logger,
       );
       const normalizedInput = {
         // Recurring chains keep a near-now sendAt: the queue needs a first
         // occurrence either way.
         ...(repeats
-          ? parsedInput.data
-          : normalizeSendEmailInput(parsedInput.data)),
+          ? inputWithVerifiedSendAt
+          : normalizeSendEmailInput(inputWithVerifiedSendAt)),
         repeatEveryMinutes: repeats?.everyMinutes,
         repeatCount: repeats?.count,
       };
@@ -1636,15 +1654,29 @@ export const replyEmailTool = ({
         return { error: getReplyEmailValidationError(parsedInput.error) };
       }
 
-      const repeats = resolveVerifiedRepeats(
-        parsedInput.data,
+      const verifiedSendAt = await resolveVerifiedSendAt({
+        sendAt: parsedInput.data.sendAt,
+        emailSubject: "(reply — subject inherited from the original thread)",
+        emailContentSnippet: parsedInput.data.content,
+        emailAccountId,
         currentUserMessageText,
+        logger,
+      });
+      const inputWithVerifiedSendAt = {
+        ...parsedInput.data,
+        sendAt: verifiedSendAt,
+      };
+
+      const repeats = await resolveVerifiedRepeats(
+        inputWithVerifiedSendAt,
+        currentUserMessageText,
+        emailAccountId,
         logger,
       );
       const normalizedInput = {
         ...(repeats
-          ? parsedInput.data
-          : normalizeSendEmailInput(parsedInput.data)),
+          ? inputWithVerifiedSendAt
+          : normalizeSendEmailInput(inputWithVerifiedSendAt)),
         repeatEveryMinutes: repeats?.everyMinutes,
         repeatCount: repeats?.count,
       };
@@ -1777,10 +1809,49 @@ function createPendingSendEmailOutput(
   };
 }
 
+// When a message describes multiple emails, a model can copy one email's
+// sendAt onto a sibling meant to go out immediately (call order doesn't
+// reliably tell the correctly-scheduled email apart from the miscopied
+// one — either can be first). Verify each scheduled send against the real
+// message independently rather than trusting the model's own claim.
+async function resolveVerifiedSendAt({
+  sendAt,
+  emailSubject,
+  emailContentSnippet,
+  emailAccountId,
+  currentUserMessageText,
+  logger,
+}: {
+  sendAt: string | undefined;
+  emailSubject: string;
+  emailContentSnippet: string;
+  emailAccountId: string;
+  currentUserMessageText: string | null | undefined;
+  logger: Logger;
+}): Promise<string | undefined> {
+  if (!sendAt) return;
+  if (!currentUserMessageText) return sendAt;
+
+  const shouldBeScheduled = await verifyScheduledSendIntent({
+    userMessageText: currentUserMessageText,
+    emailSubject,
+    emailContentSnippet,
+    emailAccountId,
+    logger,
+  });
+
+  if (shouldBeScheduled) return sendAt;
+
+  logger.warn("Dropped sendAt not supported by the user's message", {
+    emailSubject,
+  });
+  return;
+}
+
 // Recurrence is only honored when the model quotes the user's actual words
 // asking for it and that quote really appears in the current message.
 // Anything else is stripped so a single send is scheduled.
-function resolveVerifiedRepeats(
+async function resolveVerifiedRepeats(
   input: {
     sendAt?: string;
     repeatEveryMinutes?: number;
@@ -1788,8 +1859,9 @@ function resolveVerifiedRepeats(
     repeatRequestQuote?: string;
   },
   currentUserMessageText: string | null | undefined,
+  emailAccountId: string,
   logger: Logger,
-): { everyMinutes: number; count: number } | null {
+): Promise<{ everyMinutes: number; count: number } | null> {
   if (
     input.repeatEveryMinutes === undefined &&
     input.repeatCount === undefined
@@ -1801,6 +1873,22 @@ function resolveVerifiedRepeats(
   if (stripReason) {
     logger.warn("Dropped unverified repeat request from model", {
       reason: stripReason,
+    });
+    return null;
+  }
+
+  // The quote proves the text exists somewhere in the message, not that it
+  // actually means "repeat this" — a model can quote an unrelated fragment
+  // (e.g. a one-time send time) to smuggle recurrence past the check above.
+  // Judge the real intent from the full message independently.
+  const requestsRecurrence = await verifyRecurrenceRequest({
+    userMessageText: currentUserMessageText as string,
+    emailAccountId,
+    logger,
+  });
+  if (!requestsRecurrence) {
+    logger.warn("Dropped repeat request: message does not request recurrence", {
+      quote: input.repeatRequestQuote,
     });
     return null;
   }

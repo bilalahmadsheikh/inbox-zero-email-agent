@@ -39,6 +39,8 @@ export const LlmUseCase = {
   ReplyMemoryExtraction: "reply-memory-extraction",
   ReplyNudge: "reply-nudge",
   Summarise: "summarise",
+  VerifyRecurrenceRequest: "verify-recurrence-request",
+  VerifyScheduledSendIntent: "verify-scheduled-send-intent",
   WritingStyleAnalysis: "writing-style-analysis",
 } as const;
 
@@ -81,6 +83,8 @@ export const LLM_USE_CASE_MODEL_TYPES = {
   [LlmUseCase.ReplyMemoryExtraction]: "economy",
   [LlmUseCase.ReplyNudge]: "chat",
   [LlmUseCase.Summarise]: "default",
+  [LlmUseCase.VerifyRecurrenceRequest]: "economy",
+  [LlmUseCase.VerifyScheduledSendIntent]: "economy",
   [LlmUseCase.WritingStyleAnalysis]: "default",
 } as const satisfies Record<LlmUseCase, ModelType>;
 

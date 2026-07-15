@@ -142,6 +142,8 @@ describe("LLM use cases", () => {
       [LlmUseCase.ReplyMemoryExtraction]: "economy",
       [LlmUseCase.ReplyNudge]: "chat",
       [LlmUseCase.Summarise]: "default",
+      [LlmUseCase.VerifyRecurrenceRequest]: "economy",
+      [LlmUseCase.VerifyScheduledSendIntent]: "economy",
       [LlmUseCase.WritingStyleAnalysis]: "default",
     });
   });

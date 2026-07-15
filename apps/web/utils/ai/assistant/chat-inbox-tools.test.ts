@@ -25,6 +25,21 @@ vi.mock("@/utils/posthog", () => ({
   posthogCaptureEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
+const { mockVerifyRecurrenceRequest, mockVerifyScheduledSendIntent } =
+  vi.hoisted(() => ({
+    mockVerifyRecurrenceRequest: vi.fn(),
+    mockVerifyScheduledSendIntent: vi.fn(),
+  }));
+
+vi.mock("@/utils/ai/assistant/verify-recurrence-request", () => ({
+  verifyRecurrenceRequest: (
+    ...args: Parameters<typeof mockVerifyRecurrenceRequest>
+  ) => mockVerifyRecurrenceRequest(...args),
+  verifyScheduledSendIntent: (
+    ...args: Parameters<typeof mockVerifyScheduledSendIntent>
+  ) => mockVerifyScheduledSendIntent(...args),
+}));
+
 const {
   mockArchiveCategory,
   mockGetCategoryOverview,
@@ -70,6 +85,9 @@ const logger = createTestLogger();
 describe("chat inbox tools", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Most tests aren't exercising the scheduling-intent guard itself, so
+    // default to "verified" and let the guard's own tests override this.
+    mockVerifyScheduledSendIntent.mockResolvedValue(true);
   });
 
   it("adds formatted from header when sending an email", async () => {
@@ -261,11 +279,12 @@ describe("chat inbox tools", () => {
     expect(createEmailProvider).not.toHaveBeenCalled();
   });
 
-  it("keeps repeats when the quote matches the user's current message", async () => {
+  it("keeps repeats when the quote matches the user's current message and the message actually requests recurrence", async () => {
     prisma.emailAccount.findUnique.mockResolvedValue({
       name: "Test User",
       email: TEST_EMAIL,
     } as any);
+    mockVerifyRecurrenceRequest.mockResolvedValue(true);
 
     const toolInstance = sendEmailTool({
       email: TEST_EMAIL,
@@ -294,6 +313,118 @@ describe("chat inbox tools", () => {
         repeatEveryMinutes: 10,
         repeatCount: 3,
       }),
+    });
+  });
+
+  it("strips repeats when the quote is a real but unrelated fragment (e.g. a one-time send time)", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+    // The quote is a verbatim substring of the message, but doesn't itself
+    // request recurrence — this is exactly the loophole a model can exploit.
+    mockVerifyRecurrenceRequest.mockResolvedValue(false);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      currentUserMessageText: "Schedule this for tomorrow 9am",
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      sendAt,
+      repeatEveryMinutes: 1,
+      repeatCount: 2,
+      repeatRequestQuote: "tomorrow 9am",
+    });
+
+    expect(mockVerifyRecurrenceRequest).toHaveBeenCalled();
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        sendAt,
+        repeatEveryMinutes: null,
+        repeatCount: null,
+      }),
+    });
+  });
+
+  it("keeps sendAt when verification confirms the message asked to schedule this email", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+    mockVerifyScheduledSendIntent.mockResolvedValue(true);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      currentUserMessageText: "Schedule this for tomorrow 9am",
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Follow up",
+      messageHtml: "<p>Following up</p>",
+      sendAt,
+    });
+
+    expect(mockVerifyScheduledSendIntent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        emailSubject: "Follow up",
+        emailContentSnippet: "<p>Following up</p>",
+      }),
+    );
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({ sendAt }),
+    });
+  });
+
+  it("strips sendAt when verification says this specific email wasn't meant to be scheduled", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+    // Reproduces the model copying a sibling email's sendAt onto this one
+    // even though the message said this one should send now.
+    mockVerifyScheduledSendIntent.mockResolvedValue(false);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      currentUserMessageText:
+        "Send now: Subject: Quick check-in. Schedule for tomorrow 9am: Subject: Follow up.",
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Quick check-in",
+      messageHtml: "<p>Hey there</p>",
+      sendAt,
+    });
+
+    expect(mockVerifyScheduledSendIntent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        emailSubject: "Quick check-in",
+        emailContentSnippet: "<p>Hey there</p>",
+      }),
+    );
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({ sendAt: null }),
     });
   });
 

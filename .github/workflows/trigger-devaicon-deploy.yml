@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   trigger-devaicon-deploy:
@@ -37,9 +37,9 @@ jobs:
 
       - name: Push empty trigger commit to Devaicon/email-agent
         env:
-          DEVAICON_DEPLOY_TOKEN: ${{ secrets.DEVAICON_DEPLOY_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "Abdul-Muqadim2000"
-          git config user.email "127100941+Abdul-Muqadim2000@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit --allow-empty -m "chore: trigger Devaicon deploy [trigger-devaicon-deploy]"
-          git push "https://x-access-token:${DEVAICON_DEPLOY_TOKEN}@github.com/Devaicon/email-agent.git" "HEAD:${{ github.ref_name }}"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:${{ github.ref_name }}"

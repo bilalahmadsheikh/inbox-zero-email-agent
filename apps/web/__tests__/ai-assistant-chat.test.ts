@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { executeSenderWideInboxAction } from "@/utils/ai/assistant/chat-inbox-tools";
 import type { ModelMessage } from "ai";
 import {
   createTestLogger,
@@ -1715,6 +1716,8 @@ describe("aiProcessAssistantChat", () => {
         sendAt: null,
         repeatEveryMinutes: null,
         repeatCount: null,
+        supersedesDraftId: null,
+        cancelOnReply: null,
       },
       provider: "google",
       requiresConfirmation: true,
@@ -1793,6 +1796,8 @@ describe("aiProcessAssistantChat", () => {
         sendAt: null,
         repeatEveryMinutes: null,
         repeatCount: null,
+        supersedesDraftId: null,
+        cancelOnReply: null,
       },
       provider: "google",
       requiresConfirmation: true,
@@ -2215,7 +2220,7 @@ describe("aiProcessAssistantChat", () => {
     expect(mockCreateEmailProvider).not.toHaveBeenCalled();
   });
 
-  it("executes unsubscribe sender inbox action and archives sender messages", async () => {
+  it("holds unsubscribe sender actions for confirmation, then runs them once confirmed", async () => {
     const tools = await captureToolSet();
 
     const getMessagesFromSender = vi.fn().mockResolvedValue({
@@ -2257,7 +2262,31 @@ describe("aiProcessAssistantChat", () => {
       },
     });
 
-    const result = await tools.manageInbox.execute({
+    // The tool itself never executes sender-wide cleanup; it returns a
+    // pending confirmation for the user to approve in the UI.
+    const pending = await tools.manageInbox.execute({
+      action: "unsubscribe_senders",
+      fromEmails: ["sender@example.com"],
+    });
+
+    expect(pending).toEqual(
+      expect.objectContaining({
+        actionType: "manage_inbox_senders",
+        requiresConfirmation: true,
+        confirmationState: "pending",
+        action: "unsubscribe_senders",
+        senders: ["sender@example.com"],
+      }),
+    );
+    expect(mockUnsubscribeSenderAndMark).not.toHaveBeenCalled();
+    expect(bulkArchiveFromSenders).not.toHaveBeenCalled();
+
+    // The confirmation card's server action performs the real run.
+    const result = await executeSenderWideInboxAction({
+      emailAccountId: "email-account-id",
+      provider: "google",
+      userEmail: "user@test.com",
+      logger,
       action: "unsubscribe_senders",
       fromEmails: ["sender@example.com"],
     });
@@ -2291,8 +2320,6 @@ describe("aiProcessAssistantChat", () => {
   });
 
   it("archives sender messages even when automatic unsubscribe fails", async () => {
-    const tools = await captureToolSet();
-
     const getMessagesFromSender = vi.fn().mockResolvedValue({
       messages: [
         {
@@ -2332,7 +2359,11 @@ describe("aiProcessAssistantChat", () => {
       },
     });
 
-    const result = await tools.manageInbox.execute({
+    const result = await executeSenderWideInboxAction({
+      emailAccountId: "email-account-id",
+      provider: "google",
+      userEmail: "user@test.com",
+      logger,
       action: "unsubscribe_senders",
       fromEmails: ["sender@example.com"],
     });

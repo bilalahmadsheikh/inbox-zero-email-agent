@@ -14,6 +14,7 @@ import type { ParsedMessageHeaders } from "@/utils/types";
 import { isDuplicateError } from "@/utils/prisma-helpers";
 import {
   type AssistantEmailConfirmationResult,
+  type AssistantEmailHeaderOverrides,
   type AssistantPendingEmailActionType,
   type AssistantPendingEmailToolOutput,
   pendingCreateRuleToolOutputSchema,
@@ -25,6 +26,7 @@ import {
   type PendingReplyEmailToolOutput,
   type PendingSendEmailToolOutput,
 } from "./assistant-chat.validation";
+import { hasOnlyValidRecipients } from "@/utils/email";
 import {
   buildCreateRuleSchemaFromChatToolInput,
   type ChatCreateRuleToolInvocation,
@@ -76,6 +78,8 @@ export async function confirmAssistantEmailActionForAccount({
   contentOverride,
   sendAtOverride,
   repeatOverride,
+  cancelOnReplyOverride,
+  headerOverrides,
   waitForPersistence,
   persistenceWaitMs,
   emailAccountId,
@@ -89,12 +93,16 @@ export async function confirmAssistantEmailActionForAccount({
   contentOverride?: string;
   sendAtOverride?: string | null;
   repeatOverride?: { everyMinutes: number; count: number } | null;
+  cancelOnReplyOverride?: boolean;
+  headerOverrides?: AssistantEmailHeaderOverrides;
   waitForPersistence?: boolean;
   persistenceWaitMs?: number;
   emailAccountId: string;
   provider: string;
   logger: Logger;
 }) {
+  assertValidHeaderOverrides(headerOverrides);
+
   const reservation = await reservePendingAssistantEmailAction({
     chatId,
     chatMessageId,
@@ -130,6 +138,9 @@ export async function confirmAssistantEmailActionForAccount({
       contentOverride,
       sendAtOverride,
       repeatOverride,
+      cancelOnReplyOverride,
+      headerOverrides,
+      logger,
     });
   } catch (error) {
     await clearPendingPartProcessing({
@@ -159,6 +170,7 @@ export async function confirmAssistantEmailActionForAccount({
       actionType,
       confirmationResult,
       contentOverride,
+      headerOverrides,
       logger,
     });
   } catch (error) {
@@ -424,6 +436,9 @@ async function executeAssistantEmailAction({
   contentOverride,
   sendAtOverride,
   repeatOverride,
+  cancelOnReplyOverride,
+  headerOverrides,
+  logger,
 }: {
   output: AssistantPendingEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
@@ -431,6 +446,9 @@ async function executeAssistantEmailAction({
   contentOverride?: string;
   sendAtOverride?: string | null;
   repeatOverride?: { everyMinutes: number; count: number } | null;
+  cancelOnReplyOverride?: boolean;
+  headerOverrides?: AssistantEmailHeaderOverrides;
+  logger: Logger;
 }): Promise<AssistantEmailConfirmationResult> {
   const confirmedAt = new Date().toISOString();
 
@@ -444,6 +462,9 @@ async function executeAssistantEmailAction({
         contentOverride,
         sendAtOverride,
         repeatOverride,
+        cancelOnReplyOverride,
+        headerOverrides,
+        logger,
       });
     case "reply_email":
       return confirmPendingReplyEmailAction({
@@ -454,6 +475,7 @@ async function executeAssistantEmailAction({
         contentOverride,
         sendAtOverride,
         repeatOverride,
+        cancelOnReplyOverride,
       });
     case "forward_email":
       return confirmPendingForwardEmailAction({
@@ -462,6 +484,7 @@ async function executeAssistantEmailAction({
         emailAccountId,
         confirmedAt,
         contentOverride,
+        headerOverrides,
       });
   }
 }
@@ -474,6 +497,9 @@ async function confirmPendingSendEmailAction({
   contentOverride,
   sendAtOverride,
   repeatOverride,
+  cancelOnReplyOverride,
+  headerOverrides,
+  logger,
 }: {
   output: PendingSendEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
@@ -482,6 +508,9 @@ async function confirmPendingSendEmailAction({
   contentOverride?: string;
   sendAtOverride?: string | null;
   repeatOverride?: { everyMinutes: number; count: number } | null;
+  cancelOnReplyOverride?: boolean;
+  headerOverrides?: AssistantEmailHeaderOverrides;
+  logger: Logger;
 }) {
   const from =
     output.pendingAction.from ||
@@ -490,6 +519,18 @@ async function confirmPendingSendEmailAction({
   const messageHtml = contentOverride
     ? convertNewlinesToBr(escapeHtml(contentOverride))
     : output.pendingAction.messageHtml;
+
+  // Card edits win over the prepared values; cc/bcc null clears the field.
+  const to = headerOverrides?.to || output.pendingAction.to;
+  const cc =
+    headerOverrides?.cc === undefined
+      ? output.pendingAction.cc
+      : headerOverrides.cc;
+  const bcc =
+    headerOverrides?.bcc === undefined
+      ? output.pendingAction.bcc
+      : headerOverrides.bcc;
+  const subject = headerOverrides?.subject || output.pendingAction.subject;
 
   // The card's Send now / Schedule buttons can override the pending sendAt:
   // null forces an immediate send, a datetime picks a new schedule.
@@ -509,10 +550,10 @@ async function confirmPendingSendEmailAction({
     const scheduledEmail = await prisma.scheduledEmail.create({
       data: {
         emailAccountId,
-        to: output.pendingAction.to,
-        cc: output.pendingAction.cc || undefined,
-        bcc: output.pendingAction.bcc || undefined,
-        subject: output.pendingAction.subject,
+        to,
+        cc: cc || undefined,
+        bcc: bcc || undefined,
+        subject,
         messageHtml,
         sendAt,
         // Card override wins; otherwise the quote-verified suggestion applies
@@ -524,15 +565,25 @@ async function confirmPendingSendEmailAction({
           repeatOverride,
           output.pendingAction.repeatCount,
         ),
+        cancelOnReply: resolveCancelOnReply(
+          cancelOnReplyOverride,
+          output.pendingAction.cancelOnReply,
+        ),
       },
+    });
+
+    await deleteSupersededDraft({
+      emailProvider,
+      draftId: output.pendingAction.supersedesDraftId,
+      logger,
     });
 
     return {
       actionType: output.actionType,
       messageId: null,
       threadId: null,
-      to: output.pendingAction.to,
-      subject: output.pendingAction.subject,
+      to,
+      subject,
       confirmedAt,
       scheduledFor: scheduledEmail.sendAt.toISOString(),
     };
@@ -541,10 +592,10 @@ async function confirmPendingSendEmailAction({
   const sentAfter = new Date();
 
   const result = await emailProvider.sendEmailWithHtml({
-    to: output.pendingAction.to,
-    cc: output.pendingAction.cc || undefined,
-    bcc: output.pendingAction.bcc || undefined,
-    subject: output.pendingAction.subject,
+    to,
+    cc: cc || undefined,
+    bcc: bcc || undefined,
+    subject,
     messageHtml,
     ...(from ? { from } : {}),
   });
@@ -555,12 +606,18 @@ async function confirmPendingSendEmailAction({
     sentAfter,
   });
 
+  await deleteSupersededDraft({
+    emailProvider,
+    draftId: output.pendingAction.supersedesDraftId,
+    logger,
+  });
+
   return {
     actionType: output.actionType,
     messageId,
     threadId: result.threadId || null,
-    to: output.pendingAction.to,
-    subject: output.pendingAction.subject,
+    to,
+    subject,
     confirmedAt,
   };
 }
@@ -573,6 +630,7 @@ async function confirmPendingReplyEmailAction({
   contentOverride,
   sendAtOverride,
   repeatOverride,
+  cancelOnReplyOverride,
 }: {
   output: PendingReplyEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
@@ -581,6 +639,7 @@ async function confirmPendingReplyEmailAction({
   contentOverride?: string;
   sendAtOverride?: string | null;
   repeatOverride?: { everyMinutes: number; count: number } | null;
+  cancelOnReplyOverride?: boolean;
 }) {
   const sourceMessage = await emailProvider.getMessage(
     output.pendingAction.messageId,
@@ -603,6 +662,7 @@ async function confirmPendingReplyEmailAction({
       contentOverride,
       requestedSendAt,
       repeatOverride,
+      cancelOnReplyOverride,
       from,
     });
   }
@@ -648,12 +708,14 @@ async function confirmPendingForwardEmailAction({
   emailAccountId,
   confirmedAt,
   contentOverride,
+  headerOverrides,
 }: {
   output: PendingForwardEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
   emailAccountId: string;
   confirmedAt: string;
   contentOverride?: string;
+  headerOverrides?: AssistantEmailHeaderOverrides;
 }) {
   const sourceMessage = await emailProvider.getMessage(
     output.pendingAction.messageId,
@@ -663,10 +725,20 @@ async function confirmPendingForwardEmailAction({
     output.reference?.threadId,
   );
   const from = await getFormattedSenderAddress({ emailAccountId });
+  // Card edits win over the prepared values; cc/bcc null clears the field.
+  const to = headerOverrides?.to || output.pendingAction.to;
+  const cc =
+    headerOverrides?.cc === undefined
+      ? output.pendingAction.cc
+      : headerOverrides.cc;
+  const bcc =
+    headerOverrides?.bcc === undefined
+      ? output.pendingAction.bcc
+      : headerOverrides.bcc;
   const forwardArgs = {
-    to: output.pendingAction.to,
-    cc: output.pendingAction.cc || undefined,
-    bcc: output.pendingAction.bcc || undefined,
+    to,
+    cc: cc || undefined,
+    bcc: bcc || undefined,
     content: contentOverride || output.pendingAction.content || undefined,
     ...(from ? { from } : {}),
   };
@@ -683,7 +755,7 @@ async function confirmPendingForwardEmailAction({
     actionType: output.actionType,
     messageId,
     threadId: message.threadId || null,
-    to: output.pendingAction.to,
+    to,
     subject: message.subject || message.headers.subject || null,
     confirmedAt,
   };
@@ -928,11 +1000,13 @@ function updateAssistantEmailPartWithConfirmation({
   partIndex,
   confirmationResult,
   contentOverride,
+  headerOverrides,
 }: {
   parts: unknown[];
   partIndex: number;
   confirmationResult: AssistantEmailConfirmationResult;
   contentOverride?: string;
+  headerOverrides?: AssistantEmailHeaderOverrides;
 }) {
   return updateAssistantEmailPartOutput({
     parts,
@@ -942,12 +1016,11 @@ function updateAssistantEmailPartWithConfirmation({
       confirmationState: "confirmed",
       confirmationResult,
     },
-    pendingActionPatch: contentOverride
-      ? getPendingActionContentPatch(
-          confirmationResult.actionType,
-          contentOverride,
-        )
-      : undefined,
+    pendingActionPatch: buildPendingActionPatch({
+      actionType: confirmationResult.actionType,
+      contentOverride,
+      headerOverrides,
+    }),
   });
 }
 
@@ -1369,6 +1442,7 @@ async function persistConfirmedAssistantEmailActionPart({
   actionType,
   confirmationResult,
   contentOverride,
+  headerOverrides,
   logger,
 }: {
   chatMessageId: string;
@@ -1377,6 +1451,7 @@ async function persistConfirmedAssistantEmailActionPart({
   actionType: AssistantPendingEmailActionType;
   confirmationResult: AssistantEmailConfirmationResult;
   contentOverride?: string;
+  headerOverrides?: AssistantEmailHeaderOverrides;
   logger: Logger;
 }) {
   await persistConfirmedAssistantPart({
@@ -1394,6 +1469,7 @@ async function persistConfirmedAssistantEmailActionPart({
         partIndex,
         confirmationResult,
         contentOverride,
+        headerOverrides,
       }),
   });
 }
@@ -1980,6 +2056,79 @@ function getPendingActionContentPatch(
   return { content: contentOverride };
 }
 
+// Merges body and header edits into the persisted pending action so the
+// confirmed card shows what was actually sent.
+function buildPendingActionPatch({
+  actionType,
+  contentOverride,
+  headerOverrides,
+}: {
+  actionType: AssistantPendingEmailActionType;
+  contentOverride?: string;
+  headerOverrides?: AssistantEmailHeaderOverrides;
+}): Record<string, string | null> | undefined {
+  const patch: Record<string, string | null> = {};
+
+  if (contentOverride) {
+    Object.assign(
+      patch,
+      getPendingActionContentPatch(actionType, contentOverride),
+    );
+  }
+
+  if (headerOverrides && actionType !== "reply_email") {
+    if (headerOverrides.to) patch.to = headerOverrides.to;
+    if (headerOverrides.cc !== undefined) patch.cc = headerOverrides.cc;
+    if (headerOverrides.bcc !== undefined) patch.bcc = headerOverrides.bcc;
+    if (headerOverrides.subject && actionType === "send_email") {
+      patch.subject = headerOverrides.subject;
+    }
+  }
+
+  return Object.keys(patch).length > 0 ? patch : undefined;
+}
+
+// Header edits come from the card as free text; reject anything that does
+// not parse to real email addresses before any send or schedule happens.
+function assertValidHeaderOverrides(
+  headerOverrides?: AssistantEmailHeaderOverrides,
+) {
+  if (!headerOverrides) return;
+
+  for (const field of ["to", "cc", "bcc"] as const) {
+    const value = headerOverrides[field];
+    if (value && !hasOnlyValidRecipients(value)) {
+      throw new SafeError(
+        `The edited "${field}" field must contain valid email address(es)`,
+      );
+    }
+  }
+}
+
+// The user confirmed the app-side send; remove the provider draft this send
+// supersedes so the same email cannot also go out from the Drafts folder.
+// Best-effort: the send already happened, so a cleanup failure only logs.
+async function deleteSupersededDraft({
+  emailProvider,
+  draftId,
+  logger,
+}: {
+  emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
+  draftId: string | null | undefined;
+  logger: Logger;
+}) {
+  if (!draftId) return;
+
+  try {
+    await emailProvider.deleteDraft(draftId);
+    logger.info("Deleted superseded draft after confirmed send");
+  } catch (error) {
+    logger.warn("Failed to delete superseded draft after confirmed send", {
+      error,
+    });
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -1994,6 +2143,7 @@ async function scheduleReplyEmail({
   contentOverride,
   requestedSendAt,
   repeatOverride,
+  cancelOnReplyOverride,
   from,
 }: {
   output: PendingReplyEmailToolOutput;
@@ -2009,6 +2159,7 @@ async function scheduleReplyEmail({
   contentOverride?: string;
   requestedSendAt: string;
   repeatOverride?: { everyMinutes: number; count: number } | null;
+  cancelOnReplyOverride?: boolean;
   from?: string | null;
 }) {
   const requested = new Date(requestedSendAt).getTime();
@@ -2062,6 +2213,10 @@ async function scheduleReplyEmail({
         repeatOverride,
         output.pendingAction.repeatCount,
       ),
+      cancelOnReply: resolveCancelOnReply(
+        cancelOnReplyOverride,
+        output.pendingAction.cancelOnReply,
+      ),
     },
   });
 
@@ -2090,4 +2245,12 @@ function resolveRepeatCount(
 ) {
   if (repeatOverride !== undefined) return repeatOverride?.count ?? null;
   return suggested ?? null;
+}
+
+function resolveCancelOnReply(
+  cancelOnReplyOverride: boolean | undefined,
+  suggested: boolean | null | undefined,
+) {
+  if (cancelOnReplyOverride !== undefined) return cancelOnReplyOverride;
+  return suggested ?? false;
 }

@@ -2,7 +2,9 @@
 
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { APP_VERSION } from "@/utils/changelog";
 import {
   SidebarInset,
   SidebarProvider,
@@ -97,8 +99,14 @@ function MobileHeader() {
 
 function ProductionVersionBadge() {
   return (
-    <div className="pointer-events-none fixed top-2 right-3 z-50 rounded border border-border bg-background/90 px-2 py-0.5 font-medium text-[11px] text-muted-foreground shadow-sm backdrop-blur">
-      In Production Version 1.5
-    </div>
+    <Link
+      href="/changelog"
+      target="_blank"
+      rel="noopener noreferrer"
+      title="View the changelog"
+      className="fixed top-2 right-3 z-50 rounded border border-border bg-background/90 px-2 py-0.5 font-medium text-[11px] text-muted-foreground shadow-sm backdrop-blur transition-colors hover:text-foreground"
+    >
+      In Production Version {APP_VERSION}
+    </Link>
   );
 }

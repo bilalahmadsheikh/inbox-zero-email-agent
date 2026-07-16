@@ -33,6 +33,17 @@ export function splitRecipientList(recipientList: string): string[] {
     .filter(Boolean);
 }
 
+// True when every entry in a free-text recipient list parses to a real email
+// address (e.g. "Name <person@domain.com>" or "person@domain.com").
+export function hasOnlyValidRecipients(recipientList: string) {
+  const recipients = splitRecipientList(recipientList);
+  if (recipients.length === 0) return false;
+
+  return recipients.every((recipient) =>
+    Boolean(extractEmailAddress(recipient)),
+  );
+}
+
 // Converts "John Doe <john.doe@gmail>" to "john.doe@gmail"
 export function extractEmailAddress(email: string): string {
   if (!email) return "";

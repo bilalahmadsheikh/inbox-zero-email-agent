@@ -94,6 +94,93 @@ describe("confirmAssistantEmailAction", () => {
     );
   });
 
+  it("applies card header edits and deletes the superseded draft on send", async () => {
+    (prisma.emailAccount.findUnique as any)
+      .mockResolvedValueOnce({
+        email: "owner@example.com",
+        account: { userId: "u1", provider: "google" },
+      })
+      .mockResolvedValueOnce({
+        name: "Owner",
+        email: "owner@example.com",
+      });
+
+    const pendingPart = buildPendingSendPart();
+    (pendingPart.output.pendingAction as any).supersedesDraftId = "draft-123";
+    prisma.chatMessage.findFirst.mockResolvedValue({
+      id: "chat-message-1",
+      chatId: "chat-1",
+      updatedAt: new Date("2026-02-23T00:00:00.000Z"),
+      parts: [pendingPart],
+    } as any);
+
+    prisma.chatMessage.updateMany.mockResolvedValue({ count: 1 } as any);
+
+    const sendEmailWithHtml = vi.fn().mockResolvedValue({
+      messageId: "msg-1",
+      threadId: "thr-1",
+    });
+    const deleteDraft = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      sendEmailWithHtml,
+      deleteDraft,
+    } as any);
+
+    const result = await confirmAssistantEmailAction(
+      "ea_1" as any,
+      {
+        chatId: "chat-1",
+        chatMessageId: "chat-message-1",
+        toolCallId: "tool-1",
+        actionType: "send_email",
+        headerOverrides: {
+          to: "edited@example.com",
+          cc: "added@example.com",
+          subject: "Edited subject",
+        },
+      } as any,
+    );
+
+    expect(sendEmailWithHtml).toHaveBeenCalledWith({
+      to: "edited@example.com",
+      cc: "added@example.com",
+      bcc: undefined,
+      subject: "Edited subject",
+      messageHtml: "<p>Hi there</p>",
+      from: "Owner <owner@example.com>",
+    });
+    expect(deleteDraft).toHaveBeenCalledWith("draft-123");
+    expect(result?.data?.confirmationResult).toMatchObject({
+      to: "edited@example.com",
+      subject: "Edited subject",
+    });
+  });
+
+  it("rejects header edits that are not valid email addresses", async () => {
+    const sendEmailWithHtml = vi.fn();
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      sendEmailWithHtml,
+    } as any);
+    (prisma.emailAccount.findUnique as any).mockResolvedValue({
+      email: "owner@example.com",
+      account: { userId: "u1", provider: "google" },
+    });
+
+    const result = await confirmAssistantEmailAction(
+      "ea_1" as any,
+      {
+        chatId: "chat-1",
+        chatMessageId: "chat-message-1",
+        toolCallId: "tool-1",
+        actionType: "send_email",
+        headerOverrides: { to: "not an address" },
+      } as any,
+    );
+
+    expect(result?.serverError).toMatch(/valid email address/i);
+    expect(sendEmailWithHtml).not.toHaveBeenCalled();
+  });
+
   it("resolves the sent message id from sent mail when the provider omits it", async () => {
     (prisma.emailAccount.findUnique as any)
       .mockResolvedValueOnce({
@@ -309,6 +396,8 @@ describe("confirmAssistantEmailAction", () => {
 
     expect(replyToEmail).toHaveBeenCalledWith(sourceMessage, "Thanks!", {
       from: "Owner <owner@example.com>",
+      to: "reply-to@example.com",
+      cc: undefined,
     });
     expect(result?.data?.confirmationState).toBe("confirmed");
     expect(result?.data?.confirmationResult).toMatchObject({

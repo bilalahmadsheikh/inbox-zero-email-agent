@@ -19,7 +19,12 @@ import {
   toggleAllRulesBody,
   copyRulesFromAccountBody,
   importRulesBody,
+  confirmRuleUpdateBody,
 } from "@/utils/actions/rule.validation";
+import {
+  applyRuleUpdate,
+  createRuleUpdatesSchema,
+} from "@/utils/ai/assistant/tools/rules/update-rule-apply";
 import prisma from "@/utils/prisma";
 import { isDuplicateError, isNotFoundError } from "@/utils/prisma-helpers";
 import { flattenConditions } from "@/utils/condition";
@@ -329,6 +334,48 @@ export const deleteRuleAction = actionClient
       throw error;
     }
   });
+
+// Applies a chat rule update the tool held back because it adds outbound or
+// webhook actions. The user's click on the confirmation card is the risk
+// acceptance, mirroring how chat rule creation is confirmed.
+export const confirmRuleUpdateAction = actionClient
+  .metadata({ name: "confirmRuleUpdate" })
+  .inputSchema(confirmRuleUpdateBody)
+  .action(
+    async ({
+      ctx: { emailAccountId, provider, logger },
+      parsedInput: { ruleName, updates },
+    }) => {
+      const parsedUpdates =
+        createRuleUpdatesSchema(provider).safeParse(updates);
+      if (!parsedUpdates.success) {
+        throw new SafeError("Invalid rule update payload");
+      }
+
+      const result = await applyRuleUpdate({
+        emailAccountId,
+        provider,
+        logger,
+        ruleName,
+        updates: parsedUpdates.data,
+        riskConfirmed: true,
+      });
+
+      if ("requiresConfirmation" in result && result.requiresConfirmation) {
+        throw new SafeError("Rule update could not be confirmed");
+      }
+      if (!result.success) {
+        throw new SafeError(
+          ("error" in result && result.error) || "Failed to apply rule update",
+        );
+      }
+
+      return {
+        success: true,
+        ruleId: "ruleId" in result ? result.ruleId : undefined,
+      };
+    },
+  );
 
 export const createRulesOnboardingAction = actionClient
   .metadata({ name: "createRulesOnboarding" })

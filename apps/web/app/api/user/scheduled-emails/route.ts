@@ -31,6 +31,7 @@ async function getData({ emailAccountId }: { emailAccountId: string }) {
     repeatEveryMinutes: true,
     maxOccurrences: true,
     occurrence: true,
+    cancelOnReply: true,
   } as const;
 
   const [upcoming, history] = await Promise.all([

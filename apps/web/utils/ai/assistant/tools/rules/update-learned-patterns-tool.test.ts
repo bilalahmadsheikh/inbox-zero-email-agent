@@ -17,6 +17,8 @@ const logger = createTestLogger();
 describe("updateLearnedPatternsTool", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // No other rules match the include patterns unless a test says otherwise.
+    prisma.rule.findMany.mockResolvedValue([]);
   });
 
   it("marks stale-read guidance as hidden from user display", async () => {
@@ -133,5 +135,61 @@ describe("updateLearnedPatternsTool", () => {
       success: false,
       error: "Failed to update learned patterns",
     });
+  });
+
+  it("rejects includes whose sender already matches another rule", async () => {
+    prisma.rule.findUnique.mockResolvedValueOnce({
+      id: "rule-1",
+      name: "VIP senders",
+      updatedAt: new Date("2026-04-12T10:00:00.000Z"),
+      emailAccount: {
+        rulesRevision: 3,
+      },
+    } as any);
+    // The overlap query finds a different sender-only rule already matching.
+    prisma.rule.findMany.mockResolvedValue([
+      {
+        id: "rule-2",
+        name: "Newsletters",
+        instructions: null,
+        from: "vip@example.com",
+        to: null,
+        subject: null,
+        body: null,
+        groupId: null,
+        group: { items: [] },
+      } as any,
+    ]);
+
+    const toolInstance = updateLearnedPatternsTool({
+      email: "user@example.com",
+      emailAccountId: "email-account-1",
+      logger,
+      getRuleReadState: () => ({
+        readAt: Date.now(),
+        rulesRevision: 3,
+        ruleUpdatedAtByName: new Map([
+          ["VIP senders", "2026-04-12T10:00:00.000Z"],
+        ]),
+      }),
+    });
+
+    const result = await toolInstance.execute({
+      ruleName: "VIP senders",
+      learnedPatterns: [
+        {
+          include: {
+            from: "vip@example.com",
+          },
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      conflictingRuleName: "Newsletters",
+      overlappingSenders: ["vip@example.com"],
+    });
+    expect(saveLearnedPatterns).not.toHaveBeenCalled();
   });
 });

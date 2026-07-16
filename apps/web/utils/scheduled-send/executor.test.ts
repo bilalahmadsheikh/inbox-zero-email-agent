@@ -27,6 +27,7 @@ function dueEmail(overrides: Record<string, unknown> = {}) {
     maxOccurrences: null,
     occurrence: 1,
     chainRootId: null,
+    cancelOnReply: false,
     attempts: 0,
     emailAccount: { account: { provider: "google" } },
     ...overrides,
@@ -40,6 +41,10 @@ describe("processScheduledEmails", () => {
       sendEmailWithHtml,
       // biome-ignore lint/suspicious/noExplicitAny: partial provider mock
     } as any);
+    // biome-ignore lint/suspicious/noExplicitAny: passthrough for static op arrays
+    (prisma.$transaction as any).mockImplementation((ops: unknown[]) =>
+      Promise.all(ops),
+    );
   });
 
   it("does nothing when no emails are due", async () => {
@@ -77,7 +82,7 @@ describe("processScheduledEmails", () => {
     );
   });
 
-  it("queues the next occurrence after sending a recurring email", async () => {
+  it("queues the next occurrence atomically with marking SENT", async () => {
     prisma.scheduledEmail.findMany.mockResolvedValue([
       dueEmail({
         threadId: "t1",
@@ -90,10 +95,12 @@ describe("processScheduledEmails", () => {
     prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
     // biome-ignore lint/suspicious/noExplicitAny: partial row mock
     prisma.scheduledEmail.create.mockResolvedValue({ id: "se2" } as any);
+    prisma.scheduledEmail.findFirst.mockResolvedValue(null);
     sendEmailWithHtml.mockResolvedValue({ messageId: "m1", threadId: "t1" });
 
     await processScheduledEmails(logger);
 
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(prisma.scheduledEmail.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         emailAccountId: "ea1",
@@ -111,6 +118,57 @@ describe("processScheduledEmails", () => {
     expect(
       Math.abs((nextSendAt as Date).getTime() - (Date.now() + 5 * 60_000)),
     ).toBeLessThan(5000);
+  });
+
+  it("propagates cancelOnReply to the next occurrence of a chain", async () => {
+    prisma.scheduledEmail.findMany.mockResolvedValue([
+      dueEmail({
+        repeatEveryMinutes: 5,
+        maxOccurrences: 3,
+        occurrence: 1,
+        cancelOnReply: true,
+        // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+      }) as any,
+    ]);
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+    // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+    prisma.scheduledEmail.create.mockResolvedValue({ id: "se2" } as any);
+    prisma.scheduledEmail.findFirst.mockResolvedValue(null);
+    sendEmailWithHtml.mockResolvedValue({ messageId: "m1", threadId: "t1" });
+
+    await processScheduledEmails(logger);
+
+    expect(prisma.scheduledEmail.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        occurrence: 2,
+        cancelOnReply: true,
+      }),
+    });
+  });
+
+  it("retracts the queued next occurrence when a cancel raced the send", async () => {
+    prisma.scheduledEmail.findMany.mockResolvedValue([
+      dueEmail({
+        repeatEveryMinutes: 5,
+        maxOccurrences: 3,
+        occurrence: 1,
+        // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+      }) as any,
+    ]);
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+    // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+    prisma.scheduledEmail.create.mockResolvedValue({ id: "se2" } as any);
+    // A chain row carries a mid-send cancel signal.
+    // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+    prisma.scheduledEmail.findFirst.mockResolvedValue({ id: "se1" } as any);
+    sendEmailWithHtml.mockResolvedValue({ messageId: "m1", threadId: "t1" });
+
+    await processScheduledEmails(logger);
+
+    expect(prisma.scheduledEmail.updateMany).toHaveBeenCalledWith({
+      where: { id: "se2", status: "PENDING" },
+      data: { status: "CANCELLED" },
+    });
   });
 
   it("does not queue another occurrence once the chain is complete", async () => {
@@ -159,7 +217,7 @@ describe("processScheduledEmails", () => {
     expect(sendEmailWithHtml).not.toHaveBeenCalled();
   });
 
-  it("returns a failed send to PENDING for retry", async () => {
+  it("returns a failed send to PENDING for retry unless cancelled", async () => {
     // biome-ignore lint/suspicious/noExplicitAny: partial row mock
     prisma.scheduledEmail.findMany.mockResolvedValue([dueEmail() as any]);
     prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
@@ -168,14 +226,30 @@ describe("processScheduledEmails", () => {
     const result = await processScheduledEmails(logger);
 
     expect(result).toMatchObject({ sent: 0, failed: 1 });
-    expect(prisma.scheduledEmail.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: "PENDING",
-          error: "provider down",
-        }),
+    expect(prisma.scheduledEmail.updateMany).toHaveBeenCalledWith({
+      where: { id: "se1", status: "SENDING", cancelRequested: false },
+      data: expect.objectContaining({
+        status: "PENDING",
+        error: "provider down",
       }),
-    );
+    });
+  });
+
+  it("cancels instead of retrying a failed send when a cancel arrived mid-send", async () => {
+    // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+    prisma.scheduledEmail.findMany.mockResolvedValue([dueEmail() as any]);
+    prisma.scheduledEmail.updateMany
+      .mockResolvedValueOnce({ count: 1 }) // claim
+      .mockResolvedValueOnce({ count: 0 }) // revert refused: cancelRequested
+      .mockResolvedValueOnce({ count: 1 }); // cancelled
+    sendEmailWithHtml.mockRejectedValue(new Error("provider down"));
+
+    await processScheduledEmails(logger);
+
+    expect(prisma.scheduledEmail.updateMany).toHaveBeenLastCalledWith({
+      where: { id: "se1", status: "SENDING" },
+      data: { status: "CANCELLED", error: "provider down" },
+    });
   });
 
   it("marks FAILED once max attempts are exhausted", async () => {
@@ -188,7 +262,7 @@ describe("processScheduledEmails", () => {
 
     await processScheduledEmails(logger);
 
-    expect(prisma.scheduledEmail.update).toHaveBeenCalledWith(
+    expect(prisma.scheduledEmail.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "FAILED" }),
       }),

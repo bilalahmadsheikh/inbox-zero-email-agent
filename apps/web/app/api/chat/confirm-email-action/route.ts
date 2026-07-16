@@ -38,6 +38,8 @@ export const POST = withEmailAccount(
       contentOverride: data.contentOverride,
       sendAtOverride: data.sendAtOverride,
       repeatOverride: data.repeatOverride,
+      cancelOnReplyOverride: data.cancelOnReplyOverride,
+      headerOverrides: data.headerOverrides,
       waitForPersistence: true,
       persistenceWaitMs: MOBILE_PENDING_ACTION_PERSIST_WAIT_MS,
       emailAccountId,

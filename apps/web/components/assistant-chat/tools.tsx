@@ -14,10 +14,8 @@ import type {
   UpdateRuleConditionsOutput,
   UpdateRuleConditionsTool,
 } from "@/utils/ai/assistant/tools/rules/update-rule-conditions-tool";
-import type {
-  UpdateRuleOutput,
-  UpdateRuleTool,
-} from "@/utils/ai/assistant/tools/rules/update-rule-tool";
+import type { UpdateRuleTool } from "@/utils/ai/assistant/tools/rules/update-rule-tool";
+import type { UpdateRuleOutput } from "@/utils/ai/assistant/tools/rules/update-rule-apply";
 import type {
   DeleteRuleOutput,
   DeleteRuleTool,
@@ -58,7 +56,12 @@ import {
   confirmAssistantEmailAction,
   confirmAssistantSaveMemory,
 } from "@/utils/actions/assistant-chat";
-import { deleteRuleAction, toggleRuleAction } from "@/utils/actions/rule";
+import {
+  confirmRuleUpdateAction,
+  deleteRuleAction,
+  toggleRuleAction,
+} from "@/utils/actions/rule";
+import { confirmSenderWideInboxAction } from "@/utils/actions/mail";
 import { useAction } from "next-safe-action/hooks";
 import { useAccount } from "@/providers/EmailAccountProvider";
 import { useChat } from "@/providers/ChatProvider";
@@ -617,12 +620,29 @@ function EmailActionResult({
     key: "subject",
   });
   const referenceFrom = getPendingString(reference, "from");
-  const recipient =
-    to || (actionType === "reply_email" ? referenceFrom : undefined);
   const referenceSubject = getPendingString(reference, "subject");
-  const displaySubject = decodeHtmlEntities(subject || referenceSubject);
   const body = getActionBodyText({ actionType, pendingAction });
   const [editedBody, setEditedBody] = useState(body || "");
+  // Recipients and subject are editable for fresh sends and forwards;
+  // replies inherit both from the thread.
+  const canEditHeaders =
+    actionType === "send_email" || actionType === "forward_email";
+  const [editedTo, setEditedTo] = useState(to || "");
+  const [editedCc, setEditedCc] = useState(cc || "");
+  const [editedBcc, setEditedBcc] = useState(bcc || "");
+  const [editedSubject, setEditedSubject] = useState(subject || "");
+  const effectiveTo = canEditHeaders && editedTo.trim() ? editedTo.trim() : to;
+  const effectiveCc = canEditHeaders ? editedCc.trim() : cc || "";
+  const effectiveBcc = canEditHeaders ? editedBcc.trim() : bcc || "";
+  const effectiveSubject =
+    actionType === "send_email" && editedSubject.trim()
+      ? editedSubject.trim()
+      : subject;
+  const displaySubject = decodeHtmlEntities(
+    effectiveSubject || referenceSubject,
+  );
+  const recipient =
+    effectiveTo || (actionType === "reply_email" ? referenceFrom : undefined);
   const pendingSendAt = getPendingString(pendingAction, "sendAt");
   const scheduledFor = confirmationResult?.scheduledFor || pendingSendAt;
   const scheduledForLabel = scheduledFor
@@ -643,6 +663,7 @@ function EmailActionResult({
     repeatEveryMinutes && repeatCount
       ? `repeats every ${repeatEveryMinutes} min, ${repeatCount} sends total`
       : null;
+  const cancelOnReply = pendingAction?.cancelOnReply === true;
   const canPickTime =
     !isConfirmed &&
     requiresConfirmation &&
@@ -677,6 +698,7 @@ function EmailActionResult({
   const handleSend = async (
     sendAtOverride?: string | null,
     repeatOverride?: { everyMinutes: number; count: number } | null,
+    cancelOnReplyOverride?: boolean,
   ) => {
     setIsConfirming(true);
     try {
@@ -686,6 +708,36 @@ function EmailActionResult({
       }
 
       const hasEdits = editedBody && editedBody !== body;
+      // Only fields the user actually changed are sent as overrides;
+      // clearing cc/bcc sends null so the server drops the prepared value.
+      const headerOverrides: {
+        to?: string;
+        cc?: string | null;
+        bcc?: string | null;
+        subject?: string;
+      } = {};
+      if (canEditHeaders) {
+        const trimmedTo = editedTo.trim();
+        if (trimmedTo && trimmedTo !== (to || "")) {
+          headerOverrides.to = trimmedTo;
+        }
+        const trimmedCc = editedCc.trim();
+        if (trimmedCc !== (cc || "")) {
+          headerOverrides.cc = trimmedCc || null;
+        }
+        const trimmedBcc = editedBcc.trim();
+        if (trimmedBcc !== (bcc || "")) {
+          headerOverrides.bcc = trimmedBcc || null;
+        }
+        const trimmedSubject = editedSubject.trim();
+        if (
+          actionType === "send_email" &&
+          trimmedSubject &&
+          trimmedSubject !== (subject || "")
+        ) {
+          headerOverrides.subject = trimmedSubject;
+        }
+      }
       const input = {
         chatId,
         toolCallId,
@@ -693,6 +745,10 @@ function EmailActionResult({
         ...(hasEdits ? { contentOverride: editedBody } : {}),
         ...(sendAtOverride !== undefined ? { sendAtOverride } : {}),
         ...(repeatOverride !== undefined ? { repeatOverride } : {}),
+        ...(cancelOnReplyOverride !== undefined
+          ? { cancelOnReplyOverride }
+          : {}),
+        ...(Object.keys(headerOverrides).length > 0 ? { headerOverrides } : {}),
       };
 
       const result = await confirmAssistantEmailAction(emailAccountId, input);
@@ -738,12 +794,14 @@ function EmailActionResult({
             {sentLabel ? `${sentLabel} ` : ""}
             {recipient}
           </div>
-          {cc && (
-            <div className="mt-0.5 text-xs text-muted-foreground">CC: {cc}</div>
-          )}
-          {bcc && (
+          {effectiveCc && (
             <div className="mt-0.5 text-xs text-muted-foreground">
-              BCC: {bcc}
+              CC: {effectiveCc}
+            </div>
+          )}
+          {effectiveBcc && (
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              BCC: {effectiveBcc}
             </div>
           )}
           {scheduledForLabel && (
@@ -751,6 +809,7 @@ function EmailActionResult({
               <span>
                 Scheduled for: {scheduledForLabel}
                 {repeatLabel ? ` · ${repeatLabel}` : ""}
+                {cancelOnReply ? " · stops if they reply" : ""}
               </span>
               {canPickTime && pendingSendAt && (
                 <ScheduleTimePicker
@@ -760,8 +819,11 @@ function EmailActionResult({
                       ? { everyMinutes: repeatEveryMinutes, count: repeatCount }
                       : null
                   }
+                  initialCancelOnReply={cancelOnReply}
                   disabled={isConfirming || isProcessing || isChatBusy}
-                  onSchedule={(iso, repeat) => handleSend(iso, repeat)}
+                  onSchedule={(iso, repeat, stopOnReply) =>
+                    handleSend(iso, repeat, stopOnReply)
+                  }
                   trigger={
                     <button
                       type="button"
@@ -798,6 +860,36 @@ function EmailActionResult({
         <div className="px-4 py-3.5">
           {isEditing ? (
             <div className="space-y-2">
+              {canEditHeaders && (
+                <div className="grid gap-2">
+                  <EditableHeaderField
+                    label="To"
+                    value={editedTo}
+                    onChange={setEditedTo}
+                    placeholder="recipient@example.com"
+                  />
+                  <EditableHeaderField
+                    label="CC"
+                    value={editedCc}
+                    onChange={setEditedCc}
+                    placeholder="Empty to send without CC"
+                  />
+                  <EditableHeaderField
+                    label="BCC"
+                    value={editedBcc}
+                    onChange={setEditedBcc}
+                    placeholder="Empty to send without BCC"
+                  />
+                  {actionType === "send_email" && (
+                    <EditableHeaderField
+                      label="Subject"
+                      value={editedSubject}
+                      onChange={setEditedSubject}
+                      placeholder="Subject"
+                    />
+                  )}
+                </div>
+              )}
               <Textarea
                 value={editedBody}
                 onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
@@ -811,12 +903,27 @@ function EmailActionResult({
                   size="sm"
                   onClick={() => {
                     setEditedBody(body || "");
+                    setEditedTo(to || "");
+                    setEditedCc(cc || "");
+                    setEditedBcc(bcc || "");
+                    setEditedSubject(subject || "");
                     setIsEditing(false);
                   }}
                 >
                   Cancel
                 </Button>
-                <Button size="sm" onClick={() => setIsEditing(false)}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (canEditHeaders && !editedTo.trim()) {
+                      toastError({
+                        description: "The To field cannot be empty.",
+                      });
+                      return;
+                    }
+                    setIsEditing(false);
+                  }}
+                >
                   Save changes
                 </Button>
               </div>
@@ -894,8 +1001,11 @@ function EmailActionResult({
                 ) : (
                   <ScheduleTimePicker
                     initialValue={addHours(new Date(), 1)}
+                    initialCancelOnReply={cancelOnReply}
                     disabled={isConfirming || isProcessing || isChatBusy}
-                    onSchedule={(iso, repeat) => handleSend(iso, repeat)}
+                    onSchedule={(iso, repeat, stopOnReply) =>
+                      handleSend(iso, repeat, stopOnReply)
+                    }
                     trigger={
                       <Button
                         disabled={isConfirming || isProcessing || isChatBusy}
@@ -1678,6 +1788,255 @@ export function PendingDeleteRuleToolCard({
                 </>
               ) : (
                 "Delete rule"
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+export function PendingManageInboxSendersCard({
+  output,
+  disableConfirm,
+}: {
+  output: unknown;
+  disableConfirm: boolean;
+}) {
+  const { emailAccountId } = useAccount();
+  const [isRunning, setIsRunning] = useState(false);
+  const [result, setResult] = useState<{
+    sendersCount?: number;
+    successCount?: number;
+    failedCount?: number;
+    autoUnsubscribeCount?: number;
+  } | null>(null);
+
+  const action = getOutputField<string>(output, "action");
+  const senders = getOutputField<string[]>(output, "senders") ?? [];
+  const isUnsubscribe = action === "unsubscribe_senders";
+  const shownSenders = senders.slice(0, 8);
+  const hiddenSenderCount = senders.length - shownSenders.length;
+
+  const handleConfirm = async () => {
+    if (
+      !senders.length ||
+      (!isUnsubscribe && action !== "bulk_archive_senders")
+    ) {
+      toastError({ description: "Could not run this cleanup." });
+      return;
+    }
+
+    setIsRunning(true);
+    try {
+      const actionResult = await confirmSenderWideInboxAction(emailAccountId, {
+        action: isUnsubscribe ? "unsubscribe_senders" : "bulk_archive_senders",
+        fromEmails: senders,
+      });
+      if (actionResult?.serverError) {
+        toastError({ description: actionResult.serverError });
+        return;
+      }
+
+      setResult(actionResult?.data ?? {});
+      toastSuccess({
+        description: isUnsubscribe
+          ? "Unsubscribe requests sent and senders archived."
+          : "Archived all email from these senders.",
+      });
+    } catch {
+      toastError({ description: "Could not run this cleanup." });
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const title = isUnsubscribe
+    ? `Unsubscribe from ${senders.length} ${senders.length === 1 ? "sender" : "senders"}`
+    : `Archive all email from ${senders.length} ${senders.length === 1 ? "sender" : "senders"}`;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start gap-3 space-y-0 border-b px-4 py-3.5">
+        <TrashIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold">{title}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {result ? "Cleanup finished" : "Pending confirmation"}
+          </p>
+        </div>
+        {result && (
+          <Badge color="green" className="shrink-0">
+            Done
+          </Badge>
+        )}
+      </CardHeader>
+
+      <CardContent className="space-y-3 px-4 py-3.5">
+        <div className="flex flex-wrap gap-1.5">
+          {shownSenders.map((sender) => (
+            <Badge key={sender} color="gray">
+              {sender}
+            </Badge>
+          ))}
+          {hiddenSenderCount > 0 && (
+            <Badge color="gray">+{hiddenSenderCount} more</Badge>
+          )}
+        </div>
+
+        {result ? (
+          <p className="text-sm text-muted-foreground">
+            {isUnsubscribe
+              ? `Processed ${result.sendersCount ?? senders.length} senders (${result.autoUnsubscribeCount ?? 0} auto-unsubscribed${result.failedCount ? `, ${result.failedCount} failed` : ""}) and archived their email.`
+              : `Archived all existing email from ${result.sendersCount ?? senders.length} senders.`}
+          </p>
+        ) : (
+          <>
+            <Alert
+              variant="default"
+              className="border-amber-500/40 bg-amber-500/5"
+            >
+              <AlertTriangleIcon className="size-4 text-amber-600" />
+              <AlertTitle>
+                {isUnsubscribe ? "Confirm unsubscribe" : "Confirm bulk archive"}
+              </AlertTitle>
+              <AlertDescription className="text-sm text-muted-foreground">
+                {isUnsubscribe
+                  ? "This sends real unsubscribe requests to these senders and archives all their existing email."
+                  : "This archives every existing email from these senders, not just the ones shown in chat."}
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={handleConfirm}
+                disabled={disableConfirm || isRunning}
+                className="gap-2"
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Running...
+                  </>
+                ) : isUnsubscribe ? (
+                  "Unsubscribe & archive"
+                ) : (
+                  "Archive all"
+                )}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function PendingUpdateRuleToolCard({
+  args,
+  output,
+  disableConfirm,
+}: {
+  args: UpdateRuleTool["input"];
+  output: unknown;
+  disableConfirm: boolean;
+}) {
+  const { emailAccountId } = useAccount();
+  const [isApplying, setIsApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
+
+  const ruleName = getOutputField<string>(output, "ruleName") || args.ruleName;
+  const riskMessages =
+    getOutputField<string[]>(output, "riskMessages")?.filter(Boolean) ?? [];
+  const updates =
+    getOutputField<Record<string, unknown>>(output, "updates") ??
+    (args.updates as Record<string, unknown> | undefined);
+
+  const handleConfirm = async () => {
+    if (!updates) {
+      toastError({ description: "Could not apply this rule update." });
+      return;
+    }
+
+    setIsApplying(true);
+    try {
+      const result = await confirmRuleUpdateAction(emailAccountId, {
+        ruleName,
+        updates,
+      });
+      if (result?.serverError) {
+        toastError({ description: result.serverError });
+        return;
+      }
+
+      setApplied(true);
+      toastSuccess({ description: "Rule updated." });
+    } catch {
+      toastError({ description: "Failed to update rule." });
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start gap-3 space-y-0 border-b px-4 py-3.5">
+        <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-semibold">{ruleName}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {applied ? "Rule updated" : "Pending rule update"}
+          </p>
+        </div>
+        {applied && (
+          <Badge color="green" className="shrink-0">
+            Applied
+          </Badge>
+        )}
+      </CardHeader>
+
+      {!applied && (
+        <CardContent className="space-y-3 px-4 py-3.5">
+          <Alert
+            variant="default"
+            className="border-amber-500/40 bg-amber-500/5"
+          >
+            <AlertTriangleIcon className="size-4 text-amber-600" />
+            <AlertTitle>Confirm rule update</AlertTitle>
+            <AlertDescription className="text-sm text-muted-foreground">
+              {riskMessages.length === 1 ? (
+                <p>{riskMessages[0]}</p>
+              ) : riskMessages.length > 1 ? (
+                <ul className="list-disc space-y-1 pl-4">
+                  {riskMessages.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>
+                  This update adds actions that can send email or data
+                  automatically.
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={handleConfirm}
+              disabled={disableConfirm || isApplying}
+              className="gap-2"
+            >
+              {isApplying ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Applying...
+                </>
+              ) : (
+                "Apply update"
               )}
             </Button>
           </div>
@@ -2525,12 +2884,40 @@ function FieldLabel({
   return <RuleSummaryLabel className={className}>{children}</RuleSummaryLabel>;
 }
 
+function EditableHeaderField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium text-muted-foreground">
+        {label}
+      </div>
+      <input
+        type="text"
+        className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
 function ScheduleTimePicker({
   trigger,
   initialValue,
   disabled,
   onSchedule,
   initialRepeat,
+  initialCancelOnReply,
 }: {
   trigger: React.ReactNode;
   initialValue: Date;
@@ -2538,13 +2925,16 @@ function ScheduleTimePicker({
   onSchedule: (
     iso: string,
     repeat: { everyMinutes: number; count: number } | null,
+    cancelOnReply: boolean,
   ) => void;
   initialRepeat?: { everyMinutes: number; count: number } | null;
+  initialCancelOnReply?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [customSendAt, setCustomSendAt] = useState("");
   const [repeatEvery, setRepeatEvery] = useState("");
   const [repeatCount, setRepeatCount] = useState("");
+  const [stopOnReply, setStopOnReply] = useState(false);
 
   const getRepeat = () => {
     if (!repeatEvery && !repeatCount) return { repeat: null };
@@ -2571,7 +2961,7 @@ function ScheduleTimePicker({
     const { repeat, invalid } = getRepeat();
     if (invalid) return;
     setOpen(false);
-    onSchedule(date.toISOString(), repeat ?? null);
+    onSchedule(date.toISOString(), repeat ?? null, stopOnReply);
   };
 
   const presets = [
@@ -2598,6 +2988,7 @@ function ScheduleTimePicker({
             initialRepeat ? String(initialRepeat.everyMinutes) : "",
           );
           setRepeatCount(initialRepeat ? String(initialRepeat.count) : "");
+          setStopOnReply(initialCancelOnReply ?? false);
         }
       }}
     >
@@ -2653,6 +3044,14 @@ function ScheduleTimePicker({
               className="w-24 rounded-md border bg-background px-2 py-1.5 text-sm"
               value={repeatCount}
               onChange={(event) => setRepeatCount(event.target.value)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>Cancel remaining sends if they reply</span>
+            <Switch
+              checked={stopOnReply}
+              onCheckedChange={setStopOnReply}
+              aria-label="Cancel remaining sends if they reply"
             />
           </div>
           <Button

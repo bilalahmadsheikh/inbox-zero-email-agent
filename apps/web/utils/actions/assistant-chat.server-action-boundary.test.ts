@@ -7,7 +7,11 @@ vi.mock("@/utils/auth", () => ({
 }));
 
 describe("assistant chat server action boundary", () => {
-  it("only exposes authenticated server actions from the action module", async () => {
+  // The action module's import graph (AI SDK, providers) takes several
+  // seconds to load cold; the default 5s timeout flakes on slower machines.
+  it("only exposes authenticated server actions from the action module", {
+    timeout: 30_000,
+  }, async () => {
     const actions = await import("@/utils/actions/assistant-chat");
 
     expect(actions).toHaveProperty("confirmAssistantEmailAction");

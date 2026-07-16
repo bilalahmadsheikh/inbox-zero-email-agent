@@ -7,6 +7,7 @@ import {
 import { createTestLogger } from "@/__tests__/helpers";
 import { createRuleTool } from "./tools/rules/create-rule-tool";
 import { updateRuleTool } from "./tools/rules/update-rule-tool";
+import { applyRuleUpdate } from "./tools/rules/update-rule-apply";
 import { deleteRuleTool } from "./tools/rules/delete-rule-tool";
 
 const {
@@ -448,6 +449,102 @@ describe("updateRuleTool", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("Deletion is already pending");
     expect(mockSetRuleEnabled).not.toHaveBeenCalled();
+  });
+
+  it("holds back updates that add outbound actions until the user confirms", async () => {
+    mockPrisma.rule.findUnique.mockResolvedValue(
+      vendorBillingRuleWithActions(),
+    );
+    mockOutboundActionsNeedChatRiskConfirmation.mockReturnValue({
+      needsConfirmation: true,
+      riskMessages: ["High Risk: this rule can auto-send email."],
+    });
+
+    const result = await updateRuleTool({
+      email: "user@example.com",
+      emailAccountId: "email-account-id",
+      provider: "google",
+      logger,
+      getRuleReadState: () => ({
+        readAt: Date.now(),
+        rulesRevision: 3,
+        ruleUpdatedAtByName: new Map([
+          ["Vendor Billing", "2026-04-27T00:00:00.000Z"],
+        ]),
+      }),
+    }).execute({
+      ruleName: "Vendor Billing",
+      updates: {
+        actions: [
+          ...vendorBillingActionsInput(),
+          {
+            type: ActionType.REPLY,
+            fields: { content: "Thanks, we're on it." },
+            delayInMinutes: null,
+          },
+        ],
+      },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        requiresConfirmation: true,
+        confirmationState: "pending",
+        actionType: "update_rule",
+        ruleName: "Vendor Billing",
+        riskMessages: ["High Risk: this rule can auto-send email."],
+      }),
+    );
+    // Only the newly-added action is risk-checked, not the pre-existing ones.
+    expect(
+      mockOutboundActionsNeedChatRiskConfirmation.mock.calls[0][0].actions,
+    ).toEqual([
+      {
+        type: ActionType.REPLY,
+        fields: { content: "Thanks, we're on it." },
+        delayInMinutes: null,
+      },
+    ]);
+    expect(mockUpdateRuleActions).not.toHaveBeenCalled();
+    expect(mockPartialUpdateRule).not.toHaveBeenCalled();
+  });
+
+  it("applies risky action additions once riskConfirmed is set", async () => {
+    mockPrisma.rule.findUnique.mockResolvedValue(
+      vendorBillingRuleWithActions(),
+    );
+    mockOutboundActionsNeedChatRiskConfirmation.mockReturnValue({
+      needsConfirmation: true,
+      riskMessages: ["High Risk: this rule can auto-send email."],
+    });
+
+    const result = await applyRuleUpdate({
+      emailAccountId: "email-account-id",
+      provider: "google",
+      logger,
+      ruleName: "Vendor Billing",
+      updates: {
+        actions: [
+          ...vendorBillingActionsInput(),
+          {
+            type: ActionType.REPLY,
+            fields: { content: "Thanks, we're on it." },
+            delayInMinutes: null,
+          },
+        ],
+      },
+      riskConfirmed: true,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        ruleId: "rule-id",
+      }),
+    );
+    expect(result).not.toHaveProperty("requiresConfirmation");
+    expect(mockUpdateRuleActions).toHaveBeenCalledOnce();
   });
 
   it("keeps replacement AI instructions when clear flag is also present", async () => {

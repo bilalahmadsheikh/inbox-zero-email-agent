@@ -22,8 +22,9 @@ export function getReplyRecipients(
 ): ReplyRecipients {
   if (!replyAll) {
     return {
-      // If following an email from yourself, use original recipients, otherwise reply to sender
-      to: sentFromUser ? headers.to : headers.from,
+      // If following an email from yourself, use original recipients,
+      // otherwise honor Reply-To and fall back to the sender
+      to: sentFromUser ? headers.to : headers["reply-to"] || headers.from,
       // Keep original CC
       cc: headers.cc,
     };

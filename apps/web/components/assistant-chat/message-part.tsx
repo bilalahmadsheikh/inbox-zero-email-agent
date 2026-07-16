@@ -15,6 +15,8 @@ import {
   PendingDeleteRuleToolCard,
   PendingSaveMemoryToolCard,
   PendingCreateRuleToolCard,
+  PendingUpdateRuleToolCard,
+  PendingManageInboxSendersCard,
   ForwardEmailResult,
   getManageInboxActionLabel,
   ManageInboxResult,
@@ -314,6 +316,20 @@ export function MessagePart({
       if (isOutputWithError(output)) {
         return renderToolError(toolCallId, output);
       }
+
+      const requiresSenderConfirmation =
+        getOutputField<boolean>(output, "requiresConfirmation") === true &&
+        getOutputField<string>(output, "actionType") === "manage_inbox_senders";
+      if (requiresSenderConfirmation) {
+        return (
+          <PendingManageInboxSendersCard
+            key={toolCallId}
+            output={output}
+            disableConfirm={disableConfirm || !isPersistedMessage}
+          />
+        );
+      }
+
       return (
         <ManageInboxResult
           key={toolCallId}
@@ -595,6 +611,21 @@ export function MessagePart({
       if (isOutputWithError(output)) {
         return renderToolError(toolCallId, output);
       }
+
+      const requiresUpdateConfirmation =
+        getOutputField<boolean>(output, "requiresConfirmation") === true &&
+        getOutputField<string>(output, "actionType") === "update_rule";
+      if (requiresUpdateConfirmation) {
+        return (
+          <PendingUpdateRuleToolCard
+            key={toolCallId}
+            args={part.input}
+            output={output}
+            disableConfirm={disableConfirm || !isPersistedMessage}
+          />
+        );
+      }
+
       return <UpdatedRule key={toolCallId} args={part.input} output={output} />;
     }
   }

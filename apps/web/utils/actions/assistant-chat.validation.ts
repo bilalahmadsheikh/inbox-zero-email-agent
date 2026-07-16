@@ -41,6 +41,11 @@ export const pendingSendEmailToolOutputSchema = z.object({
     sendAt: z.string().nullish(),
     repeatEveryMinutes: z.number().nullish(),
     repeatCount: z.number().nullish(),
+    // Draft created by draftEmail that this send fulfills; deleted from the
+    // provider Drafts folder after the user confirms, to prevent duplicates.
+    supersedesDraftId: z.string().nullish(),
+    // One-time stop condition: a reply from the recipient cancels the chain.
+    cancelOnReply: z.boolean().nullish(),
   }),
   confirmationResult: confirmationResultSchema.optional(),
 });
@@ -61,6 +66,8 @@ export const pendingReplyEmailToolOutputSchema = z.object({
     sendAt: z.string().nullish(),
     repeatEveryMinutes: z.number().nullish(),
     repeatCount: z.number().nullish(),
+    // One-time stop condition: a reply from the recipient cancels the chain.
+    cancelOnReply: z.boolean().nullish(),
   }),
   reference: z
     .object({
@@ -122,15 +129,32 @@ export const confirmAssistantEmailActionBody =
     // schedules at that time, null forces an immediate send, undefined keeps
     // the pending action's own sendAt.
     sendAtOverride: z.string().datetime().nullable().optional(),
-    // User-chosen recurrence from the confirmation card. Recurrence can only
-    // come from here; the model cannot enable repeats.
+    // User-chosen recurrence from the confirmation card: overrides the
+    // model's verified suggestion, and null clears it.
     repeatOverride: z
       .object({
         everyMinutes: z.number().int().min(1).max(1440),
         count: z.number().int().min(2).max(10),
       })
       .nullish(),
+    // User toggle from the confirmation card's "cancel if they reply"
+    // checkbox: present = explicit choice, absent = keep the prepared value.
+    cancelOnReplyOverride: z.boolean().optional(),
+    // User edits to recipients/subject from the confirmation card. Only
+    // applies to send_email (all fields) and forward_email (recipients).
+    // For cc/bcc, null clears the field and undefined keeps the prepared one.
+    headerOverrides: z
+      .object({
+        to: z.string().trim().min(1).optional(),
+        cc: z.string().trim().min(1).nullish(),
+        bcc: z.string().trim().min(1).nullish(),
+        subject: z.string().trim().min(1).max(300).optional(),
+      })
+      .optional(),
   });
+export type AssistantEmailHeaderOverrides = NonNullable<
+  z.infer<typeof confirmAssistantEmailActionBody>["headerOverrides"]
+>;
 export type ConfirmAssistantEmailActionBody = z.infer<
   typeof confirmAssistantEmailActionBody
 >;

@@ -794,6 +794,16 @@ model ScheduledEmail {
   status   ScheduledEmailStatus @default(PENDING)
   attempts Int                  @default(0)
 
+  // Set when a cancel arrives while the executor has the row claimed
+  // (SENDING): a failed send is then cancelled instead of retried, and a
+  // recurring chain stops instead of queueing the next occurrence.
+  cancelRequested Boolean @default(false)
+
+  // One-time stop condition: when the recipient replies (same thread, or any
+  // email from the recipient for unthreaded sends), the whole chain is
+  // cancelled. Lives and dies with the chain; no standing rule involved.
+  cancelOnReply Boolean @default(false)
+
   // Recurring follow-ups: after a send, the executor queues the next
   // occurrence until maxOccurrences (total sends) is reached. chainRootId
   // links occurrences to the first row so a whole chain can be cancelled.

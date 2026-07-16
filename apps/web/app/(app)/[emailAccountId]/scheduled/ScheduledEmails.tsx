@@ -44,8 +44,17 @@ export function ScheduledEmails() {
   const { execute: cancelEmail, isExecuting: isCancelling } = useAction(
     cancelScheduledEmailAction.bind(null, emailAccountId),
     {
-      onSuccess: () => {
-        toastSuccess({ description: "Scheduled email cancelled." });
+      onSuccess: (result) => {
+        const inFlight = result.data?.inFlightCount ?? 0;
+        const cancelled = result.data?.cancelledCount ?? 0;
+        toastSuccess({
+          description:
+            inFlight > 0 && cancelled === 0
+              ? "This email is being sent right now. If the send completes it has already gone out; if it fails it will be cancelled instead of retried."
+              : inFlight > 0
+                ? "Scheduled email cancelled. One occurrence was mid-send and may still go out, but nothing further will be sent."
+                : "Scheduled email cancelled.",
+        });
         mutate();
       },
       onError: (error) => {
@@ -224,6 +233,19 @@ function ScheduleTypeBadges({ email }: { email: ScheduledEmailRow }) {
     badges.push(
       <Badge key="thread" variant="outline" className="whitespace-nowrap">
         Thread reply
+      </Badge>,
+    );
+  }
+
+  if (email.cancelOnReply) {
+    badges.push(
+      <Badge
+        key="stops-on-reply"
+        variant="outline"
+        className="whitespace-nowrap"
+        title="Cancelled automatically if the recipient replies"
+      >
+        Stops on reply
       </Badge>,
     );
   }

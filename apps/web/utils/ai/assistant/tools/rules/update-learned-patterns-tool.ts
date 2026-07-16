@@ -4,6 +4,7 @@ import type { Logger } from "@/utils/logger";
 import prisma from "@/utils/prisma";
 import { GroupItemType } from "@/generated/prisma/enums";
 import { saveLearnedPatterns } from "@/utils/rule/learned-patterns";
+import { findSenderOnlyOverlapConflict } from "@/utils/rule/sender-scope-overlap";
 import { hideToolErrorFromUser } from "../../tool-error-visibility";
 import type { RuleReadState } from "../../chat-rule-state";
 import {
@@ -26,7 +27,7 @@ export const updateLearnedPatternsTool = ({
 }) =>
   tool({
     description:
-      "Update the learned patterns of an existing inbox rule after you have identified the exact rule to change. Use when an existing category rule already fits and the user wants recurring senders added or removed, instead of creating a new rule or editing static from/to fields. If a recurring sender should move from one rule to another, update both rules with learned-pattern includes and excludes.",
+      "Update the learned patterns of an existing inbox rule after you have identified the exact rule to change. Use when an existing category rule already fits and the user wants recurring senders added or removed, instead of creating a new rule or editing static from/to fields. Only save patterns the user's current message explicitly identifies or that confirm a concrete proposal you made; never silently widen a rule's senders from your own inference. If a recurring sender should move from one rule to another, apply the exclude on the old rule before the include on the new one; includes that overlap another rule's senders are rejected with the conflicting rule's name.",
     inputSchema: z.object({
       ruleName: z.string().describe("The name of the rule to update"),
       learnedPatterns: z
@@ -153,6 +154,31 @@ export const updateLearnedPatternsTool = ({
               value: pattern.exclude.subject,
               exclude: true,
             });
+          }
+        }
+
+        // Same overlap guard as createRule: an include that another rule
+        // already matches on sender scope would make rule selection
+        // ambiguous, so reject it and name the conflicting rule instead.
+        const includedFromPatterns = patternsToSave
+          .filter(
+            (pattern) =>
+              pattern.type === GroupItemType.FROM && !pattern.exclude,
+          )
+          .map((pattern) => pattern.value);
+        if (includedFromPatterns.length > 0) {
+          const overlapConflict = await findSenderOnlyOverlapConflict({
+            emailAccountId,
+            rule: { from: includedFromPatterns.join(", ") },
+            excludeRuleId: rule.id,
+          });
+          if (overlapConflict) {
+            return {
+              success: false,
+              error: `No patterns were saved. Sender ${overlapConflict.overlappingSenders.join(", ")} already matches the "${overlapConflict.ruleName}" rule. To move the sender, add an exclude to "${overlapConflict.ruleName}" first, then retry this include; otherwise leave it where it is.`,
+              conflictingRuleName: overlapConflict.ruleName,
+              overlappingSenders: overlapConflict.overlappingSenders,
+            };
           }
         }
 

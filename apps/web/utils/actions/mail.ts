@@ -6,9 +6,11 @@ import { cancelScheduledEmailChain } from "@/utils/scheduled-send/cancel";
 import { sendEmailBody } from "@/utils/gmail/mail";
 import {
   cancelScheduledEmailBody,
+  confirmSenderWideInboxActionBody,
   deleteScheduledEmailBody,
   scheduleSendBody,
 } from "@/utils/actions/mail.validation";
+import { executeSenderWideInboxAction } from "@/utils/ai/assistant/chat-inbox-tools";
 import { ScheduledEmailStatus } from "@/generated/prisma/enums";
 import { actionClient } from "@/utils/actions/safe-action";
 import { SafeError } from "@/utils/error";
@@ -310,7 +312,11 @@ export const cancelScheduledEmailAction = actionClient
       throw new SafeError(messages[result.reason]);
     }
 
-    return { success: true, cancelledCount: result.cancelledCount };
+    return {
+      success: true,
+      cancelledCount: result.cancelledCount,
+      inFlightCount: result.inFlightCount,
+    };
   });
 
 export const deleteScheduledEmailAction = actionClient
@@ -333,3 +339,31 @@ export const deleteScheduledEmailAction = actionClient
 
     return { success: true };
   });
+
+// Runs a sender-wide cleanup (bulk archive / unsubscribe) that the chat
+// prepared as a pending confirmation; the user's click on the card is the
+// authorization to execute it.
+export const confirmSenderWideInboxAction = actionClient
+  .metadata({ name: "confirmSenderWideInboxAction" })
+  .inputSchema(confirmSenderWideInboxActionBody)
+  .action(
+    async ({
+      ctx: { emailAccountId, emailAccount, provider, logger },
+      parsedInput: { action, fromEmails },
+    }) => {
+      const result = await executeSenderWideInboxAction({
+        emailAccountId,
+        provider,
+        userEmail: emailAccount.email,
+        logger,
+        action,
+        fromEmails,
+      });
+
+      if ("error" in result && result.error) {
+        throw new SafeError(result.error);
+      }
+
+      return result;
+    },
+  );

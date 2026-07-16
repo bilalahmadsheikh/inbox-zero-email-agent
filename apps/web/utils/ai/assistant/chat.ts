@@ -124,14 +124,15 @@ export async function aiProcessAssistantChat({
     userTimezone,
     currentTimestamp,
   });
-  const currentUserMessageText = getLatestUserMessageText(messages);
+  const conversationUserMessageTexts =
+    getConversationUserMessageTexts(messages);
   const toolOptions = {
     email: user.email,
     emailAccountId,
     userId: user.userId,
     provider: user.account.provider,
     logger,
-    currentUserMessageText,
+    conversationUserMessageTexts,
     setRuleReadState: (state: RuleReadState) => {
       ruleReadState = state;
     },
@@ -606,11 +607,13 @@ function getEmailCapabilitiesPolicy({
     "- These pending actions are app-side confirmations, not provider Drafts-folder saves.",
     '- When the user asks to "draft" an email or a reply for them to review and send themselves, use draftEmail. It saves a real draft to their Drafts folder immediately and sends nothing.',
     "- After draftEmail, briefly confirm the draft is saved in their Drafts folder, ready to review and send from their email client.",
+    "- If the account has a configured signature, it is appended automatically to emails prepared with sendEmail and to draftEmail drafts. Never write your own sign-off or placeholder names like 'Your Name'; end the body naturally before the signature. If the user says their signature is wrong or missing, it is configured in Settings, not something you can edit.",
     "- Scheduling: sendEmail schedules new emails via sendAt; replyEmail schedules threaded follow-ups inside an existing conversation via sendAt. Forwards cannot be scheduled.",
-    "- Recurring follow-up reminders: when the user's CURRENT message explicitly asks for repeated sends, set repeatEveryMinutes and repeatCount with sendAt and quote their exact words in repeatRequestQuote (the server verifies the quote against the real message and silently drops repeats that do not match, so never fabricate it). A scheduled email is otherwise always a single send; earlier recurring emails in the conversation never justify repeating a new one. The user can review, change, or remove the recurrence on the confirmation card before confirming. If the user asked for repetition in an earlier message, ask them to restate it or use the card's repeat controls.",
-    "- To stop follow-ups when the person writes back, also create a rule (createRule) with the CANCEL_SCHEDULED action and a condition matching email from that person: an email arriving in the same thread cancels that thread's pending follow-ups, and other emails from the sender cancel their unthreaded ones. SEND_SCHEDULED instead releases pending scheduled emails immediately. Never claim this is impossible.",
+    "- Recurring follow-up reminders: when the user explicitly asked for repeated sends anywhere in THIS conversation (including an earlier message a later one refers back to, like 'do all of this'), set repeatEveryMinutes and repeatCount with sendAt and quote the user's exact words in repeatRequestQuote (the server verifies the quote against the user's real messages in this conversation and silently drops repeats that do not match, so never fabricate it). A scheduled email is otherwise always a single send; requests from other chats never carry over. The user can review, change, or remove the recurrence on the confirmation card before confirming.",
+    "- To stop a scheduled chain when the recipient replies, prefer the one-time way: set cancelIfRecipientReplies on the sendEmail/replyEmail call (or the user can toggle it on the confirmation card). It cancels that chain's remaining sends when a reply arrives and leaves nothing behind. Only create a rule (createRule with the CANCEL_SCHEDULED action and a condition matching that person) when the user wants this as standing behavior for future emails too: an email arriving in the same thread cancels that thread's pending follow-ups, and other emails from the sender cancel their unthreaded ones. Such a rule applies to FUTURE scheduled emails as well, so an empty scheduled queue is not a blocker for creating it. SEND_SCHEDULED instead releases pending scheduled emails immediately. Never claim any of this is impossible.",
     "- Rules themselves never compose or schedule emails; scheduling always happens through sendEmail/replyEmail. Tell the user exactly what was scheduled; never claim a rule will send reminders on its own.",
     "- When the user describes multiple separate emails in one message (e.g. one to send now and a different one to schedule), call the tool once per email with fully independent fields. Do not carry a field — especially sendAt, recipient, or subject — from one email's request over to another's; an email the user wants sent now must never receive a sendAt from a sibling scheduled email.",
+    "- Compound requests (e.g. compose + schedule + recurrence + stop-on-reply) must be completed part by part, in dependency order: prepare the scheduled sends first, then any stop condition or rule. If one part fails, recover — fix the input, pick a different rule name, or update the existing rule — and still complete the remaining parts. End by reporting the status of every part; never silently drop one.",
     "- Use listScheduledEmails, cancelScheduledEmail, and rescheduleScheduledEmail to view or change the scheduled email queue when asked.",
     "- When replying to a thread, write the reply in the same language as the latest message in the thread.",
     '- When the user asks to forward an existing email, activate "forward" and use forwardEmail with a messageId from searchInbox results. Do not recreate forwards with sendEmail.',
@@ -726,6 +729,8 @@ export function buildResolvedSystemPrompt({
 - For proposed durable changes that still need confirmation, use conditional language. Do not imply the change has been recorded, queued, or will be applied; say what you can save after the user confirms.
 - If a write tool fails or is unavailable, clearly state that nothing changed and explain the reason.
 - If createRule returns requiresConfirmation, explain that the rule is pending confirmation in the UI and was not created yet.
+- If updateRule returns requiresConfirmation, explain that the risky rule change is pending confirmation in the UI and has not been applied.
+- If manageInbox returns requiresConfirmation for a sender-wide cleanup, nothing has been archived or unsubscribed yet; tell the user to review and confirm the card.
 - If saveMemory returns requiresConfirmation, explain that the memory is pending confirmation in the UI and was not saved yet.
 - If hidden UI context shows that specific threads were already archived or marked read, treat that as completed work. For follow-up confirmations, acknowledge the completed action instead of repeating it.
 - Never invent thread IDs, sender addresses, or existing rule names.
@@ -767,7 +772,8 @@ export function buildResolvedSystemPrompt({
   * updatePersonalInstructions for how the assistant should behave in future.
   * saveMemory for a fact or preference the user states or asks you to remember.
   * updateAssistantSettings only for supported assistant.* settings.
-  * addToKnowledgeBase only when the user explicitly asks for the knowledge base or reusable reference material.`,
+  * addToKnowledgeBase only when the user explicitly asks for the knowledge base or reusable reference material.
+- Call updatePersonalInstructions only when the user dictates instruction text or confirms your exact proposed wording. Complaints or feedback about one specific draft or reply are not instructions: fix that draft, and if a durable preference seems implied, propose the exact instruction text and wait for confirmation before writing it.`,
     `Response style and formatting:
 - Always explain the changes you made.
 - Use simple language and avoid jargon in your reply.
@@ -817,16 +823,28 @@ Inline email cards:
 - Only render email widgets when they add clarity, not for every search result.`;
 }
 
-function getLatestUserMessageText(messages: ModelMessage[]): string | null {
+// Scheduling verification (send times, recurrence, stop conditions) is
+// checked against what the user actually wrote in THIS conversation, capped
+// to the most recent messages to bound judge input size. Other chats never
+// carry over.
+const MAX_VERIFICATION_USER_MESSAGES = 10;
+
+function getConversationUserMessageTexts(messages: ModelMessage[]): string[] {
+  const texts: string[] = [];
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
     if (message.role !== "user") continue;
-    if (typeof message.content === "string") return message.content || null;
-    const text = message.content
-      .map((part) => ("text" in part && part.type === "text" ? part.text : ""))
-      .filter(Boolean)
-      .join("\n");
-    return text || null;
+    const text =
+      typeof message.content === "string"
+        ? message.content
+        : message.content
+            .map((part) =>
+              "text" in part && part.type === "text" ? part.text : "",
+            )
+            .filter(Boolean)
+            .join("\n");
+    if (text) texts.push(text);
+    if (texts.length >= MAX_VERIFICATION_USER_MESSAGES) break;
   }
-  return null;
+  return texts.reverse();
 }

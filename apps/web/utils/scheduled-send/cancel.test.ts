@@ -16,7 +16,9 @@ describe("cancelScheduledEmailChain", () => {
       repeatEveryMinutes: 2,
       // biome-ignore lint/suspicious/noExplicitAny: partial row mock
     } as any);
-    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+    prisma.scheduledEmail.updateMany
+      .mockResolvedValueOnce({ count: 0 }) // no in-flight rows
+      .mockResolvedValueOnce({ count: 1 });
 
     const result = await cancelScheduledEmailChain({
       emailAccountId: "ea1",
@@ -31,7 +33,7 @@ describe("cancelScheduledEmailChain", () => {
       },
       data: { status: "CANCELLED" },
     });
-    expect(result).toEqual({ ok: true, cancelledCount: 1 });
+    expect(result).toEqual({ ok: true, cancelledCount: 1, inFlightCount: 0 });
   });
 
   it("uses the row itself as chain root for first occurrences", async () => {
@@ -52,6 +54,33 @@ describe("cancelScheduledEmailChain", () => {
         }),
       }),
     );
+  });
+
+  it("flags an executor-claimed row so a failed send cancels instead of retrying", async () => {
+    prisma.scheduledEmail.findFirst.mockResolvedValue({
+      id: "se-1",
+      chainRootId: null,
+      repeatEveryMinutes: null,
+      // biome-ignore lint/suspicious/noExplicitAny: partial row mock
+    } as any);
+    prisma.scheduledEmail.updateMany
+      .mockResolvedValueOnce({ count: 1 }) // SENDING row flagged
+      .mockResolvedValueOnce({ count: 0 }); // nothing pending
+
+    const result = await cancelScheduledEmailChain({
+      emailAccountId: "ea1",
+      id: "se-1",
+    });
+
+    expect(prisma.scheduledEmail.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        emailAccountId: "ea1",
+        status: "SENDING",
+        OR: [{ id: "se-1" }, { id: "se-1" }, { chainRootId: "se-1" }],
+      },
+      data: { cancelRequested: true },
+    });
+    expect(result).toEqual({ ok: true, cancelledCount: 0, inFlightCount: 1 });
   });
 
   it("reports a finished chain distinctly from a sent single email", async () => {

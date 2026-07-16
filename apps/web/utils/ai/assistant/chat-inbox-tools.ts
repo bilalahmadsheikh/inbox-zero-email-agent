@@ -6,9 +6,8 @@ import { posthogCaptureEvent } from "@/utils/posthog";
 import { createEmailProvider } from "@/utils/email/provider";
 import { cancelScheduledEmailChain } from "@/utils/scheduled-send/cancel";
 import {
-  extractEmailAddress,
   extractUniqueEmailAddresses,
-  splitRecipientList,
+  hasOnlyValidRecipients,
 } from "@/utils/email";
 import { getRuleLabel } from "@/utils/rule/consts";
 import { ScheduledEmailStatus, SystemType } from "@/generated/prisma/enums";
@@ -133,7 +132,7 @@ const sendEmailToolInputSchema = z
       .max(1440)
       .optional()
       .describe(
-        "Only when the user's CURRENT message explicitly asks for recurring or repeated sends: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies the message actually requests recurrence and drops these fields otherwise.",
+        "Only when the user explicitly asked for recurring or repeated sends in this conversation: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies against the user's real messages in this conversation and drops these fields otherwise.",
       ),
     repeatCount: z
       .number()
@@ -148,7 +147,21 @@ const sendEmailToolInputSchema = z
       .string()
       .optional()
       .describe(
-        "The user's verbatim words from their CURRENT message that themselves ask for repetition (e.g. 'every 10 minutes', 'remind them 3 times') — not a time, date, or unrelated phrase that merely appears near the scheduling request. The server independently verifies both that this quote appears in the real message and that the message actually requests recurrence; repeat fields are dropped otherwise.",
+        "The user's verbatim words from a message in THIS conversation that themselves ask for repetition (e.g. 'every 10 minutes', 'remind them 3 times') — not a time, date, or unrelated phrase that merely appears near the scheduling request. The server independently verifies both that this quote appears in the user's real messages and that they actually requested recurrence; repeat fields are dropped otherwise.",
+      ),
+    supersedesDraftId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "Only when this send fulfills an email already saved with draftEmail in this conversation: that draft's draftId. After the user confirms, the superseded draft is deleted from their Drafts folder so the same email cannot also be sent manually from there. Omit when no earlier draftEmail call is being sent.",
+      ),
+    cancelIfRecipientReplies: z
+      .boolean()
+      .optional()
+      .describe(
+        "One-time stop condition: when true and the email is scheduled (sendAt set), a reply from the recipient cancels this send and any remaining occurrences of its chain. Set it when the user asks to stop or cancel follow-ups if the person replies. No rule is created; it applies only to this scheduled email/chain. The user can toggle it on the confirmation card.",
       ),
   })
   .strict();
@@ -166,6 +179,14 @@ const draftEmailToolInputSchema = z
       .optional()
       .describe(
         "Only when drafting a reply to an existing email: the messageId of the email being replied to (from searchInbox results), so the draft is threaded onto that conversation. Omit for standalone drafts.",
+      ),
+    replacesDraftId: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe(
+        "Only when rewriting or revising a draft already created with draftEmail in this conversation: that draft's draftId. The old version is deleted after the new draft is saved, so the Drafts folder holds one copy instead of accumulating near-duplicates. Omit for brand-new drafts.",
       ),
   })
   .strict();
@@ -198,7 +219,7 @@ const replyEmailToolInputSchema = z
       .max(1440)
       .optional()
       .describe(
-        "Only when the user's CURRENT message explicitly asks for recurring or repeated sends: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies the message actually requests recurrence and drops these fields otherwise.",
+        "Only when the user explicitly asked for recurring or repeated sends in this conversation: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies against the user's real messages in this conversation and drops these fields otherwise.",
       ),
     repeatCount: z
       .number()
@@ -213,7 +234,13 @@ const replyEmailToolInputSchema = z
       .string()
       .optional()
       .describe(
-        "The user's verbatim words from their CURRENT message that themselves ask for repetition (e.g. 'every 10 minutes', 'remind them 3 times') — not a time, date, or unrelated phrase that merely appears near the scheduling request. The server independently verifies both that this quote appears in the real message and that the message actually requests recurrence; repeat fields are dropped otherwise.",
+        "The user's verbatim words from a message in THIS conversation that themselves ask for repetition (e.g. 'every 10 minutes', 'remind them 3 times') — not a time, date, or unrelated phrase that merely appears near the scheduling request. The server independently verifies both that this quote appears in the user's real messages and that they actually requested recurrence; repeat fields are dropped otherwise.",
+      ),
+    cancelIfRecipientReplies: z
+      .boolean()
+      .optional()
+      .describe(
+        "One-time stop condition: when true and the reply is scheduled (sendAt set), a reply from the recipient cancels this send and any remaining occurrences of its chain. Set it when the user asks to stop or cancel follow-ups if the person replies. No rule is created; it applies only to this scheduled email/chain. The user can toggle it on the confirmation card.",
       ),
   })
   .strict();
@@ -1103,7 +1130,7 @@ const buildManageInboxTool = ({
 
   return tool({
     description:
-      "Run inbox actions on threads or senders. For emails already shown or found in this turn, prefer thread actions with threadIds. Do not widen a limited thread-level request into sender-wide cleanup. Only use sender-wide cleanup with fromEmails when the user clearly wants all mail from that sender, and get confirmation before doing broad sender-wide cleanup.",
+      "Run inbox actions on threads or senders. For emails already shown or found in this turn, prefer thread actions with threadIds; those execute immediately. Do not widen a limited thread-level request into sender-wide cleanup. Only use sender-wide cleanup (bulk_archive_senders, unsubscribe_senders) with fromEmails when the user clearly wants all mail from those senders. Sender-wide actions do NOT execute immediately: they return requiresConfirmation and only run after the user approves the card in the UI, so tell the user to confirm there and never claim the cleanup already happened.",
     inputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "manage_inbox", email, logger });
@@ -1145,12 +1172,6 @@ const buildManageInboxTool = ({
       }
 
       try {
-        const emailProvider = await createEmailProvider({
-          emailAccountId,
-          provider,
-          logger,
-        });
-
         if (isSenderAction) {
           const normalizedFromEmails = normalizeSenderEmails(
             parsedInput.fromEmails ?? [],
@@ -1162,59 +1183,25 @@ const buildManageInboxTool = ({
             };
           }
 
-          if (action === "unsubscribe_senders") {
-            const unsubscribeResults = await runSenderUnsubscribeActions({
-              fromEmails: normalizedFromEmails,
-              emailProvider,
-              emailAccountId,
-              logger,
-            });
-            const successfulSenders = unsubscribeResults
-              .filter((result) => result.success)
-              .map((result) => result.senderEmail);
-            const failedSenders = unsubscribeResults
-              .filter((result) => !result.success)
-              .map((result) => result.senderEmail);
-            const successCount = successfulSenders.length;
-            const autoUnsubscribeCount = unsubscribeResults.filter(
-              (result) => result.success && result.unsubscribe.success,
-            ).length;
-            const autoUnsubscribeAttemptedCount = unsubscribeResults.filter(
-              (result) => result.unsubscribe.attempted,
-            ).length;
-
-            await emailProvider.bulkArchiveFromSenders(
-              normalizedFromEmails,
-              email,
-              emailAccountId,
-            );
-
-            return {
-              success: failedSenders.length === 0,
-              action: originalAction,
-              sendersCount: normalizedFromEmails.length,
-              senders: normalizedFromEmails,
-              successCount,
-              failedCount: failedSenders.length,
-              failedSenders,
-              autoUnsubscribeCount,
-              autoUnsubscribeAttemptedCount,
-            };
-          }
-
-          await emailProvider.bulkArchiveFromSenders(
-            normalizedFromEmails,
-            email,
-            emailAccountId,
-          );
-
+          // Sender-wide cleanup is destructive (bulk archive, real
+          // unsubscribe requests), so it only executes after the user
+          // confirms the card in the UI — never from the model's call alone.
           return {
-            success: true,
+            success: true as const,
+            actionType: "manage_inbox_senders" as const,
+            requiresConfirmation: true as const,
+            confirmationState: "pending" as const,
             action: originalAction,
-            sendersCount: normalizedFromEmails.length,
             senders: normalizedFromEmails,
+            sendersCount: normalizedFromEmails.length,
           };
         }
+
+        const emailProvider = await createEmailProvider({
+          emailAccountId,
+          provider,
+          logger,
+        });
 
         const threadIds = parsedInput.threadIds!;
 
@@ -1316,17 +1303,17 @@ export const sendEmailTool = ({
   emailAccountId,
   provider,
   logger,
-  currentUserMessageText,
+  conversationUserMessageTexts,
 }: {
   email: string;
   emailAccountId: string;
   provider: string;
   logger: Logger;
-  currentUserMessageText?: string | null;
+  conversationUserMessageTexts?: string[] | null;
 }) =>
   tool({
     description:
-      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely. If the user asks for a draft to review and send themselves, use draftEmail instead.",
+      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely. If the user asks for a draft to review and send themselves, use draftEmail instead. If the user asks to send an email that was already saved with draftEmail in this conversation, pass that draft's id as supersedesDraftId so the leftover draft is removed after the send instead of surviving as a duplicate.",
     inputSchema: sendEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "send_email", email, logger });
@@ -1341,7 +1328,7 @@ export const sendEmailTool = ({
         emailSubject: parsedInput.data.subject,
         emailContentSnippet: parsedInput.data.messageHtml,
         emailAccountId,
-        currentUserMessageText,
+        conversationUserMessageTexts,
         logger,
       });
       const inputWithVerifiedSendAt = {
@@ -1351,7 +1338,7 @@ export const sendEmailTool = ({
 
       const repeats = await resolveVerifiedRepeats(
         inputWithVerifiedSendAt,
-        currentUserMessageText,
+        conversationUserMessageTexts,
         emailAccountId,
         logger,
       );
@@ -1371,8 +1358,15 @@ export const sendEmailTool = ({
             emailAccountId,
             fallbackEmail: email,
           })) || email;
+        const signature = await getComposeSignature(emailAccountId);
         return createPendingSendEmailOutput(
-          normalizedInput,
+          {
+            ...normalizedInput,
+            messageHtml: appendSignature(
+              normalizedInput.messageHtml,
+              signature,
+            ),
+          },
           from || null,
           provider,
         );
@@ -1398,7 +1392,7 @@ export const draftEmailTool = ({
 }) =>
   tool({
     description:
-      "Create an email draft saved to the user's Drafts folder without sending anything. Use whenever the user asks to draft, write up, or prepare an email for them to review and send themselves - including when they have not decided whether to send now or later. The draft is created immediately; there is no confirmation step and nothing is sent. Use sendEmail instead only when the user clearly wants the email sent, immediately or scheduled.",
+      "Create an email draft saved to the user's Drafts folder without sending anything. Use whenever the user asks to draft, write up, or prepare an email for them to review and send themselves - including when they have not decided whether to send now or later. The draft is created immediately; there is no confirmation step and nothing is sent. Use sendEmail instead only when the user clearly wants the email sent, immediately or scheduled. When revising a draft made earlier in this conversation, pass its draftId as replacesDraftId so the old version is removed. If the user later asks to send a drafted email from chat, call sendEmail with supersedesDraftId set to the draftId returned here so the draft is cleaned up rather than left as a duplicate.",
     inputSchema: draftEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "draft_email", email, logger });
@@ -1414,19 +1408,33 @@ export const draftEmailTool = ({
           provider,
           logger,
         });
+        const signature = await getComposeSignature(emailAccountId);
         const draft = await emailProvider.createDraft({
           to: parsedInput.data.to,
           cc: parsedInput.data.cc ?? undefined,
           bcc: parsedInput.data.bcc ?? undefined,
           subject: parsedInput.data.subject,
-          messageHtml: parsedInput.data.messageHtml,
+          messageHtml: appendSignature(parsedInput.data.messageHtml, signature),
           replyToMessageId: parsedInput.data.replyToMessageId,
         });
+
+        // Best-effort: the new draft already exists, so a cleanup failure
+        // only leaves the old copy behind rather than failing the rewrite.
+        const replacesDraftId = parsedInput.data.replacesDraftId;
+        if (replacesDraftId && replacesDraftId !== draft.id) {
+          try {
+            await emailProvider.deleteDraft(replacesDraftId);
+          } catch (error) {
+            logger.warn("Failed to delete replaced draft", { error });
+          }
+        }
+
         return {
           success: true as const,
           draftId: draft.id,
           to: parsedInput.data.to,
           subject: parsedInput.data.subject,
+          ...(replacesDraftId ? { replacedDraftId: replacesDraftId } : {}),
         };
       } catch (error) {
         logger.error("Failed to create draft from chat", { error });
@@ -1473,7 +1481,7 @@ export const listScheduledEmailsTool = ({
 }) =>
   tool({
     description:
-      "List the user's pending scheduled emails (queued to send later), soonest first. Returns each one's id, recipients, subject, and send time. Use this when the user asks what is scheduled, or to find the id before cancelling or rescheduling one.",
+      "List the user's pending scheduled emails (queued to send later), soonest first. Returns each one's id, recipients, subject, send time, cancelOnReply (true when a reply from the recipient stops the chain), and — for recurring chains — repeatEveryMinutes, occurrence, and maxOccurrences (e.g. occurrence 2 of maxOccurrences 5 means 3 sends remain after this one). Entries without repeatEveryMinutes are one-time sends. Use this when the user asks what is scheduled, whether something still repeats, or whether it stops on reply, or to find the id before cancelling or rescheduling one.",
     inputSchema: z.object({}),
     execute: async () => {
       trackToolCall({ tool: "list_scheduled_emails", email, logger });
@@ -1486,13 +1494,24 @@ export const listScheduledEmailsTool = ({
           },
           orderBy: { sendAt: "asc" },
           take: 25,
-          select: { id: true, to: true, subject: true, sendAt: true },
+          select: {
+            id: true,
+            to: true,
+            subject: true,
+            sendAt: true,
+            repeatEveryMinutes: true,
+            occurrence: true,
+            maxOccurrences: true,
+            threadId: true,
+            cancelOnReply: true,
+          },
         });
 
         return {
           scheduledEmails: scheduledEmails.map((scheduled) => ({
             ...scheduled,
             sendAt: scheduled.sendAt.toISOString(),
+            isThreadedReply: Boolean(scheduled.threadId),
           })),
         };
       } catch (error) {
@@ -1517,7 +1536,7 @@ export const cancelScheduledEmailTool = ({
 }) =>
   tool({
     description:
-      "Cancel one of the user's pending scheduled emails so it is never sent. Takes the scheduled email id from listScheduledEmails. Only pending emails can be cancelled; already sent or cancelled ones cannot.",
+      "Cancel one of the user's pending scheduled emails so it is never sent. Takes the scheduled email id from listScheduledEmails. Cancelling any occurrence of a recurring chain cancels the whole chain. Already sent or cancelled emails cannot be cancelled. If an occurrence is mid-send at that exact moment, the result reports it as in flight: that send may still complete, but it will not be retried and the chain will not continue — relay this honestly instead of claiming the email was stopped.",
     inputSchema: cancelScheduledEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "cancel_scheduled_email", email, logger });
@@ -1548,6 +1567,12 @@ export const cancelScheduledEmailTool = ({
           success: true as const,
           id: parsedInput.data.id,
           cancelledCount: result.cancelledCount,
+          inFlightCount: result.inFlightCount,
+          ...(result.inFlightCount > 0
+            ? {
+                note: "One occurrence was already mid-send when the cancel arrived. That send may still complete, but it will not be retried and no further occurrences will be queued.",
+              }
+            : {}),
         };
       } catch (error) {
         logger.error("Failed to cancel scheduled email", { error });
@@ -1571,7 +1596,7 @@ export const rescheduleScheduledEmailTool = ({
 }) =>
   tool({
     description:
-      "Change the send time of one of the user's pending scheduled emails. Takes the scheduled email id from listScheduledEmails and the new send time. Only pending emails can be rescheduled.",
+      "Change the send time of one of the user's pending scheduled emails. Takes the scheduled email id from listScheduledEmails and the new send time. Only pending emails can be rescheduled. For recurring chains, any occurrence id reschedules the chain's current pending occurrence, and later occurrences follow from the new send time at the chain's interval.",
     inputSchema: rescheduleScheduledEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "reschedule_scheduled_email", email, logger });
@@ -1597,11 +1622,27 @@ export const rescheduleScheduledEmailTool = ({
       }
 
       try {
+        // For recurring chains the referenced occurrence may already have
+        // been sent and superseded; follow the chain (like cancel does) so a
+        // stale id still reschedules the current pending occurrence.
+        const target = await prisma.scheduledEmail.findFirst({
+          where: { id: parsedInput.data.id, emailAccountId },
+          select: { id: true, chainRootId: true },
+        });
+
+        if (!target) {
+          return {
+            error:
+              "Scheduled email not found. Use listScheduledEmails to see the current queue.",
+          };
+        }
+
+        const chainRootId = target.chainRootId ?? target.id;
         const result = await prisma.scheduledEmail.updateMany({
           where: {
-            id: parsedInput.data.id,
             emailAccountId,
             status: ScheduledEmailStatus.PENDING,
+            OR: [{ id: target.id }, { id: chainRootId }, { chainRootId }],
           },
           data: { sendAt },
         });
@@ -1609,7 +1650,7 @@ export const rescheduleScheduledEmailTool = ({
         if (result.count === 0) {
           return {
             error:
-              "Scheduled email not found or no longer pending. Use listScheduledEmails to see the current queue.",
+              "Scheduled email is no longer pending. Use listScheduledEmails to see the current queue.",
           };
         }
 
@@ -1617,6 +1658,7 @@ export const rescheduleScheduledEmailTool = ({
           success: true as const,
           id: parsedInput.data.id,
           sendAt: sendAt.toISOString(),
+          rescheduledCount: result.count,
         };
       } catch (error) {
         logger.error("Failed to reschedule scheduled email", { error });
@@ -1634,13 +1676,13 @@ export const replyEmailTool = ({
   emailAccountId,
   provider,
   logger,
-  currentUserMessageText,
+  conversationUserMessageTexts,
 }: {
   email: string;
   emailAccountId: string;
   provider: string;
   logger: Logger;
-  currentUserMessageText?: string | null;
+  conversationUserMessageTexts?: string[] | null;
 }) =>
   tool({
     description:
@@ -1659,7 +1701,7 @@ export const replyEmailTool = ({
         emailSubject: "(reply — subject inherited from the original thread)",
         emailContentSnippet: parsedInput.data.content,
         emailAccountId,
-        currentUserMessageText,
+        conversationUserMessageTexts,
         logger,
       });
       const inputWithVerifiedSendAt = {
@@ -1669,7 +1711,7 @@ export const replyEmailTool = ({
 
       const repeats = await resolveVerifiedRepeats(
         inputWithVerifiedSendAt,
-        currentUserMessageText,
+        conversationUserMessageTexts,
         emailAccountId,
         logger,
       );
@@ -1805,6 +1847,8 @@ function createPendingSendEmailOutput(
       sendAt: input.sendAt || null,
       repeatEveryMinutes: input.repeatEveryMinutes || null,
       repeatCount: input.repeatCount || null,
+      supersedesDraftId: input.supersedesDraftId || null,
+      cancelOnReply: input.cancelIfRecipientReplies || null,
     },
   };
 }
@@ -1819,21 +1863,21 @@ async function resolveVerifiedSendAt({
   emailSubject,
   emailContentSnippet,
   emailAccountId,
-  currentUserMessageText,
+  conversationUserMessageTexts,
   logger,
 }: {
   sendAt: string | undefined;
   emailSubject: string;
   emailContentSnippet: string;
   emailAccountId: string;
-  currentUserMessageText: string | null | undefined;
+  conversationUserMessageTexts: string[] | null | undefined;
   logger: Logger;
 }): Promise<string | undefined> {
   if (!sendAt) return;
-  if (!currentUserMessageText) return sendAt;
+  if (!conversationUserMessageTexts?.length) return sendAt;
 
   const shouldBeScheduled = await verifyScheduledSendIntent({
-    userMessageText: currentUserMessageText,
+    userMessageTexts: conversationUserMessageTexts,
     emailSubject,
     emailContentSnippet,
     emailAccountId,
@@ -1842,15 +1886,15 @@ async function resolveVerifiedSendAt({
 
   if (shouldBeScheduled) return sendAt;
 
-  logger.warn("Dropped sendAt not supported by the user's message", {
+  logger.warn("Dropped sendAt not supported by the user's messages", {
     emailSubject,
   });
   return;
 }
 
 // Recurrence is only honored when the model quotes the user's actual words
-// asking for it and that quote really appears in the current message.
-// Anything else is stripped so a single send is scheduled.
+// asking for it and that quote really appears in this conversation's user
+// messages. Anything else is stripped so a single send is scheduled.
 async function resolveVerifiedRepeats(
   input: {
     sendAt?: string;
@@ -1858,7 +1902,7 @@ async function resolveVerifiedRepeats(
     repeatCount?: number;
     repeatRequestQuote?: string;
   },
-  currentUserMessageText: string | null | undefined,
+  conversationUserMessageTexts: string[] | null | undefined,
   emailAccountId: string,
   logger: Logger,
 ): Promise<{ everyMinutes: number; count: number } | null> {
@@ -1869,7 +1913,7 @@ async function resolveVerifiedRepeats(
     return null;
   }
 
-  const stripReason = getRepeatStripReason(input, currentUserMessageText);
+  const stripReason = getRepeatStripReason(input, conversationUserMessageTexts);
   if (stripReason) {
     logger.warn("Dropped unverified repeat request from model", {
       reason: stripReason,
@@ -1877,12 +1921,12 @@ async function resolveVerifiedRepeats(
     return null;
   }
 
-  // The quote proves the text exists somewhere in the message, not that it
-  // actually means "repeat this" — a model can quote an unrelated fragment
+  // The quote proves the text exists somewhere in the conversation, not that
+  // it actually means "repeat this" — a model can quote an unrelated fragment
   // (e.g. a one-time send time) to smuggle recurrence past the check above.
-  // Judge the real intent from the full message independently.
+  // Judge the real intent from the user's own messages independently.
   const requestsRecurrence = await verifyRecurrenceRequest({
-    userMessageText: currentUserMessageText as string,
+    userMessageTexts: conversationUserMessageTexts as string[],
     emailAccountId,
     logger,
   });
@@ -1906,7 +1950,7 @@ function getRepeatStripReason(
     repeatCount?: number;
     repeatRequestQuote?: string;
   },
-  currentUserMessageText: string | null | undefined,
+  conversationUserMessageTexts: string[] | null | undefined,
 ): string | null {
   if (!input.sendAt) return "missing sendAt";
   if (
@@ -1917,13 +1961,16 @@ function getRepeatStripReason(
   }
   const quote = input.repeatRequestQuote?.trim();
   if (!quote) return "missing quote";
-  if (!currentUserMessageText) return "no user message to verify against";
+  if (!conversationUserMessageTexts?.length) {
+    return "no user messages to verify against";
+  }
+  const normalizedQuote = normalizeForQuoteMatch(quote);
   if (
-    !normalizeForQuoteMatch(currentUserMessageText).includes(
-      normalizeForQuoteMatch(quote),
+    !conversationUserMessageTexts.some((text) =>
+      normalizeForQuoteMatch(text).includes(normalizedQuote),
     )
   ) {
-    return "quote not found in the user's message";
+    return "quote not found in the user's messages";
   }
   return null;
 }
@@ -1967,6 +2014,7 @@ function createPendingReplyEmailOutput(
       sendAt: input.sendAt || null,
       repeatEveryMinutes: input.repeatEveryMinutes || null,
       repeatCount: input.repeatCount || null,
+      cancelOnReply: input.cancelIfRecipientReplies || null,
     },
     reference: {
       messageId: message.id,
@@ -2526,6 +2574,89 @@ async function resolveThreadLabel({
   };
 }
 
+// Runs a confirmed sender-wide cleanup. Called from the confirmation card's
+// server action after the user approves — the chat tool itself only returns
+// the pending confirmation and never executes these directly.
+export async function executeSenderWideInboxAction({
+  emailAccountId,
+  provider,
+  userEmail,
+  logger,
+  action,
+  fromEmails,
+}: {
+  emailAccountId: string;
+  provider: string;
+  userEmail: string;
+  logger: Logger;
+  action: "bulk_archive_senders" | "unsubscribe_senders";
+  fromEmails: string[];
+}) {
+  const normalizedFromEmails = normalizeSenderEmails(fromEmails);
+  if (!normalizedFromEmails.length) {
+    return { error: "No valid sender email addresses were provided." };
+  }
+
+  const emailProvider = await createEmailProvider({
+    emailAccountId,
+    provider,
+    logger,
+  });
+
+  if (action === "unsubscribe_senders") {
+    const unsubscribeResults = await runSenderUnsubscribeActions({
+      fromEmails: normalizedFromEmails,
+      emailProvider,
+      emailAccountId,
+      logger,
+    });
+    const successfulSenders = unsubscribeResults
+      .filter((result) => result.success)
+      .map((result) => result.senderEmail);
+    const failedSenders = unsubscribeResults
+      .filter((result) => !result.success)
+      .map((result) => result.senderEmail);
+    const successCount = successfulSenders.length;
+    const autoUnsubscribeCount = unsubscribeResults.filter(
+      (result) => result.success && result.unsubscribe.success,
+    ).length;
+    const autoUnsubscribeAttemptedCount = unsubscribeResults.filter(
+      (result) => result.unsubscribe.attempted,
+    ).length;
+
+    await emailProvider.bulkArchiveFromSenders(
+      normalizedFromEmails,
+      userEmail,
+      emailAccountId,
+    );
+
+    return {
+      success: failedSenders.length === 0,
+      action,
+      sendersCount: normalizedFromEmails.length,
+      senders: normalizedFromEmails,
+      successCount,
+      failedCount: failedSenders.length,
+      failedSenders,
+      autoUnsubscribeCount,
+      autoUnsubscribeAttemptedCount,
+    };
+  }
+
+  await emailProvider.bulkArchiveFromSenders(
+    normalizedFromEmails,
+    userEmail,
+    emailAccountId,
+  );
+
+  return {
+    success: true,
+    action,
+    sendersCount: normalizedFromEmails.length,
+    senders: normalizedFromEmails,
+  };
+}
+
 async function runSenderUnsubscribeActions({
   fromEmails,
   emailProvider,
@@ -2898,17 +3029,24 @@ function getReplyEmailValidationError(error: z.ZodError) {
   return getValidationErrorMessage("replyEmail", error);
 }
 
-function hasOnlyValidRecipients(recipientList: string) {
-  const recipients = splitRecipientList(recipientList);
-  if (recipients.length === 0) return false;
-
-  return recipients.every((recipient) =>
-    Boolean(extractEmailAddress(recipient)),
-  );
-}
-
 function normalizeSenderEmails(fromEmails: string[]) {
   return extractUniqueEmailAddresses(fromEmails);
+}
+
+// Chat-composed emails and drafts get the account's configured signature
+// appended server-side (matching rule-generated drafts), so the model never
+// writes sign-offs and placeholder names cannot leak into real sends.
+async function getComposeSignature(emailAccountId: string) {
+  const account = await prisma.emailAccount.findUnique({
+    where: { id: emailAccountId },
+    select: { signature: true },
+  });
+  return account?.signature || null;
+}
+
+function appendSignature(messageHtml: string, signature: string | null) {
+  if (!signature) return messageHtml;
+  return `${messageHtml}<br><br>${signature}`;
 }
 
 type NormalizedManageInboxInput = {

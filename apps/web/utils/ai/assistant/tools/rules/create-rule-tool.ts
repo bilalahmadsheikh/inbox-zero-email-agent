@@ -9,6 +9,7 @@ import {
   findSenderOnlyOverlapConflict,
   formatSenderOnlyOverlapError,
 } from "@/utils/rule/sender-scope-overlap";
+import { isDuplicateError } from "@/utils/prisma-helpers";
 import {
   buildCreateRuleSchemaFromChatToolInput,
   loadRuleSnapshotAfterWrite,
@@ -32,7 +33,8 @@ export const createRuleTool = ({
   onRulesStateExposed?: (rulesRevision: number) => void;
 }) =>
   tool({
-    description: "Create a new rule.",
+    description:
+      "Create a new automation rule that runs on future incoming email. Only call this when the user's CURRENT message directly asks for ongoing automation with enough condition and action detail, or confirms a concrete rule you proposed with its exact conditions and actions. A complaint, a one-time cleanup request, or a vague wish (e.g. being tired of promo emails) is NOT a rule request: handle the immediate need or propose the exact rule and ask before creating it. Rules with send, reply, forward, or webhook actions additionally return requiresConfirmation and only exist after the user confirms the card in the UI.",
     inputSchema: createRuleSchema(provider),
     execute: async ({ name, condition, actions }) => {
       trackRuleToolCall({ tool: "create_rule", email, logger });
@@ -100,6 +102,14 @@ export const createRuleTool = ({
           currentRule,
         };
       } catch (error) {
+        if (isDuplicateError(error, "name")) {
+          return {
+            success: false,
+            error: `A rule named "${name}" already exists. Read the current rules: if the existing rule already serves this purpose, update it with updateRule instead; otherwise retry createRule once with a different, more specific name. Do not abandon the remaining parts of the user's request.`,
+            conflictingRuleName: name,
+          };
+        }
+
         const message = error instanceof Error ? error.message : String(error);
 
         logger.error("Failed to create rule", { error });

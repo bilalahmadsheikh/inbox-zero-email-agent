@@ -324,6 +324,15 @@ export type EnableMultiRuleSelectionBody = z.infer<
 export const enableTriageLabelsBody = z.object({ enable: z.boolean() });
 export type EnableTriageLabelsBody = z.infer<typeof enableTriageLabelsBody>;
 
+// Confirms a risky chat rule update (one that adds outbound/webhook actions).
+// The updates payload is transported loosely here and re-validated with the
+// provider-aware schema inside the action before anything is applied.
+export const confirmRuleUpdateBody = z.object({
+  ruleName: z.string().trim().min(1),
+  updates: z.record(z.string(), z.unknown()),
+});
+export type ConfirmRuleUpdateBody = z.infer<typeof confirmRuleUpdateBody>;
+
 export const updateDraftReplyConfidenceBody = z.object({
   confidence: z.nativeEnum(DraftReplyConfidence),
 });

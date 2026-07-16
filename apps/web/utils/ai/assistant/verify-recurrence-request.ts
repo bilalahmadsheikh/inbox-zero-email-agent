@@ -16,11 +16,11 @@ const schema = z.object({
  * independent of whatever quote the tool call supplied.
  */
 export async function verifyRecurrenceRequest({
-  userMessageText,
+  userMessageTexts,
   emailAccountId,
   logger,
 }: {
-  userMessageText: string;
+  userMessageTexts: string[];
   emailAccountId: string;
   logger: Logger;
 }): Promise<boolean> {
@@ -29,13 +29,11 @@ export async function verifyRecurrenceRequest({
     if (!emailAccount) return false;
 
     const system =
-      "Determine whether a message explicitly asks for an action to be repeated multiple times (a recurring reminder or follow-up), as opposed to a single action scheduled for one specific future time.";
+      "Determine whether a user's messages in one conversation explicitly ask for an action to be repeated multiple times (a recurring reminder or follow-up), as opposed to a single action scheduled for one specific future time.";
 
-    const prompt = `<message>
-${userMessageText}
-</message>
+    const prompt = `${formatUserMessages(userMessageTexts)}
 
-Does this message explicitly ask for something to be sent, done, or repeated multiple times (e.g. "every 10 minutes", "remind them a few times", "send this 3 times", "keep following up until they reply")? A single future time (e.g. "tomorrow at 9am", "in 2 hours") is NOT a recurrence request on its own.`;
+Do these messages (from the same conversation, oldest first) explicitly ask for something to be sent, done, or repeated multiple times (e.g. "every 10 minutes", "remind them a few times", "send this 3 times", "keep following up until they reply")? A later message like "do all of this" carries forward an earlier explicit request. A single future time (e.g. "tomorrow at 9am", "in 2 hours") is NOT a recurrence request on its own.`;
 
     const modelOptions = getModelForUseCase(
       emailAccount.user,
@@ -75,13 +73,13 @@ const scheduledSendIntentSchema = z.object({
  * independent of whatever sendAt the tool call attached to it.
  */
 export async function verifyScheduledSendIntent({
-  userMessageText,
+  userMessageTexts,
   emailSubject,
   emailContentSnippet,
   emailAccountId,
   logger,
 }: {
-  userMessageText: string;
+  userMessageTexts: string[];
   emailSubject: string;
   emailContentSnippet: string;
   emailAccountId: string;
@@ -92,18 +90,16 @@ export async function verifyScheduledSendIntent({
     if (!emailAccount) return false;
 
     const system =
-      "Determine whether a message asked for one specific email, out of possibly several described in the same message, to be scheduled for a future time rather than sent immediately.";
+      "Determine whether a user's messages in one conversation asked for one specific email, out of possibly several described, to be scheduled for a future time rather than sent immediately.";
 
-    const prompt = `<message>
-${userMessageText}
-</message>
+    const prompt = `${formatUserMessages(userMessageTexts)}
 
 <email_in_question>
 Subject: ${emailSubject}
 Content: ${emailContentSnippet}
 </email_in_question>
 
-The message may describe more than one email. Considering only what the message says about the specific email above (matched by its subject/content), did the user ask for THIS email to be scheduled for a future send time? If the message says this one should be sent now, or says nothing about scheduling for this one specifically, answer false.`;
+The messages (from the same conversation, oldest first) may describe more than one email. Considering only what they say about the specific email above (matched by its subject/content), did the user ask for THIS email to be scheduled for a future send time? A later message like "do all of this" carries forward an earlier explicit request. If the user asked for this one to be sent now, or never asked for scheduling for this one specifically, answer false.`;
 
     const modelOptions = getModelForUseCase(
       emailAccount.user,
@@ -129,4 +125,10 @@ The message may describe more than one email. Considering only what the message 
     logger.error("Failed to verify scheduled send intent", { error });
     return false;
   }
+}
+
+function formatUserMessages(userMessageTexts: string[]) {
+  return userMessageTexts
+    .map((text) => `<user_message>\n${text}\n</user_message>`)
+    .join("\n");
 }

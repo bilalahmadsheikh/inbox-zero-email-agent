@@ -513,6 +513,24 @@ describe("getReplyRecipients", () => {
     expect(result.cc).toBe("manager@company.com");
   });
 
+  it("honors the Reply-To header on plain replies", () => {
+    const headers: ParsedMessageHeaders = {
+      from: "sender@example.com",
+      "reply-to": "billing-desk@example.com",
+      to: "me@company.com",
+      subject: "Test",
+      date: "2024-01-01",
+    };
+
+    const result = getReplyRecipients(headers, {
+      sentFromUser: false,
+      replyAll: false,
+      userEmail: "me@company.com",
+    });
+
+    expect(result.to).toBe("billing-desk@example.com");
+  });
+
   it("replies to all original recipients when replyAll is true", () => {
     const headers: ParsedMessageHeaders = {
       from: "sender@example.com",

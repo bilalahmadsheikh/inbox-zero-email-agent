@@ -6,6 +6,7 @@ import { createEmailProvider } from "@/utils/email/provider";
 import {
   cancelScheduledEmailTool,
   draftEmailTool,
+  executeSenderWideInboxAction,
   forwardEmailTool,
   getAccountOverviewTool,
   rescheduleScheduledEmailTool,
@@ -202,6 +203,61 @@ describe("chat inbox tools", () => {
     });
   });
 
+  it("appends the account's configured signature to composed emails", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+      signature: "<p>Best,<br>Dara</p>",
+    } as any);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+    });
+
+    expect(result).toMatchObject({
+      pendingAction: expect.objectContaining({
+        messageHtml: "<p>Hi there</p><br><br><p>Best,<br>Dara</p>",
+      }),
+    });
+  });
+
+  it("carries supersedesDraftId into the pending action so the draft is cleaned up on confirm", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      supersedesDraftId: "draft-123",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        supersedesDraftId: "draft-123",
+      }),
+    });
+  });
+
   it("rejects sendEmail input when recipient has no email address", async () => {
     const toolInstance = sendEmailTool({
       email: TEST_EMAIL,
@@ -258,6 +314,37 @@ describe("chat inbox tools", () => {
     });
   });
 
+  it("deletes the replaced draft after a rewrite saves the new one", async () => {
+    const mockCreateDraft = vi.fn().mockResolvedValue({ id: "draft-456" });
+    const mockDeleteDraft = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      createDraft: mockCreateDraft,
+      deleteDraft: mockDeleteDraft,
+    } as any);
+
+    const toolInstance = draftEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Rewritten</p>",
+      replacesDraftId: "draft-123",
+    });
+
+    expect(mockCreateDraft).toHaveBeenCalled();
+    expect(mockDeleteDraft).toHaveBeenCalledWith("draft-123");
+    expect(result).toMatchObject({
+      success: true,
+      draftId: "draft-456",
+      replacedDraftId: "draft-123",
+    });
+  });
+
   it("rejects draftEmail input when recipient has no email address", async () => {
     const toolInstance = draftEmailTool({
       email: TEST_EMAIL,
@@ -291,8 +378,9 @@ describe("chat inbox tools", () => {
       emailAccountId: "email-account-1",
       provider: "google",
       logger,
-      currentUserMessageText:
+      conversationUserMessageTexts: [
         "Please remind her every 10 minutes, 3 times total, starting in an hour.",
+      ],
     });
 
     const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -316,6 +404,82 @@ describe("chat inbox tools", () => {
     });
   });
 
+  it("keeps repeats requested in an earlier message of the conversation", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+    mockVerifyRecurrenceRequest.mockResolvedValue(true);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      // The recurrence was requested two messages ago; the latest message
+      // only refers back to it.
+      conversationUserMessageTexts: [
+        "send 5 chained messages separated by 1 min saying i miss you",
+        "do all of this for darabodla@gmail.com",
+      ],
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "darabodla@gmail.com",
+      subject: "I miss you",
+      messageHtml: "<p>I miss you.</p>",
+      sendAt,
+      repeatEveryMinutes: 1,
+      repeatCount: 5,
+      repeatRequestQuote: "5 chained messages separated by 1 min",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        sendAt,
+        repeatEveryMinutes: 1,
+        repeatCount: 5,
+      }),
+    });
+  });
+
+  it("carries cancelIfRecipientReplies into the pending action", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+    mockVerifyScheduledSendIntent.mockResolvedValue(true);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      conversationUserMessageTexts: [
+        "send it in an hour and cancel if he replies",
+      ],
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "Hello",
+      messageHtml: "<p>Hi there</p>",
+      sendAt,
+      cancelIfRecipientReplies: true,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        sendAt,
+        cancelOnReply: true,
+      }),
+    });
+  });
+
   it("strips repeats when the quote is a real but unrelated fragment (e.g. a one-time send time)", async () => {
     prisma.emailAccount.findUnique.mockResolvedValue({
       name: "Test User",
@@ -330,7 +494,7 @@ describe("chat inbox tools", () => {
       emailAccountId: "email-account-1",
       provider: "google",
       logger,
-      currentUserMessageText: "Schedule this for tomorrow 9am",
+      conversationUserMessageTexts: ["Schedule this for tomorrow 9am"],
     });
 
     const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -367,7 +531,7 @@ describe("chat inbox tools", () => {
       emailAccountId: "email-account-1",
       provider: "google",
       logger,
-      currentUserMessageText: "Schedule this for tomorrow 9am",
+      conversationUserMessageTexts: ["Schedule this for tomorrow 9am"],
     });
 
     const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -404,8 +568,9 @@ describe("chat inbox tools", () => {
       emailAccountId: "email-account-1",
       provider: "google",
       logger,
-      currentUserMessageText:
+      conversationUserMessageTexts: [
         "Send now: Subject: Quick check-in. Schedule for tomorrow 9am: Subject: Follow up.",
+      ],
     });
 
     const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -439,8 +604,9 @@ describe("chat inbox tools", () => {
       emailAccountId: "email-account-1",
       provider: "google",
       logger,
-      currentUserMessageText:
+      conversationUserMessageTexts: [
         "send a scheduled email saying miss you in 2 mins",
+      ],
     });
 
     const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -475,7 +641,7 @@ describe("chat inbox tools", () => {
       emailAccountId: "email-account-1",
       provider: "google",
       logger,
-      currentUserMessageText: "remind her every 5 minutes, 4 times",
+      conversationUserMessageTexts: ["remind her every 5 minutes, 4 times"],
     });
 
     const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
@@ -541,7 +707,9 @@ describe("chat inbox tools", () => {
       chainRootId: null,
       repeatEveryMinutes: null,
     } as any);
-    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+    prisma.scheduledEmail.updateMany
+      .mockResolvedValueOnce({ count: 0 }) // no in-flight rows to flag
+      .mockResolvedValueOnce({ count: 1 });
 
     const toolInstance = cancelScheduledEmailTool({
       email: TEST_EMAIL,
@@ -563,6 +731,33 @@ describe("chat inbox tools", () => {
       success: true,
       id: "sched-1",
       cancelledCount: 1,
+      inFlightCount: 0,
+    });
+  });
+
+  it("reports an in-flight occurrence honestly instead of claiming it was stopped", async () => {
+    prisma.scheduledEmail.findFirst.mockResolvedValue({
+      id: "sched-1",
+      chainRootId: null,
+      repeatEveryMinutes: 5,
+    } as any);
+    prisma.scheduledEmail.updateMany
+      .mockResolvedValueOnce({ count: 1 }) // SENDING row flagged
+      .mockResolvedValueOnce({ count: 0 }); // nothing left pending
+
+    const toolInstance = cancelScheduledEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({ id: "sched-1" });
+
+    expect(result).toMatchObject({
+      success: true,
+      cancelledCount: 0,
+      inFlightCount: 1,
+      note: expect.stringContaining("mid-send"),
     });
   });
 
@@ -603,6 +798,10 @@ describe("chat inbox tools", () => {
   });
 
   it("reschedules a pending scheduled email to a future time", async () => {
+    prisma.scheduledEmail.findFirst.mockResolvedValue({
+      id: "sched-1",
+      chainRootId: null,
+    } as any);
     prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
 
     const toolInstance = rescheduleScheduledEmailTool({
@@ -619,13 +818,44 @@ describe("chat inbox tools", () => {
 
     expect(prisma.scheduledEmail.updateMany).toHaveBeenCalledWith({
       where: {
-        id: "sched-1",
         emailAccountId: "email-account-1",
         status: "PENDING",
+        OR: [{ id: "sched-1" }, { id: "sched-1" }, { chainRootId: "sched-1" }],
       },
       data: { sendAt: new Date(sendAt) },
     });
-    expect(result).toEqual({ success: true, id: "sched-1", sendAt });
+    expect(result).toEqual({
+      success: true,
+      id: "sched-1",
+      sendAt,
+      rescheduledCount: 1,
+    });
+  });
+
+  it("reschedules the chain's current occurrence from a stale occurrence id", async () => {
+    prisma.scheduledEmail.findFirst.mockResolvedValue({
+      id: "sched-2",
+      chainRootId: "sched-1",
+    } as any);
+    prisma.scheduledEmail.updateMany.mockResolvedValue({ count: 1 });
+
+    const toolInstance = rescheduleScheduledEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      logger,
+    });
+
+    const sendAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    await (toolInstance.execute as any)({ id: "sched-2", sendAt });
+
+    expect(prisma.scheduledEmail.updateMany).toHaveBeenCalledWith({
+      where: {
+        emailAccountId: "email-account-1",
+        status: "PENDING",
+        OR: [{ id: "sched-2" }, { id: "sched-1" }, { chainRootId: "sched-1" }],
+      },
+      data: { sendAt: new Date(sendAt) },
+    });
   });
 
   it("returns an error when draft creation fails", async () => {
@@ -1130,6 +1360,65 @@ describe("chat inbox tools", () => {
       success: true,
       categoryId: "category-123",
       categoryName: "Finance",
+    });
+  });
+
+  it("returns a pending confirmation for sender-wide cleanup instead of executing", async () => {
+    const bulkArchiveFromSenders = vi.fn();
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      bulkArchiveFromSenders,
+    } as any);
+
+    const toolInstance = manageInboxTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      action: "bulk_archive_senders",
+      fromEmails: ["Promo <promo@shop.example>", "news@letters.example"],
+    });
+
+    expect(result).toEqual({
+      success: true,
+      actionType: "manage_inbox_senders",
+      requiresConfirmation: true,
+      confirmationState: "pending",
+      action: "bulk_archive_senders",
+      senders: ["promo@shop.example", "news@letters.example"],
+      sendersCount: 2,
+    });
+    expect(createEmailProvider).not.toHaveBeenCalled();
+    expect(bulkArchiveFromSenders).not.toHaveBeenCalled();
+  });
+
+  it("executes a confirmed sender-wide bulk archive", async () => {
+    const bulkArchiveFromSenders = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      bulkArchiveFromSenders,
+    } as any);
+
+    const result = await executeSenderWideInboxAction({
+      emailAccountId: "email-account-1",
+      provider: "google",
+      userEmail: TEST_EMAIL,
+      logger,
+      action: "bulk_archive_senders",
+      fromEmails: ["promo@shop.example"],
+    });
+
+    expect(bulkArchiveFromSenders).toHaveBeenCalledWith(
+      ["promo@shop.example"],
+      TEST_EMAIL,
+      "email-account-1",
+    );
+    expect(result).toEqual({
+      success: true,
+      action: "bulk_archive_senders",
+      sendersCount: 1,
+      senders: ["promo@shop.example"],
     });
   });
 

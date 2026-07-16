@@ -35,6 +35,49 @@ export async function cancelScheduledEmailsToSender({
   return { cancelledCount: result.count };
 }
 
+// One-time stop condition carried by the chain itself (no standing rule):
+// when the recipient replies, pending sends flagged cancelOnReply are
+// cancelled, and an occurrence that is mid-send is flagged so it is not
+// retried and its chain queues no further occurrences. Matching semantics
+// are identical to the CANCEL_SCHEDULED rule action above.
+export async function cancelOnReplyForIncomingEmail({
+  emailAccountId,
+  from,
+  threadId,
+  logger,
+}: {
+  emailAccountId: string;
+  from: string;
+  threadId?: string | null;
+  logger: Logger;
+}): Promise<{ cancelledCount: number }> {
+  const where = buildMatchingWhere({ emailAccountId, from, threadId, logger });
+  if (!where) return { cancelledCount: 0 };
+
+  const inFlight = await prisma.scheduledEmail.updateMany({
+    where: {
+      ...where,
+      status: ScheduledEmailStatus.SENDING,
+      cancelOnReply: true,
+    },
+    data: { cancelRequested: true },
+  });
+
+  const result = await prisma.scheduledEmail.updateMany({
+    where: { ...where, cancelOnReply: true },
+    data: { status: ScheduledEmailStatus.CANCELLED },
+  });
+
+  if (result.count > 0 || inFlight.count > 0) {
+    logger.info("Cancelled scheduled emails after recipient reply", {
+      cancelledCount: result.count,
+      inFlightCount: inFlight.count,
+    });
+  }
+
+  return { cancelledCount: result.count };
+}
+
 export async function releaseScheduledEmailsToSender({
   emailAccountId,
   from,

@@ -12,6 +12,7 @@ import {
   getFilableAttachments,
 } from "@/utils/drive/filing-engine";
 import { handleOutboundMessage } from "@/utils/reply-tracker/handle-outbound";
+import { cancelOnReplyForIncomingEmail } from "@/utils/scheduled-send/rule-actions";
 import { cleanupThreadAIDrafts } from "@/utils/reply-tracker/draft-tracking";
 import { clearFollowUpLabel } from "@/utils/follow-up/labels";
 import { NewsletterStatus } from "@/generated/prisma/enums";
@@ -145,6 +146,18 @@ export async function processHistoryItem(
       });
       return;
     }
+
+    // A reply from the recipient stops scheduled chains flagged
+    // cancelOnReply. Runs for every inbound message, independent of rules or
+    // AI access, so the one-time stop condition never silently lapses.
+    await cancelOnReplyForIncomingEmail({
+      emailAccountId,
+      from: parsedMessage.headers.from,
+      threadId: actualThreadId,
+      logger,
+    }).catch((error) => {
+      logger.error("Failed to run cancel-on-reply check", { error });
+    });
 
     // check if unsubscribed
     const email = extractEmailAddress(parsedMessage.headers.from);

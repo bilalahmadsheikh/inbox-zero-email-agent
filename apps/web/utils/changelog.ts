@@ -9,6 +9,13 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "1.7",
+    date: "2026-07-18",
+    notes: [
+      'Fixed recurring "chained" sends: a request like "send 5 messages one minute apart" now correctly sets up the whole chain starting immediately, instead of going out once as a single email. A start time is no longer required for a recurring chain.',
+    ],
+  },
+  {
     version: "1.6",
     date: "2026-07-17",
     notes: [

@@ -445,6 +445,44 @@ describe("chat inbox tools", () => {
     });
   });
 
+  it("keeps recurrence for an immediate-start chain with no sendAt", async () => {
+    prisma.emailAccount.findUnique.mockResolvedValue({
+      name: "Test User",
+      email: TEST_EMAIL,
+    } as any);
+    mockVerifyRecurrenceRequest.mockResolvedValue(true);
+
+    const toolInstance = sendEmailTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      conversationUserMessageTexts: [
+        "send 5 chained messages one minute apart saying i miss you",
+      ],
+    });
+
+    // No sendAt: the first message starts now, the rest follow the interval.
+    const result = await (toolInstance.execute as any)({
+      to: "recipient@example.com",
+      subject: "I miss you",
+      messageHtml: "<p>I miss you.</p>",
+      repeatEveryMinutes: 1,
+      repeatCount: 5,
+      repeatRequestQuote: "5 chained messages one minute apart",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pendingAction: expect.objectContaining({
+        repeatEveryMinutes: 1,
+        repeatCount: 5,
+      }),
+    });
+    // A chain must enter the queue, so sendAt is synthesized (not null).
+    expect(result.pendingAction.sendAt).toBeTruthy();
+  });
+
   it("carries cancelIfRecipientReplies into the pending action", async () => {
     prisma.emailAccount.findUnique.mockResolvedValue({
       name: "Test User",

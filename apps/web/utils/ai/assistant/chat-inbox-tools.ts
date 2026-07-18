@@ -132,7 +132,7 @@ const sendEmailToolInputSchema = z
       .max(1440)
       .optional()
       .describe(
-        "Only when the user explicitly asked for recurring or repeated sends in this conversation: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies against the user's real messages in this conversation and drops these fields otherwise.",
+        "Only when the user explicitly asked for recurring or repeated sends in this conversation: minutes between resends. Requires repeatCount and repeatRequestQuote; sendAt is optional (omit it to start the chain now, or set it to delay the first send). 'Send an email in 2 mins' means ONE send; 'send 5 messages one minute apart' or 'remind her every 10 minutes, 5 times' means repeatEveryMinutes and repeatCount are set. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies against the user's real messages in this conversation and drops these fields otherwise.",
       ),
     repeatCount: z
       .number()
@@ -141,7 +141,7 @@ const sendEmailToolInputSchema = z
       .max(10)
       .optional()
       .describe(
-        "Total number of sends including the first (2-10). Requires sendAt, repeatEveryMinutes, and repeatRequestQuote.",
+        "Total number of sends including the first (2-10). Requires repeatEveryMinutes and repeatRequestQuote; sendAt is optional.",
       ),
     repeatRequestQuote: z
       .string()
@@ -161,7 +161,7 @@ const sendEmailToolInputSchema = z
       .boolean()
       .optional()
       .describe(
-        "One-time stop condition: when true and the email is scheduled (sendAt set), a reply from the recipient cancels this send and any remaining occurrences of its chain. Set it when the user asks to stop or cancel follow-ups if the person replies. No rule is created; it applies only to this scheduled email/chain. The user can toggle it on the confirmation card.",
+        "One-time stop condition: when true and the email is scheduled or recurring (sendAt set, or repeat fields set), a reply from the recipient cancels this send and any remaining occurrences of its chain. Set it when the user asks to stop or cancel follow-ups if the person replies. No rule is created; it applies only to this scheduled email/chain. The user can toggle it on the confirmation card.",
       ),
   })
   .strict();
@@ -219,7 +219,7 @@ const replyEmailToolInputSchema = z
       .max(1440)
       .optional()
       .describe(
-        "Only when the user explicitly asked for recurring or repeated sends in this conversation: minutes between resends. Requires sendAt, repeatCount, and repeatRequestQuote. 'Send an email in 2 mins' means ONE send; 'remind her every 10 minutes, 5 times' means repeatEveryMinutes=10, repeatCount=5. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies against the user's real messages in this conversation and drops these fields otherwise.",
+        "Only when the user explicitly asked for recurring or repeated sends in this conversation: minutes between resends. Requires repeatCount and repeatRequestQuote; sendAt is optional (omit it to start the chain now, or set it to delay the first send). 'Send an email in 2 mins' means ONE send; 'send 5 messages one minute apart' or 'remind her every 10 minutes, 5 times' means repeatEveryMinutes and repeatCount are set. A single future send time on its own (e.g. 'tomorrow at 9am') is never a repeat request. The server independently verifies against the user's real messages in this conversation and drops these fields otherwise.",
       ),
     repeatCount: z
       .number()
@@ -228,7 +228,7 @@ const replyEmailToolInputSchema = z
       .max(10)
       .optional()
       .describe(
-        "Total number of sends including the first (2-10). Requires sendAt, repeatEveryMinutes, and repeatRequestQuote.",
+        "Total number of sends including the first (2-10). Requires repeatEveryMinutes and repeatRequestQuote; sendAt is optional.",
       ),
     repeatRequestQuote: z
       .string()
@@ -240,7 +240,7 @@ const replyEmailToolInputSchema = z
       .boolean()
       .optional()
       .describe(
-        "One-time stop condition: when true and the reply is scheduled (sendAt set), a reply from the recipient cancels this send and any remaining occurrences of its chain. Set it when the user asks to stop or cancel follow-ups if the person replies. No rule is created; it applies only to this scheduled email/chain. The user can toggle it on the confirmation card.",
+        "One-time stop condition: when true and the reply is scheduled or recurring (sendAt set, or repeat fields set), a reply from the recipient cancels this send and any remaining occurrences of its chain. Set it when the user asks to stop or cancel follow-ups if the person replies. No rule is created; it applies only to this scheduled email/chain. The user can toggle it on the confirmation card.",
       ),
   })
   .strict();
@@ -1323,33 +1323,24 @@ export const sendEmailTool = ({
         return { error: getSendEmailValidationError(parsedInput.error) };
       }
 
-      const verifiedSendAt = await resolveVerifiedSendAt({
-        sendAt: parsedInput.data.sendAt,
+      const scheduled = await resolveScheduledSendFields({
+        input: parsedInput.data,
         emailSubject: parsedInput.data.subject,
         emailContentSnippet: parsedInput.data.messageHtml,
         emailAccountId,
         conversationUserMessageTexts,
         logger,
       });
-      const inputWithVerifiedSendAt = {
-        ...parsedInput.data,
-        sendAt: verifiedSendAt,
-      };
-
-      const repeats = await resolveVerifiedRepeats(
-        inputWithVerifiedSendAt,
-        conversationUserMessageTexts,
-        emailAccountId,
-        logger,
-      );
       const normalizedInput = {
-        // Recurring chains keep a near-now sendAt: the queue needs a first
-        // occurrence either way.
-        ...(repeats
-          ? inputWithVerifiedSendAt
-          : normalizeSendEmailInput(inputWithVerifiedSendAt)),
-        repeatEveryMinutes: repeats?.everyMinutes,
-        repeatCount: repeats?.count,
+        ...parsedInput.data,
+        sendAt: scheduled.sendAt,
+        repeatEveryMinutes: scheduled.repeatEveryMinutes,
+        repeatCount: scheduled.repeatCount,
+        // Cancel-on-reply only means something for a queued send; an immediate
+        // one-off has nothing left to cancel.
+        cancelIfRecipientReplies: scheduled.sendAt
+          ? parsedInput.data.cancelIfRecipientReplies
+          : undefined,
       };
 
       try {
@@ -1696,31 +1687,22 @@ export const replyEmailTool = ({
         return { error: getReplyEmailValidationError(parsedInput.error) };
       }
 
-      const verifiedSendAt = await resolveVerifiedSendAt({
-        sendAt: parsedInput.data.sendAt,
+      const scheduled = await resolveScheduledSendFields({
+        input: parsedInput.data,
         emailSubject: "(reply — subject inherited from the original thread)",
         emailContentSnippet: parsedInput.data.content,
         emailAccountId,
         conversationUserMessageTexts,
         logger,
       });
-      const inputWithVerifiedSendAt = {
-        ...parsedInput.data,
-        sendAt: verifiedSendAt,
-      };
-
-      const repeats = await resolveVerifiedRepeats(
-        inputWithVerifiedSendAt,
-        conversationUserMessageTexts,
-        emailAccountId,
-        logger,
-      );
       const normalizedInput = {
-        ...(repeats
-          ? inputWithVerifiedSendAt
-          : normalizeSendEmailInput(inputWithVerifiedSendAt)),
-        repeatEveryMinutes: repeats?.everyMinutes,
-        repeatCount: repeats?.count,
+        ...parsedInput.data,
+        sendAt: scheduled.sendAt,
+        repeatEveryMinutes: scheduled.repeatEveryMinutes,
+        repeatCount: scheduled.repeatCount,
+        cancelIfRecipientReplies: scheduled.sendAt
+          ? parsedInput.data.cancelIfRecipientReplies
+          : undefined,
       };
 
       try {
@@ -1853,6 +1835,88 @@ function createPendingSendEmailOutput(
   };
 }
 
+// Resolves the final sendAt and repeat fields for a chat-composed email.
+// Recurrence is decided first and does not depend on a user-supplied sendAt:
+// a verified "send N times, M minutes apart" chain enters the queue starting
+// now (or at the model's future sendAt if it gave a valid one), so an
+// immediate-start chain is no longer silently downgraded to a single send.
+// Non-recurring sends still verify the sendAt against the real message to
+// catch a sibling's copied schedule, then drop a near-now time for immediate
+// delivery.
+async function resolveScheduledSendFields({
+  input,
+  emailSubject,
+  emailContentSnippet,
+  emailAccountId,
+  conversationUserMessageTexts,
+  logger,
+}: {
+  input: {
+    sendAt?: string;
+    repeatEveryMinutes?: number;
+    repeatCount?: number;
+    repeatRequestQuote?: string;
+  };
+  emailSubject: string;
+  emailContentSnippet: string;
+  emailAccountId: string;
+  conversationUserMessageTexts: string[] | null | undefined;
+  logger: Logger;
+}): Promise<{
+  sendAt: string | undefined;
+  repeatEveryMinutes?: number;
+  repeatCount?: number;
+}> {
+  const repeats = await resolveVerifiedRepeats(
+    input,
+    conversationUserMessageTexts,
+    emailAccountId,
+    logger,
+  );
+
+  if (repeats) {
+    return {
+      sendAt: coerceChainStartSendAt(input.sendAt),
+      repeatEveryMinutes: repeats.everyMinutes,
+      repeatCount: repeats.count,
+    };
+  }
+
+  const verifiedSendAt = await resolveVerifiedSendAt({
+    sendAt: input.sendAt,
+    emailSubject,
+    emailContentSnippet,
+    emailAccountId,
+    conversationUserMessageTexts,
+    logger,
+  });
+
+  return { sendAt: dropNearNowSendAt(verifiedSendAt) };
+}
+
+// A recurring chain must enter the ScheduledEmail queue. Honor a valid future
+// sendAt from the model; otherwise start the chain now (the first occurrence
+// fires on the next sweep, within a minute, and the rest follow the interval).
+function coerceChainStartSendAt(sendAt: string | undefined): string {
+  if (sendAt) {
+    const requested = new Date(sendAt).getTime();
+    if (
+      requested >= Date.now() + MIN_SCHEDULE_AHEAD_MS &&
+      requested <= Date.now() + MAX_SCHEDULE_AHEAD_MS
+    ) {
+      return sendAt;
+    }
+  }
+  return new Date().toISOString();
+}
+
+function dropNearNowSendAt(sendAt: string | undefined): string | undefined {
+  if (!sendAt) return;
+  return new Date(sendAt).getTime() >= Date.now() + MIN_SCHEDULE_AHEAD_MS
+    ? sendAt
+    : undefined;
+}
+
 // When a message describes multiple emails, a model can copy one email's
 // sendAt onto a sibling meant to go out immediately (call order doesn't
 // reliably tell the correctly-scheduled email apart from the miscopied
@@ -1945,14 +2009,15 @@ async function resolveVerifiedRepeats(
 
 function getRepeatStripReason(
   input: {
-    sendAt?: string;
     repeatEveryMinutes?: number;
     repeatCount?: number;
     repeatRequestQuote?: string;
   },
   conversationUserMessageTexts: string[] | null | undefined,
 ): string | null {
-  if (!input.sendAt) return "missing sendAt";
+  // A recurring chain does not need a user-supplied sendAt: "send 5 messages
+  // one minute apart" starts now and repeats. The chain still enters the
+  // queue (with a now sendAt) so occurrences can be tracked and cancelled.
   if (
     input.repeatEveryMinutes === undefined ||
     input.repeatCount === undefined
@@ -1981,18 +2046,6 @@ function normalizeForQuoteMatch(text: string) {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function normalizeSendEmailInput<T extends { sendAt?: string }>(
-  input: T,
-): T | Omit<T, "sendAt"> {
-  if (!input.sendAt) return input;
-
-  const sendAt = new Date(input.sendAt);
-  if (sendAt.getTime() >= Date.now() + MIN_SCHEDULE_AHEAD_MS) return input;
-
-  const { sendAt: _sendAt, ...immediateInput } = input;
-  return immediateInput;
 }
 
 function createPendingReplyEmailOutput(

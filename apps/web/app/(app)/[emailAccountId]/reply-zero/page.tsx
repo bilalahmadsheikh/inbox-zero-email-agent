@@ -24,12 +24,14 @@ export default async function ReplyTrackerPage(props: {
     page?: string;
     timeRange?: TimeRange;
     enabled?: boolean;
+    tab?: string;
   }>;
 }) {
   const { emailAccountId } = await props.params;
   await checkUserOwnsEmailAccount({ emailAccountId });
 
   const searchParams = await props.searchParams;
+  const activeTab = getReplyZeroTab(searchParams.tab);
 
   const cookieStore = await cookies();
   const viewedOnboarding =
@@ -66,7 +68,7 @@ export default async function ReplyTrackerPage(props: {
 
   return (
     <GmailProvider>
-      <Tabs defaultValue="needsReply" className="flex h-full flex-col">
+      <Tabs defaultValue={activeTab} className="flex h-full flex-col">
         <TabsToolbar>
           <div className="w-full overflow-x-auto">
             <div className="flex items-center justify-between gap-2">
@@ -144,4 +146,10 @@ export default async function ReplyTrackerPage(props: {
       </Tabs>
     </GmailProvider>
   );
+}
+
+// Deep links (e.g. from the digest) can target a specific tab.
+function getReplyZeroTab(tab: string | undefined) {
+  if (tab === "awaitingReply" || tab === "resolved") return tab;
+  return "needsReply";
 }

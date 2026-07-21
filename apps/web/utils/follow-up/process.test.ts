@@ -25,6 +25,9 @@ vi.mock("@/utils/prisma", () => ({
       create: vi.fn().mockResolvedValue({ id: "tracker-1" }),
       update: vi.fn().mockResolvedValue({ id: "tracker-1" }),
     },
+    scheduledEmail: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     messagingChannel: {
       findMany: vi.fn().mockResolvedValue([]),
     },

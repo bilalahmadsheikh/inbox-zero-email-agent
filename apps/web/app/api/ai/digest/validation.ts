@@ -10,6 +10,7 @@ export const digestBody = z.object({
     to: z.string().optional(),
     subject: z.string(),
     content: z.string(),
+    hasAttachments: z.boolean().optional(),
   }),
 });
 

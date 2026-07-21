@@ -22,6 +22,7 @@ import camelCase from "lodash/camelCase";
 import { createEmailProvider } from "@/utils/email/provider";
 import { sleep } from "@/utils/sleep";
 import { withQstashOrInternal } from "@/utils/qstash";
+import { getReplyReminderDigestSections } from "@/utils/digest/reply-reminders";
 
 export const maxDuration = 60;
 
@@ -115,6 +116,9 @@ async function sendEmail({
     where: { id: emailAccountId },
     select: {
       email: true,
+      timezone: true,
+      followUpNeedsReplyDays: true,
+      followUpAwaitingReplyDays: true,
       account: { select: { provider: true, refresh_token: true } },
     },
   });
@@ -152,6 +156,20 @@ async function sendEmail({
       return { success: true, message: "Digest schedule is not due yet" };
     }
   }
+
+  // Reply reminders are computed fresh each send (not stored as DigestItems)
+  // so the digest reflects the current overdue state of To Reply / Waiting
+  // threads. They can carry a digest on their own even with no rule items.
+  const replyReminders = await getReplyReminderDigestSections({
+    emailAccountId,
+    timezone: emailAccount.timezone,
+    needsReplyDays: emailAccount.followUpNeedsReplyDays,
+    awaitingReplyDays: emailAccount.followUpAwaitingReplyDays,
+    provider: emailProvider,
+    now,
+    logger,
+  });
+  const hasReplyReminders = Object.keys(replyReminders.itemsByRule).length > 0;
 
   const pendingDigests = await prisma.digest.findMany({
     where: {
@@ -197,8 +215,10 @@ async function sendEmail({
   }
 
   try {
-    // Return early if no digests were found, unless force is true
-    if (pendingDigests.length === 0) {
+    // Return early only when there is nothing to send: no rule digest items
+    // AND no reply reminders (unless force). Reply reminders alone are enough
+    // to warrant a digest.
+    if (pendingDigests.length === 0 && !hasReplyReminders) {
       if (!force) {
         if (digestScheduleData && digestScheduleProgression) {
           await prisma.schedule.update({
@@ -306,6 +326,15 @@ async function sendEmail({
       });
       return acc;
     }, {} as Digest);
+
+    // Merge reply reminders as their own digest sections. These render like
+    // any other section across email and messaging channels.
+    for (const [key, items] of Object.entries(replyReminders.itemsByRule)) {
+      executedRulesByRule[key] = items;
+    }
+    for (const [key, name] of Object.entries(replyReminders.ruleNames)) {
+      ruleNameMap.set(key, name);
+    }
 
     if (Object.keys(executedRulesByRule).length === 0) {
       logger.info("No executed rules found, skipping digest email");

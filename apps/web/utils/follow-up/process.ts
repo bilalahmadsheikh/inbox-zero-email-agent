@@ -46,6 +46,7 @@ import {
 } from "@/utils/email/provider-types";
 import { isDuplicateError } from "@/utils/prisma-helpers";
 import { getEmailUrlForOptionalMessage } from "@/utils/url";
+import { getThreadIdsWithActiveScheduledChain } from "@/utils/scheduled-send/active-chain";
 import { env } from "@/env";
 
 const FOLLOW_UP_ELIGIBILITY_WINDOW_MINUTES = 15;
@@ -353,6 +354,18 @@ async function processFollowUpsForType({
       : ThreadTrackerType.NEEDS_REPLY;
 
   const threadIds = threads.map((t) => t.id);
+
+  // Automation precedence: for waiting-on-others (AWAITING), skip threads the
+  // user already has an active scheduled follow-up chain on — the app is
+  // auto-chasing them, so don't also draft/notify a manual chase.
+  const activeChainThreadIds =
+    systemType === SystemType.AWAITING_REPLY
+      ? await getThreadIdsWithActiveScheduledChain({
+          emailAccountId: emailAccount.id,
+          threadIds,
+        })
+      : new Set<string>();
+
   const processedLedger = await getProcessedFollowUpLedger({
     emailAccountId: emailAccount.id,
     threadIds,
@@ -373,12 +386,22 @@ async function processFollowUpsForType({
   let skippedNoLatestMessageCount = 0;
   let skippedTooRecentCount = 0;
   let errorCount = 0;
+  let skippedActiveScheduledChainCount = 0;
   const skippedAlreadyProcessedThreadIds = new Set<string>();
 
   for (const thread of threads) {
     const threadLogger = logger.with({ threadId: thread.id });
 
     try {
+      if (activeChainThreadIds.has(thread.id)) {
+        skippedActiveScheduledChainCount++;
+        threadLogger.info(
+          "Skipping follow-up: thread has an active scheduled chain",
+          { systemType },
+        );
+        continue;
+      }
+
       const lastMessage = await provider.getLatestMessageFromThreadSnapshot({
         id: thread.id,
         messages: thread.messages,
@@ -635,7 +658,8 @@ async function processFollowUpsForType({
   const skippedCount =
     skippedAlreadyProcessedCount +
     skippedNoLatestMessageCount +
-    skippedTooRecentCount;
+    skippedTooRecentCount +
+    skippedActiveScheduledChainCount;
 
   if (skippedAlreadyProcessedThreadIds.size > 0) {
     logger.info("Skipping already-processed threads", {
@@ -656,6 +680,7 @@ async function processFollowUpsForType({
     skippedAlreadyProcessed: skippedAlreadyProcessedCount,
     skippedNoLatestMessage: skippedNoLatestMessageCount,
     skippedTooRecent: skippedTooRecentCount,
+    skippedActiveScheduledChain: skippedActiveScheduledChainCount,
     errors: errorCount,
     eligibilityWindowMinutes: FOLLOW_UP_ELIGIBILITY_WINDOW_MINUTES,
     thresholdDays,

@@ -25,6 +25,7 @@ import {
   PenIcon,
   PersonStandingIcon,
   RatioIcon,
+  ReplyIcon,
   SendIcon,
   SparklesIcon,
   TagIcon,
@@ -98,6 +99,13 @@ export const useNavigation = () => {
         href: prefixPath(currentEmailAccountId, "/automation"),
         icon: SparklesIcon,
         description: "Rules that automatically handle incoming email for you",
+      },
+      {
+        name: "Reply Zero",
+        href: prefixPath(currentEmailAccountId, "/reply-zero"),
+        icon: ReplyIcon,
+        description:
+          "Threads awaiting your reply and mail you're waiting on others to answer",
       },
       {
         name: "Channels",

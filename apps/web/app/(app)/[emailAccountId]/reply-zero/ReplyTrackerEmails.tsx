@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import sortBy from "lodash/sortBy";
 import { useState, useCallback, type RefCallback } from "react";
 import type { ParsedMessage } from "@/utils/types";
@@ -27,7 +28,6 @@ import {
   ResizablePanelGroup,
   ResizablePanel,
 } from "@/components/ui/resizable";
-import { ThreadContent } from "@/components/EmailViewer";
 import { formatShortDate, internalDateToDate } from "@/utils/date";
 import { cn } from "@/utils";
 import { CommandShortcut } from "@/components/ui/command";
@@ -37,6 +37,14 @@ import { useAccount } from "@/providers/EmailAccountProvider";
 import { isGoogleProvider } from "@/utils/email/provider-types";
 import { MutedText } from "@/components/Typography";
 import { BRAND_NAME } from "@/utils/branding";
+
+// The rich email viewer is heavy and only needed once a thread's split view is
+// opened. Loading it lazily keeps the Reply Zero list route light so it renders
+// quickly instead of waiting on the whole viewer graph to compile/bundle.
+const ThreadContent = dynamic(
+  () => import("@/components/EmailViewer").then((mod) => mod.ThreadContent),
+  { ssr: false, loading: () => <Loading /> },
+);
 
 export function ReplyTrackerEmails({
   trackers,

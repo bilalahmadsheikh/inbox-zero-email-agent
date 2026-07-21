@@ -31,6 +31,11 @@ export async function enqueueDigestItem({
           to: email.headers.to || "",
           subject: email.headers.subject,
           content: emailToContentForAI(email),
+          // Recorded so the digest job only pays for attachment extraction
+          // when there is actually something to extract.
+          hasAttachments: Boolean(
+            "attachments" in email && email.attachments?.length,
+          ),
         },
       },
       qstash: {

@@ -4,6 +4,9 @@ import { DigestStatus } from "@/generated/prisma/enums";
 import type { Logger } from "@/utils/logger";
 import prisma from "@/utils/prisma";
 import { aiSummarizeEmailForDigest } from "@/utils/ai/digest/summarize-email-for-digest";
+import { summarizeDigestAttachments } from "@/utils/ai/digest/summarize-attachments-for-digest";
+import { createEmailProvider } from "@/utils/email/provider";
+import type { EmailAccountWithAI } from "@/utils/llms/types";
 import { getEmailAccountWithAi } from "@/utils/user/get";
 import type { StoredDigestContent } from "@/app/api/resend/digest/validation";
 import { withError } from "@/utils/middleware";
@@ -83,6 +86,21 @@ export const POST = withError(
             "Skipping digest item because it is not worth summarizing",
           );
           return new NextResponse("OK", { status: 200 });
+        }
+
+        // Distill any PDF/DOCX attachments (contracts, decks, financials) and
+        // append to the summary so they appear in the digest alongside the
+        // email. Best-effort: never blocks the digest item on failure.
+        if (message.hasAttachments) {
+          const attachmentSummary = await summarizeMessageAttachments({
+            emailAccount,
+            emailAccountId,
+            messageId: message.id,
+            logger,
+          });
+          if (attachmentSummary) {
+            summary.content = `${summary.content}\n${attachmentSummary}`;
+          }
         }
 
         await upsertDigest({
@@ -251,6 +269,39 @@ async function upsertDigest({
   } catch (error) {
     logger.error("Failed to upsert digest", { error });
     throw error;
+  }
+}
+
+// Best-effort attachment distillation for a single digest email. Failures are
+// swallowed inside summarizeDigestAttachments; this only wires up the provider.
+async function summarizeMessageAttachments({
+  emailAccount,
+  emailAccountId,
+  messageId,
+  logger,
+}: {
+  emailAccount: EmailAccountWithAI & { name: string | null };
+  emailAccountId: string;
+  messageId: string;
+  logger: Logger;
+}): Promise<string | null> {
+  try {
+    const provider = await createEmailProvider({
+      emailAccountId,
+      provider: emailAccount.account.provider,
+      logger,
+    });
+    return await summarizeDigestAttachments({
+      emailAccount,
+      provider,
+      messageId,
+      logger,
+    });
+  } catch (error) {
+    logger.error("Failed to prepare provider for attachment summary", {
+      error,
+    });
+    return null;
   }
 }
 

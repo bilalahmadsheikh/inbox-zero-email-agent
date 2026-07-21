@@ -101,6 +101,12 @@ export default function DigestEmail(props: DigestEmailProps) {
     coldEmail: "gray",
     notification: "pink",
     toReply: "red",
+    awaitingYourReply: "red",
+    waitingOnOthers: "amber",
+    catchupSummary: "blue",
+    catchupURGENT: "red",
+    catchupIMPORTANT: "amber",
+    catchupFYI: "gray",
   };
 
   // Check if there are any items to display

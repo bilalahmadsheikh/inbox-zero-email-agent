@@ -9,6 +9,33 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.0",
+    date: "2026-07-21",
+    notes: [
+      "Reply Zero opens quickly again: the page now loads its heavy email viewer only when you open a conversation, so the list appears right away.",
+      "Consistent priorities: the catch-up briefing now reuses the priority already assigned to each email when it arrived, instead of re-judging it — so Urgent/Important/FYI mean the same thing across your inbox, digest, and catch-up.",
+      "No double-chasing: if you've set up an automatic scheduled follow-up on a thread, the app no longer also nudges you to chase it by hand — the automation takes precedence.",
+    ],
+  },
+  {
+    version: "1.9",
+    date: "2026-07-19",
+    notes: [
+      "Attachment summaries in your digest: PDF and Word attachments (contracts, decks, financial docs) on digested emails are now distilled to their essentials and shown alongside the email summary.",
+      '"What you missed" catch-up briefing: a new on-demand endpoint (GET /api/devaicon/catchup?since=…) fetches unread mail since a time you specify, ranks it by urgency (Urgent / Important / FYI) with a one-line reason each, and writes an urgency-first summary — optionally delivered to your email or messaging channel.',
+    ],
+  },
+  {
+    version: "1.8",
+    date: "2026-07-19",
+    notes: [
+      "Reply reminders in your digest: threads awaiting your reply, and mail you're waiting on others to answer, now resurface in the daily digest (email and messaging channels) before they slip — using your existing follow-up day settings.",
+      "Waiting-on-others chase nudges: overdue threads you're waiting on link straight to the Reply Zero 'Waiting' tab to follow up, and an auto-draft is prepared when auto-draft is enabled.",
+      "Reply Zero now appears in the sidebar for Outlook accounts too, not just Gmail. (Replying from within the app remains Gmail-only for now; Outlook opens in your mail client.)",
+      "The version badge changelog link now opens the in-app changelog instead of an external site.",
+    ],
+  },
+  {
     version: "1.7",
     date: "2026-07-18",
     notes: [

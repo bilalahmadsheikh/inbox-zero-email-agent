@@ -166,11 +166,6 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
-        source: "/changelog",
-        destination: "https://go.getinboxzero.com/changelog",
-        permanent: true,
-      },
-      {
         source: "/twitter",
         destination: "https://go.getinboxzero.com/x",
         permanent: true,

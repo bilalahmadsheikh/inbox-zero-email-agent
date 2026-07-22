@@ -9,6 +9,35 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.4",
+    date: "2026-07-22",
+    notes: [
+      "Attachment reading is now controlled per automation rule. Your regular draft and reply rules leave attachments untouched; ask Assistant to create an attachment-aware rule when you want incoming documents read before a response is prepared.",
+    ],
+  },
+  {
+    version: "2.3",
+    date: "2026-07-22",
+    notes: [
+      "Attachment-aware automations: rules created in Assistant can read supported documents from incoming emails before drafting or replying when attachment reading is enabled on that rule. Small files are read directly, while lengthy PDFs and Word documents automatically switch to section-by-section processing so relevant facts from later pages can inform the response.",
+      "Automatic replies now use the same grounded drafting pipeline as saved drafts, including document context and confidence checks.",
+    ],
+  },
+  {
+    version: "2.2",
+    date: "2026-07-22",
+    notes: [
+      "Reply Zero loads much faster: the To Reply and Waiting lists now render straight from your saved data instead of re-fetching every conversation from your mail provider one by one. Older items still fill in automatically the first time they're opened.",
+    ],
+  },
+  {
+    version: "2.1",
+    date: "2026-07-21",
+    notes: [
+      'Reply and Nudge now work in Reply Zero for Outlook accounts too: the To Reply tab opens a reply composer and the Waiting tab opens a follow-up, sent straight from the app — no more "reply in your mail client" message.',
+    ],
+  },
+  {
     version: "2.0",
     date: "2026-07-21",
     notes: [

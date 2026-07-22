@@ -86,6 +86,8 @@ export function useDraftReplies() {
                       to: null,
                       cc: null,
                       bcc: null,
+                      replyAll: null,
+                      readAttachments: false,
                       url: null,
                       delayInMinutes: null,
                       folderName: null,

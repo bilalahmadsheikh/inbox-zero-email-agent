@@ -24,10 +24,10 @@ function formatDate(filename) {
 }
 
 function parseFrontmatter(raw) {
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const match = raw.match(/^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) throw new Error("Missing frontmatter");
   const meta = {};
-  for (const line of match[1].split("\n")) {
+  for (const line of match[1].split(/\r?\n/)) {
     const [key, ...rest] = line.split(": ");
     meta[key.trim()] = rest.join(": ").replace(/^"|"$/g, "");
   }
@@ -40,7 +40,7 @@ function escapeAttr(str) {
 
 function buildUpdate(filename, { meta, content }) {
   const indented = content
-    .split("\n")
+    .split(/\r?\n/)
     .map((line) => (line ? `  ${line}` : ""))
     .join("\n");
   const label = formatDate(filename);

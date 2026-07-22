@@ -41,6 +41,10 @@ export const draftContextMetadataSchema = z.object({
   attachments: z.object({
     injected: z.boolean(),
     selectedCount: z.number(),
+    incomingInjected: z.boolean().optional(),
+    incomingCount: z.number().optional(),
+    incomingChunkedCount: z.number().optional(),
+    incomingTruncated: z.boolean().optional(),
   }),
 });
 

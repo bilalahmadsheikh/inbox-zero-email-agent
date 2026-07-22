@@ -32,6 +32,7 @@ import type { SelectedAttachment } from "@/utils/attachments/source-schema";
 import { getReplyMemoriesForPrompt } from "@/utils/ai/reply/reply-memory";
 import type { DraftContextMetadata } from "@/utils/ai/reply/draft-context-metadata";
 import { collectSenderReplyExamples } from "@/utils/reply-tracker/sender-reply-examples";
+import { getIncomingAttachmentContext } from "@/utils/ai/reply/incoming-attachment-context";
 
 export type DraftGenerationResult = {
   attachments?: SelectedAttachment[];
@@ -51,6 +52,7 @@ export async function fetchMessagesAndGenerateDraft(
   testMessage: ParsedMessage | undefined,
   logger: Logger,
   selectedRuleId?: string,
+  readAttachments = false,
 ): Promise<string> {
   const result = await fetchMessagesAndGenerateDraftWithConfidenceThreshold(
     emailAccount,
@@ -60,6 +62,7 @@ export async function fetchMessagesAndGenerateDraft(
     logger,
     DraftReplyConfidence.ALL_EMAILS,
     selectedRuleId,
+    readAttachments,
   );
 
   if (result.draft == null) {
@@ -77,6 +80,7 @@ export async function fetchMessagesAndGenerateDraftWithConfidenceThreshold(
   logger: Logger,
   minimumConfidence: DraftReplyConfidence,
   selectedRuleId?: string,
+  readAttachments = false,
 ): Promise<DraftGenerationResult> {
   const { threadMessages, previousConversationMessages } = testMessage
     ? { threadMessages: [testMessage], previousConversationMessages: null }
@@ -91,6 +95,7 @@ export async function fetchMessagesAndGenerateDraftWithConfidenceThreshold(
       logger,
       minimumConfidence,
       selectedRuleId,
+      readAttachments,
     );
 
   if (draft == null) {
@@ -178,6 +183,7 @@ async function generateDraftContent(
   logger: Logger,
   minimumConfidence: DraftReplyConfidence,
   selectedRuleId?: string,
+  readAttachments = false,
 ): Promise<DraftGenerationResult> {
   const lastMessage = threadMessages.at(-1);
 
@@ -189,7 +195,7 @@ async function generateDraftContent(
     ruleId: selectedRuleId,
   });
 
-  if (cachedReply) {
+  if (cachedReply && !readAttachments) {
     const meetsThreshold = meetsDraftReplyConfidenceRequirement({
       draftConfidence: cachedReply.confidence,
       minimumConfidence,
@@ -278,6 +284,30 @@ async function generateDraftContent(
         selectedAttachments: [],
         attachmentContext: null,
       });
+  const incomingAttachmentContextPromise = readAttachments
+    ? getIncomingAttachmentContext({
+        messages: threadMessages,
+        emailContent: lastMessageContent,
+        emailAccount,
+        provider: emailProvider,
+        logger,
+      }).catch((error) => {
+        logger.error("Failed to prepare incoming attachment context", {
+          error,
+        });
+        return {
+          content: null,
+          attachmentCount: 0,
+          chunkedCount: 0,
+          truncated: false,
+        };
+      })
+    : Promise.resolve({
+        content: null,
+        attachmentCount: 0,
+        chunkedCount: 0,
+        truncated: false,
+      });
   const activeBookingLinksPromise = prisma.bookingLink.findMany({
     where: { emailAccountId: emailAccount.id, isActive: true },
     orderBy: { createdAt: "desc" },
@@ -307,6 +337,7 @@ async function generateDraftContent(
     attachmentSelection,
     activeBookingLinks,
     senderReplyExamples,
+    incomingAttachmentContext,
   ] = await Promise.all([
     aiExtractRelevantKnowledge({
       knowledgeBase,
@@ -362,6 +393,7 @@ async function generateDraftContent(
       currentMessageIds,
       logger,
     }),
+    incomingAttachmentContextPromise,
   ]);
   const {
     content: replyMemoryContent,
@@ -402,6 +434,10 @@ async function generateDraftContent(
     attachments: {
       injected: !!attachmentSelection.attachmentContext,
       selectedCount: attachmentSelection.selectedAttachments.length,
+      incomingInjected: !!incomingAttachmentContext.content,
+      incomingCount: incomingAttachmentContext.attachmentCount,
+      incomingChunkedCount: incomingAttachmentContext.chunkedCount,
+      incomingTruncated: incomingAttachmentContext.truncated,
     },
   };
 
@@ -434,6 +470,7 @@ async function generateDraftContent(
     mcpContext: mcpResult?.response || null,
     meetingContext,
     attachmentContext: attachmentSelection.attachmentContext,
+    incomingAttachmentContext: incomingAttachmentContext.content,
   });
 
   if (

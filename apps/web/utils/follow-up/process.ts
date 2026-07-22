@@ -465,6 +465,18 @@ async function processFollowUpsForType({
         logger: threadLogger,
       });
 
+      // Keep the Reply Zero list's denormalized display in sync with the
+      // message this tracker now points at (AWAITING shows the recipient,
+      // NEEDS_REPLY shows the sender).
+      const trackerDisplay = {
+        sender:
+          trackerType === ThreadTrackerType.AWAITING
+            ? lastMessage.headers.to
+            : lastMessage.headers.from,
+        subject: lastMessage.headers.subject,
+        snippet: lastMessage.snippet ?? "",
+      };
+
       const existingTracker = await prisma.threadTracker.findFirst({
         where: {
           emailAccountId: emailAccount.id,
@@ -485,6 +497,7 @@ async function processFollowUpsForType({
               messageId: lastMessage.id,
               sentAt: messageDate,
               followUpAppliedAt: now,
+              ...trackerDisplay,
             },
           });
           trackerWritePath = "updated-existing";
@@ -503,6 +516,7 @@ async function processFollowUpsForType({
                 type: trackerType,
                 sentAt: messageDate,
                 followUpAppliedAt: now,
+                ...trackerDisplay,
               },
             });
             trackerWritePath = "updated-duplicate";
@@ -520,6 +534,7 @@ async function processFollowUpsForType({
               type: trackerType,
               sentAt: messageDate,
               followUpAppliedAt: now,
+              ...trackerDisplay,
             },
           });
           trackerWritePath = "created";
@@ -538,6 +553,7 @@ async function processFollowUpsForType({
                 type: trackerType,
                 sentAt: messageDate,
                 followUpAppliedAt: now,
+                ...trackerDisplay,
               },
             });
             trackerWritePath = "created-duplicate-updated";

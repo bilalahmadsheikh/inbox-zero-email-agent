@@ -153,6 +153,8 @@ export function Rules({
           ...action,
           emailAccountId,
           messagingChannelEmailAccountId: null,
+          replyAll: null,
+          readAttachments: false,
         })),
         group: null,
         emailAccountId: emailAccountId,

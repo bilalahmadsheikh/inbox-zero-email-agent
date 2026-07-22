@@ -152,6 +152,41 @@ describe("createRuleTool overlap guard", () => {
     );
     expect(mockCreateRule).toHaveBeenCalledOnce();
   });
+
+  it("persists attachment reading only when requested on the draft action", async () => {
+    await createRuleTool({
+      email: "user@example.com",
+      emailAccountId: "email-account-id",
+      provider: "google",
+      logger,
+    }).execute({
+      name: "Attachment Review",
+      condition: {
+        aiInstructions: "Emails containing documents that need a response.",
+        static: null,
+        conditionalOperator: null,
+      },
+      actions: [
+        {
+          type: ActionType.DRAFT_EMAIL,
+          fields: { readAttachments: true },
+          delayInMinutes: null,
+        },
+      ],
+    });
+
+    expect(mockCreateRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        result: expect.objectContaining({
+          actions: [
+            expect.objectContaining({
+              fields: expect.objectContaining({ readAttachments: true }),
+            }),
+          ],
+        }),
+      }),
+    );
+  });
 });
 
 describe("updateRuleTool", () => {

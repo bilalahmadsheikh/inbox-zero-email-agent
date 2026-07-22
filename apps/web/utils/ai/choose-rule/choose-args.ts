@@ -84,6 +84,7 @@ export async function getActionItemsWithAiArgs({
           logger,
           emailAccount.draftReplyConfidence,
           selectedRule.id,
+          draftReplyActions.some((action) => action.readAttachments),
         );
       draft = draftResult.draft;
       draftConfidence = draftResult.confidence;

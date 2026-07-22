@@ -47,6 +47,7 @@ export function RuleImportExportSetting({
           label: action.label,
           to: action.to,
           cc: action.cc,
+          readAttachments: action.readAttachments,
           bcc: action.bcc,
           subject: action.subject,
           content: action.content,

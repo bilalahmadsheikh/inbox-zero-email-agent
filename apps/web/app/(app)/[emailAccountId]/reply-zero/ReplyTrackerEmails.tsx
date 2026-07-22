@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import sortBy from "lodash/sortBy";
 import { useState, useCallback, type RefCallback } from "react";
-import type { ParsedMessage } from "@/utils/types";
 import { ThreadTrackerType } from "@/generated/prisma/enums";
 import type { ThreadTracker } from "@/generated/prisma/client";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
@@ -20,7 +19,7 @@ import {
 } from "lucide-react";
 import { useThreadsByIds } from "@/hooks/useThreadsByIds";
 import { resolveThreadTrackerAction } from "@/utils/actions/reply-tracking";
-import { toastError, toastSuccess, toastInfo } from "@/components/Toast";
+import { toastError, toastSuccess } from "@/components/Toast";
 import { Loading } from "@/components/Loading";
 import { TablePagination } from "@/components/TablePagination";
 import {
@@ -33,10 +32,7 @@ import { cn } from "@/utils";
 import { CommandShortcut } from "@/components/ui/command";
 import { useTableKeyboardNavigation } from "@/hooks/useTableKeyboardNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useAccount } from "@/providers/EmailAccountProvider";
-import { isGoogleProvider } from "@/utils/email/provider-types";
 import { MutedText } from "@/components/Typography";
-import { BRAND_NAME } from "@/utils/branding";
 
 // The rich email viewer is heavy and only needed once a thread's split view is
 // opened. Loading it lazily keeps the Reply Zero list route light so it renders
@@ -45,6 +41,18 @@ const ThreadContent = dynamic(
   () => import("@/components/EmailViewer").then((mod) => mod.ThreadContent),
   { ssr: false, loading: () => <Loading /> },
 );
+
+// The list only needs the latest message's counterparty/subject/snippet/date.
+// Both the DB fast path and the provider-fetch fallback normalize into this.
+type DisplayRow = {
+  threadId: string;
+  messageId: string;
+  sender: string;
+  subject: string;
+  snippet: string;
+  date: Date;
+  labelIds?: string[];
+};
 
 export function ReplyTrackerEmails({
   trackers,
@@ -63,9 +71,6 @@ export function ReplyTrackerEmails({
   totalPages: number;
   isAnalyzing: boolean;
 }) {
-  const { provider } = useAccount();
-  const isGmail = isGoogleProvider(provider);
-
   const [selectedEmail, setSelectedEmail] = useState<{
     threadId: string;
     messageId: string;
@@ -79,16 +84,47 @@ export function ReplyTrackerEmails({
     new Set(),
   );
 
+  // Fast path: when every tracker carries denormalized display fields, render
+  // straight from the DB with no per-thread provider fetch. Older trackers
+  // (null fields) fall back to fetching the threads from the provider.
+  const canRenderFromDb =
+    trackers.length > 0 && trackers.every((t) => t.sender !== null);
+
   const { data, isLoading } = useThreadsByIds(
-    {
-      threadIds: trackers.map((t) => t.threadId),
-    },
+    { threadIds: canRenderFromDb ? [] : trackers.map((t) => t.threadId) },
     { keepPreviousData: true },
   );
 
-  const sortedThreads = sortBy(
-    data?.threads.filter((t) => !recentlySentThreads.has(t.id)),
-    (t) => -internalDateToDate(t.messages.at(-1)?.internalDate),
+  const rows: DisplayRow[] = canRenderFromDb
+    ? trackers.map((t) => ({
+        threadId: t.threadId,
+        messageId: t.messageId,
+        sender: t.sender ?? "",
+        subject: t.subject ?? "",
+        snippet: t.snippet ?? "",
+        date: t.sentAt,
+      }))
+    : (data?.threads ?? []).flatMap((thread) => {
+        const message = thread.messages.at(-1);
+        if (!message) return [];
+        return [
+          {
+            threadId: thread.id,
+            messageId: message.id,
+            sender: message.labelIds?.includes("SENT")
+              ? message.headers.to
+              : message.headers.from,
+            subject: message.headers.subject,
+            snippet: message.snippet,
+            date: internalDateToDate(message.internalDate),
+            labelIds: message.labelIds,
+          },
+        ];
+      });
+
+  const sortedRows = sortBy(
+    rows.filter((r) => !recentlySentThreads.has(r.threadId)),
+    (r) => -r.date.getTime(),
   );
 
   const handleResolve = useCallback(
@@ -133,28 +169,22 @@ export function ReplyTrackerEmails({
 
   const handleAction = useCallback(
     async (index: number, action: "reply" | "resolve" | "unresolve") => {
-      const thread = sortedThreads[index];
-      if (!thread) return;
-
-      const message = thread.messages.at(-1)!;
+      const row = sortedRows[index];
+      if (!row) return;
 
       if (action === "reply") {
-        if (!isGmail) {
-          showReplyNotSupportedToast();
-          return;
-        }
-        setSelectedEmail({ threadId: thread.id, messageId: message.id });
+        setSelectedEmail({ threadId: row.threadId, messageId: row.messageId });
       } else if (action === "resolve") {
-        await handleResolve(thread.id, true);
+        await handleResolve(row.threadId, true);
       } else if (action === "unresolve") {
-        await handleResolve(thread.id, false);
+        await handleResolve(row.threadId, false);
       }
     },
-    [sortedThreads, handleResolve, isGmail],
+    [sortedRows, handleResolve],
   );
 
   const { selectedIndex, setSelectedIndex, getRefCallback } =
-    useReplyTrackerKeyboardNav(sortedThreads, handleAction);
+    useReplyTrackerKeyboardNav(sortedRows, handleAction);
 
   const onSendSuccess = useCallback(
     async (_messageId: string, threadId: string) => {
@@ -187,7 +217,7 @@ export function ReplyTrackerEmails({
     return <Loading />;
   }
 
-  if (!data?.threads.length) {
+  if (!sortedRows.length) {
     return (
       <div className="mt-2">
         <EmptyState message="No emails yet!" isAnalyzing={isAnalyzing} />
@@ -199,26 +229,22 @@ export function ReplyTrackerEmails({
     <>
       <Table>
         <TableBody>
-          {sortedThreads.map((thread, index) => {
-            const message = thread.messages.at(-1);
-            if (!message) return null;
-            return (
-              <Row
-                key={thread.id}
-                message={message}
-                userEmail={userEmail}
-                isResolved={isResolved}
-                type={type}
-                setSelectedEmail={setSelectedEmail}
-                isSplitViewOpen={!!selectedEmail}
-                isSelected={index === selectedIndex}
-                onResolve={handleResolve}
-                isResolving={resolvingThreads.has(thread.id)}
-                onSelect={() => setSelectedIndex(index)}
-                rowRef={getRefCallback(index)}
-              />
-            );
-          })}
+          {sortedRows.map((row, index) => (
+            <Row
+              key={row.threadId}
+              row={row}
+              userEmail={userEmail}
+              isResolved={isResolved}
+              type={type}
+              setSelectedEmail={setSelectedEmail}
+              isSplitViewOpen={!!selectedEmail}
+              isSelected={index === selectedIndex}
+              onResolve={handleResolve}
+              isResolving={resolvingThreads.has(row.threadId)}
+              onSelect={() => setSelectedIndex(index)}
+              rowRef={getRefCallback(index)}
+            />
+          ))}
         </TableBody>
       </Table>
       <TablePagination totalPages={totalPages} />
@@ -287,7 +313,7 @@ export function ReplyTrackerEmails({
 }
 
 function Row({
-  message,
+  row,
   userEmail,
   isResolved,
   type,
@@ -299,7 +325,7 @@ function Row({
   onSelect,
   rowRef,
 }: {
-  message: ParsedMessage;
+  row: DisplayRow;
   userEmail: string;
   isResolved?: boolean;
   type?: ThreadTrackerType;
@@ -313,10 +339,10 @@ function Row({
 }) {
   const openSplitView = useCallback(() => {
     setSelectedEmail({
-      threadId: message.threadId,
-      messageId: message.id,
+      threadId: row.threadId,
+      messageId: row.messageId,
     });
-  }, [message.id, message.threadId, setSelectedEmail]);
+  }, [row.messageId, row.threadId, setSelectedEmail]);
 
   return (
     <TableRow
@@ -331,18 +357,14 @@ function Row({
       <TableCell onClick={openSplitView} className="py-8 pl-8 pr-6">
         <div className="flex items-center justify-between">
           <EmailMessageCell
-            sender={
-              message.labelIds?.includes("SENT")
-                ? message.headers.to
-                : message.headers.from
-            }
-            subject={message.headers.subject}
-            snippet={message.snippet}
+            sender={row.sender}
+            subject={row.subject}
+            snippet={row.snippet}
             userEmail={userEmail}
-            threadId={message.threadId}
-            messageId={message.id}
+            threadId={row.threadId}
+            messageId={row.messageId}
             hideViewEmailButton
-            labelIds={message.labelIds}
+            labelIds={row.labelIds}
             filterReplyTrackerLabels
           />
 
@@ -355,12 +377,12 @@ function Row({
             onClick={(e) => e.stopPropagation()}
           >
             <MutedText className="mr-4 text-nowrap">
-              {formatShortDate(internalDateToDate(message.internalDate))}
+              {formatShortDate(row.date)}
             </MutedText>
 
             {isResolved ? (
               <UnresolveButton
-                threadId={message.threadId}
+                threadId={row.threadId}
                 onResolve={onResolve}
                 isLoading={isResolving}
                 showShortcut
@@ -369,7 +391,7 @@ function Row({
               <>
                 {!!type && <NudgeButton type={type} onClick={openSplitView} />}
                 <ResolveButton
-                  threadId={message.threadId}
+                  threadId={row.threadId}
                   onResolve={onResolve}
                   isLoading={isResolving}
                   showShortcut
@@ -391,22 +413,12 @@ function NudgeButton({
   onClick: () => void;
 }) {
   const showNudge = type === ThreadTrackerType.AWAITING;
-  const { provider } = useAccount();
-  const isGmail = isGoogleProvider(provider);
-
-  const handleClick = () => {
-    if (!isGmail) {
-      showReplyNotSupportedToast();
-      return;
-    }
-    onClick();
-  };
 
   return (
     <Button
       className="w-full"
       Icon={showNudge ? HandIcon : ReplyIcon}
-      onClick={handleClick}
+      onClick={onClick}
     >
       {showNudge ? "Nudge" : "Reply"}
       <CommandShortcut className="ml-2">R</CommandShortcut>
@@ -504,7 +516,7 @@ function EmptyState({
 }
 
 function useReplyTrackerKeyboardNav(
-  items: { id: string }[],
+  items: readonly unknown[],
   onAction: (
     index: number,
     action: "reply" | "resolve" | "unresolve",
@@ -526,12 +538,4 @@ function useReplyTrackerKeyboardNav(
     });
 
   return { selectedIndex, setSelectedIndex, getRefCallback };
-}
-
-function showReplyNotSupportedToast() {
-  toastInfo({
-    title: "Reply in your email client",
-    description: `Please use your email client to reply. Replying from within ${BRAND_NAME} not yet supported for Microsoft accounts.`,
-    duration: 5000,
-  });
 }

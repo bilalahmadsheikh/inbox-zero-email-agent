@@ -1,0 +1,2 @@
+ALTER TABLE "Action"
+ADD COLUMN "readAttachments" BOOLEAN NOT NULL DEFAULT false;

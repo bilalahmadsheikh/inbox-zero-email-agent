@@ -151,6 +151,7 @@ export type RuleActionFields = {
   cc?: string | null;
   bcc?: string | null;
   replyAll?: boolean | null;
+  readAttachments?: boolean | null;
   subject?: string | null;
   content?: string | null;
   webhookUrl?: string | null;
@@ -272,9 +273,9 @@ function createActionObjectSchema(type: ActionType, fields: z.ZodTypeAny) {
 function getActionTypeDescription(type: ActionType) {
   switch (type) {
     case ActionType.DRAFT_EMAIL:
-      return "Draft a reply to the matching inbound email without sending it. Use this for draft reply requests.";
+      return "Draft a reply to the matching inbound email without sending it. The draft automatically reads supported incoming documents when present, using direct or large-document processing as needed. Use this for draft reply requests.";
     case ActionType.REPLY:
-      return "Send a reply to the matching inbound email. Do not use this for draft reply requests.";
+      return "Generate and send a reply to the matching inbound email. The reply automatically reads supported incoming documents when present, using direct or large-document processing as needed. Do not use this for draft-only requests.";
     case ActionType.SEND_EMAIL:
       return "Send a new outbound email. Do not use this for draft reply requests.";
     case ActionType.FORWARD:
@@ -368,6 +369,13 @@ function createActionFieldShape(provider: string) {
       .transform((value) => value ?? null)
       .describe(
         "Only relevant for REPLY actions. If true, address the reply to everyone on the original email (all original To and Cc recipients), not just the sender. Use this when the user asks to reply to everyone, reply all, or keep the whole thread included.",
+      ),
+    readAttachments: z
+      .boolean()
+      .nullish()
+      .transform((value) => value ?? null)
+      .describe(
+        "Only for DRAFT_EMAIL or REPLY. Set true only when the user explicitly asks this rule to read incoming email attachments before drafting or replying. Leave false or omit for ordinary rules.",
       ),
     subject: optionalStringField("The subject of the email"),
     content: optionalStringField("The content of the email"),

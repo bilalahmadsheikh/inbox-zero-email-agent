@@ -107,12 +107,17 @@ export async function updateThreadTrackers({
   messageId,
   sentAt,
   status,
+  display,
 }: {
   emailAccountId: string;
   threadId: string;
   messageId: string;
   sentAt: Date;
   status: SystemType;
+  // Denormalized display fields for the Reply Zero list. `sender` is the
+  // counterparty shown for this tracker type (the recipient for AWAITING, the
+  // sender for NEEDS_REPLY).
+  display?: { sender: string; subject: string; snippet: string };
 }) {
   // Resolve all existing trackers for this thread
   await withPrismaRetry(
@@ -149,13 +154,14 @@ export async function updateThreadTrackers({
           messageId,
         },
       },
-      update: {},
+      update: display ? { ...display } : {},
       create: {
         emailAccountId,
         threadId,
         messageId,
         type: trackerType,
         sentAt,
+        ...display,
       },
     });
   }

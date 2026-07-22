@@ -3,6 +3,7 @@ import { ActionType } from "@/generated/prisma/enums";
 export const DRAFT_REPLY_ACTION_TYPES = [
   ActionType.DRAFT_EMAIL,
   ActionType.DRAFT_MESSAGING_CHANNEL,
+  ActionType.REPLY,
 ] as const;
 
 export const MESSAGING_CHANNEL_ACTION_TYPES = [

@@ -5,6 +5,7 @@ import prisma from "@/utils/prisma";
 import type { Logger } from "@/utils/logger";
 import { internalDateToDate, sortByInternalDate } from "@/utils/date";
 import type { EmailProvider } from "@/utils/email/types";
+import { SystemType } from "@/generated/prisma/enums";
 import { applyThreadStatusLabel } from "./label-helpers";
 import { updateThreadTrackers } from "@/utils/reply-tracker/handle-conversation-status";
 import {
@@ -121,6 +122,15 @@ export async function handleOutboundReply({
         messageId: message.id,
         sentAt: internalDateToDate(message.internalDate),
         status: aiResult.status,
+        display: {
+          // AWAITING shows the recipient; NEEDS_REPLY shows the sender.
+          sender:
+            aiResult.status === SystemType.AWAITING_REPLY
+              ? message.headers.to
+              : message.headers.from,
+          subject: message.headers.subject,
+          snippet: message.snippet ?? "",
+        },
       }),
     ]);
 

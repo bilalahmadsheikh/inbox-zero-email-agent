@@ -611,6 +611,7 @@ model Action {
   cc                String?
   bcc               String?
   replyAll          Boolean? // For REPLY actions: address the reply to all original recipients, not just the sender
+  readAttachments   Boolean          @default(false) // For draft/reply actions: read supported incoming documents before generating content
   url               String?
   folderName        String?
   folderId          String?
@@ -1006,6 +1007,13 @@ model ThreadTracker {
   followUpAppliedAt DateTime?
   followUpDraftId   String?
   followUpNotifications Json?
+
+  // Denormalized display fields for the Reply Zero list so it can render from
+  // the DB without fetching each thread from the provider. Populated when the
+  // tracker is created; null on older rows (the list falls back to fetching).
+  sender  String?
+  subject String?
+  snippet String?
 
   emailAccountId String
   emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)

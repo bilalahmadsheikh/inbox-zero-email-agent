@@ -151,6 +151,7 @@ export function getActionFields(fields: Action | ExecutedAction | undefined) {
     cc?: string;
     bcc?: string;
     replyAll?: boolean;
+    readAttachments?: boolean;
     url?: string;
     folderName?: string;
     folderId?: string;
@@ -164,6 +165,7 @@ export function getActionFields(fields: Action | ExecutedAction | undefined) {
   if (fields?.cc) res.cc = fields.cc;
   if (fields?.bcc) res.bcc = fields.bcc;
   if (fields?.replyAll) res.replyAll = fields.replyAll;
+  if (fields?.readAttachments) res.readAttachments = fields.readAttachments;
   if (fields?.url) res.url = fields.url;
   if (fields?.folderName) res.folderName = fields.folderName;
   if (fields?.folderId) res.folderId = fields.folderId;
@@ -182,6 +184,7 @@ type ActionFieldsSelection = {
   cc: string | null;
   bcc: string | null;
   replyAll: boolean | null;
+  readAttachments: boolean;
   url: string | null;
   folderName: string | null;
   folderId: string | null;
@@ -218,6 +221,7 @@ export function sanitizeActionFields(
     cc: null,
     bcc: null,
     replyAll: null,
+    readAttachments: action.readAttachments ?? false,
     url: null,
     folderName: null,
     folderId: null,

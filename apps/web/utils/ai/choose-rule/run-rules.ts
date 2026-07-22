@@ -582,6 +582,15 @@ async function executeMatchedRule(
         messageId: message.id,
         sentAt: internalDateToDate(message.internalDate),
         status: rule.systemType,
+        display: {
+          // AWAITING shows the recipient; NEEDS_REPLY shows the sender.
+          sender:
+            rule.systemType === SystemType.AWAITING_REPLY
+              ? message.headers.to
+              : message.headers.from,
+          subject: message.headers.subject,
+          snippet: message.snippet ?? "",
+        },
       }),
     ]);
   }

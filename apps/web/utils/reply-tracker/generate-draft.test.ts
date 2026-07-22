@@ -83,6 +83,15 @@ vi.mock("@/utils/attachments/draft-attachments", () => ({
   }),
 }));
 
+vi.mock("@/utils/ai/reply/incoming-attachment-context", () => ({
+  getIncomingAttachmentContext: vi.fn().mockResolvedValue({
+    content: "<incoming_attachment>Contract total: $500</incoming_attachment>",
+    attachmentCount: 1,
+    chunkedCount: 0,
+    truncated: false,
+  }),
+}));
+
 vi.mock("@/utils/ai/knowledge/extract-from-email-history", () => ({
   aiExtractFromEmailHistory: vi.fn().mockResolvedValue(null),
 }));
@@ -100,6 +109,7 @@ import { selectDraftAttachmentsForRule } from "@/utils/attachments/draft-attachm
 import { aiExtractFromEmailHistory } from "@/utils/ai/knowledge/extract-from-email-history";
 import prisma from "@/utils/prisma";
 import { getReplyWithConfidence, saveReply } from "@/utils/redis/reply";
+import { getIncomingAttachmentContext } from "@/utils/ai/reply/incoming-attachment-context";
 
 const logger = createTestLogger();
 
@@ -720,6 +730,61 @@ describe("fetchMessagesAndGenerateDraftWithConfidenceThreshold", () => {
     });
   });
 
+  it("does not read incoming attachments for ordinary draft rules", async () => {
+    vi.mocked(aiDraftReplyWithConfidence).mockResolvedValue({
+      reply: "Thanks for the document.",
+      confidence: DraftReplyConfidence.HIGH_CONFIDENCE,
+      attribution: null,
+    });
+    vi.mocked(prisma.emailAccount.findUnique).mockResolvedValue(
+      createMockEmailAccountSettings(),
+    );
+
+    await fetchMessagesAndGenerateDraftWithConfidenceThreshold(
+      createMockEmailAccount(),
+      "thread-1",
+      createMockClient(),
+      createMockMessage(),
+      logger,
+      DraftReplyConfidence.ALL_EMAILS,
+      "rule-1",
+    );
+
+    expect(getIncomingAttachmentContext).not.toHaveBeenCalled();
+    expect(aiDraftReplyWithConfidence).toHaveBeenCalledWith(
+      expect.objectContaining({ incomingAttachmentContext: null }),
+    );
+  });
+
+  it("reads incoming attachments only for attachment-aware rules", async () => {
+    vi.mocked(aiDraftReplyWithConfidence).mockResolvedValue({
+      reply: "The contract total is $500.",
+      confidence: DraftReplyConfidence.HIGH_CONFIDENCE,
+      attribution: null,
+    });
+    vi.mocked(prisma.emailAccount.findUnique).mockResolvedValue(
+      createMockEmailAccountSettings(),
+    );
+
+    await fetchMessagesAndGenerateDraftWithConfidenceThreshold(
+      createMockEmailAccount(),
+      "thread-1",
+      createMockClient(),
+      createMockMessage(),
+      logger,
+      DraftReplyConfidence.ALL_EMAILS,
+      "rule-1",
+      true,
+    );
+
+    expect(getIncomingAttachmentContext).toHaveBeenCalledOnce();
+    expect(aiDraftReplyWithConfidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        incomingAttachmentContext: expect.stringContaining("$500"),
+      }),
+    );
+  });
+
   it("uses cached drafts when cached confidence meets the threshold", async () => {
     vi.mocked(getReplyWithConfidence).mockResolvedValue({
       reply: "Cached draft reply",
@@ -986,10 +1051,10 @@ reason: Matched the requested property packet
         attachments: selectedAttachments,
         ruleId: "rule-1",
         draftContextMetadata: expect.objectContaining({
-          attachments: {
+          attachments: expect.objectContaining({
             injected: true,
             selectedCount: 1,
-          },
+          }),
         }),
       }),
     );
@@ -1002,10 +1067,10 @@ reason: Matched the requested property packet
     });
     expect(result.draftContextMetadata).toEqual(
       expect.objectContaining({
-        attachments: {
+        attachments: expect.objectContaining({
           injected: true,
           selectedCount: 1,
-        },
+        }),
       }),
     );
   });

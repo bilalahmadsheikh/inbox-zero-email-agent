@@ -566,6 +566,7 @@ function ActionCard({
   };
 
   const replyAllChecked = !!watch(`actions.${index}.replyAll`);
+  const readAttachmentsChecked = !!watch(`actions.${index}.readAttachments`);
 
   const fieldsContent = (
     <>
@@ -585,6 +586,25 @@ function ActionCard({
           >
             Reply all — include everyone on the original email, not just the
             sender
+          </label>
+        </div>
+      )}
+      {(actionType === ActionType.DRAFT_EMAIL ||
+        actionType === ActionType.REPLY) && (
+        <div className="mt-2 flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={readAttachmentsChecked}
+            onCheckedChange={(checked) =>
+              setValue(`actions.${index}.readAttachments`, checked === true)
+            }
+            aria-label="Read incoming attachments"
+            id={`actions.${index}.readAttachments`}
+          />
+          <label
+            htmlFor={`actions.${index}.readAttachments`}
+            className="cursor-pointer text-muted-foreground"
+          >
+            Read supported incoming documents before preparing the response
           </label>
         </div>
       )}

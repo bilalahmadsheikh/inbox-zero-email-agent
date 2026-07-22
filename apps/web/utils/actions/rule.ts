@@ -871,6 +871,7 @@ function mapActionToSanitizedFields(action: {
   cc?: { value?: string | null } | null;
   bcc?: { value?: string | null } | null;
   replyAll?: boolean | null;
+  readAttachments?: boolean | null;
   url?: { value?: string | null } | null;
   folderName?: { value?: string | null } | null;
   folderId?: { value?: string | null } | null;
@@ -888,6 +889,7 @@ function mapActionToSanitizedFields(action: {
     cc: action.cc?.value,
     bcc: action.bcc?.value,
     replyAll: action.replyAll,
+    readAttachments: action.readAttachments,
     url: action.url?.value,
     folderName: action.folderName?.value,
     folderId: action.folderId?.value,
@@ -905,6 +907,7 @@ function mapActionToSanitizedFields(action: {
       cc: sanitized.cc ?? null,
       bcc: sanitized.bcc ?? null,
       replyAll: sanitized.replyAll ?? null,
+      readAttachments: sanitized.readAttachments,
       subject: sanitized.subject ?? null,
       content: sanitized.content ?? null,
       webhookUrl: sanitized.url ?? null,

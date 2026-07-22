@@ -34,7 +34,7 @@ export const createRuleTool = ({
 }) =>
   tool({
     description:
-      "Create a new automation rule that runs on future incoming email. Only call this when the user's CURRENT message directly asks for ongoing automation with enough condition and action detail, or confirms a concrete rule you proposed with its exact conditions and actions. A complaint, a one-time cleanup request, or a vague wish (e.g. being tired of promo emails) is NOT a rule request: handle the immediate need or propose the exact rule and ask before creating it. Rules with send, reply, forward, or webhook actions additionally return requiresConfirmation and only exist after the user confirms the card in the UI.",
+      "Create a new automation rule that runs on future incoming email. Incoming attachments are not read by default. When the user explicitly asks for an attachment-aware draft or reply rule, set fields.readAttachments=true on its DRAFT_EMAIL or REPLY action; that rule will then read supported documents and switch to large-document processing when needed. Only call this when the user's CURRENT message directly asks for ongoing automation with enough condition and action detail, or confirms a concrete rule you proposed with its exact conditions and actions. A complaint, a one-time cleanup request, or a vague wish (e.g. being tired of promo emails) is NOT a rule request: handle the immediate need or propose the exact rule and ask before creating it. Rules with send, reply, forward, or webhook actions additionally return requiresConfirmation and only exist after the user confirms the card in the UI.",
     inputSchema: createRuleSchema(provider),
     execute: async ({ name, condition, actions }) => {
       trackRuleToolCall({ tool: "create_rule", email, logger });

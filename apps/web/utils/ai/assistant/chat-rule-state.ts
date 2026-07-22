@@ -37,6 +37,8 @@ export type AssistantRuleSnapshot = {
         to: string | null;
         cc: string | null;
         bcc: string | null;
+        replyAll: boolean | null;
+        readAttachments: boolean | null;
         subject: string | null;
         webhookUrl: string | null;
         folderName: string | null;
@@ -78,6 +80,8 @@ export async function loadAssistantRuleSnapshot({
               to: true,
               cc: true,
               bcc: true,
+              replyAll: true,
+              readAttachments: true,
               subject: true,
               url: true,
               folderName: true,
@@ -143,6 +147,8 @@ export async function loadAssistantRuleSnapshot({
             to: action.to,
             cc: action.cc,
             bcc: action.bcc,
+            replyAll: action.replyAll,
+            readAttachments: action.readAttachments,
             subject: action.subject,
             webhookUrl: action.url,
             folderName: action.folderName,

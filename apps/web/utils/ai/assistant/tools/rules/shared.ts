@@ -29,6 +29,7 @@ type RuleActionFieldValues = {
   cc?: string | null;
   bcc?: string | null;
   replyAll?: boolean | null;
+  readAttachments?: boolean | null;
   folderName?: string | null;
 };
 
@@ -57,6 +58,7 @@ export function buildProviderRuleActionFields({
     cc: fields.cc ?? null,
     bcc: fields.bcc ?? null,
     replyAll: fields.replyAll ?? null,
+    readAttachments: fields.readAttachments ?? null,
     ...(providerRuleActionFieldBuilders[provider]?.(fields) ?? {}),
   };
 }

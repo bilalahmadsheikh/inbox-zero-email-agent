@@ -54,6 +54,7 @@ export async function getEmailAccountWithAi({
       sensitiveDataPolicy: true,
       timezone: true,
       calendarBookingLink: true,
+      alwaysReadDraftAttachments: true,
       name: true,
       user: {
         select: {
@@ -92,6 +93,7 @@ export async function getEmailAccountForRuleExecution({
       sensitiveDataPolicy: true,
       timezone: true,
       calendarBookingLink: true,
+      alwaysReadDraftAttachments: true,
       name: true,
       draftReplyConfidence: true,
       user: {

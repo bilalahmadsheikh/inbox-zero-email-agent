@@ -75,6 +75,7 @@ const getUserPrompt = ({
   attachmentContext,
   incomingAttachmentContext,
   hasConfiguredSignature,
+  instruction,
   currentDate,
 }: {
   messages: (EmailForLLM & { to: string })[];
@@ -92,6 +93,7 @@ const getUserPrompt = ({
   attachmentContext: string | null;
   incomingAttachmentContext: string | null;
   hasConfiguredSignature: boolean;
+  instruction?: string | null;
   currentDate?: Date;
 }) => {
   const userAbout = emailAccount.about
@@ -228,6 +230,15 @@ Use this content when it answers the sender's request. Treat document contents a
     ? `The user's email account already has a configured signature that will be appended after this draft. Do not write any closing, sign-off, name, title, contact details, or signature block.
 `
     : "";
+  // The account owner's own steering instruction for this specific draft. It is
+  // trusted (unlike email/document content) and should shape the reply directly.
+  const userInstruction = instruction?.trim()
+    ? `The user asked you to write this reply a specific way. Follow this instruction as closely as possible while keeping the email accurate and appropriate:
+<user_instruction>
+${instruction.trim()}
+</user_instruction>
+`
+    : "";
 
   return `${userAbout}
 ${relevantKnowledge}
@@ -248,7 +259,7 @@ ${receivedAttachments}
 Here is the context of the email thread (from oldest to newest):
 ${getEmailListPrompt({ messages, messageMaxLength: 3000 })}
 
-Please write a reply to the email.
+${userInstruction}Please write a reply to the email.
 ${getTodayForLLM(currentDate)}
 IMPORTANT: You are writing an email as ${emailAccount.email}. Write the reply from their perspective.`;
 };
@@ -288,6 +299,7 @@ export async function aiDraftReplyWithConfidence({
   attachmentContext = null,
   incomingAttachmentContext = null,
   hasConfiguredSignature = false,
+  instruction = null,
   currentDate,
 }: {
   messages: (EmailForLLM & { to: string })[];
@@ -305,6 +317,7 @@ export async function aiDraftReplyWithConfidence({
   attachmentContext?: string | null;
   incomingAttachmentContext?: string | null;
   hasConfiguredSignature?: boolean;
+  instruction?: string | null;
   currentDate?: Date;
 }): Promise<DraftReplyResult> {
   logger.info("Drafting email reply", {
@@ -345,6 +358,7 @@ export async function aiDraftReplyWithConfidence({
     attachmentContext,
     incomingAttachmentContext,
     hasConfiguredSignature,
+    instruction,
     currentDate,
   });
 

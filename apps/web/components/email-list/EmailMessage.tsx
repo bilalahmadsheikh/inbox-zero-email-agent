@@ -5,6 +5,7 @@ import {
   ReplyAllIcon,
   ChevronsUpDownIcon,
   ChevronsDownUpIcon,
+  SparklesIcon,
 } from "lucide-react";
 import { Tooltip } from "@/components/Tooltip";
 import { extractNameFromEmail } from "@/utils/email";
@@ -18,7 +19,11 @@ import { extractEmailReply } from "@/utils/parse/extract-reply.client";
 import type { ReplyingToEmail } from "@/app/(app)/[emailAccountId]/compose/ComposeEmailForm";
 import { createReplyContent } from "@/utils/gmail/reply";
 import { cn } from "@/utils";
-import { generateNudgeReplyAction } from "@/utils/actions/generate-reply";
+import {
+  generateNudgeReplyAction,
+  generateReplyDraftAction,
+} from "@/utils/actions/generate-reply";
+import { Input } from "@/components/ui/input";
 import type { ThreadMessage } from "@/components/email-list/types";
 import { EmailDetails } from "@/components/email-list/EmailDetails";
 import { HtmlEmail, PlainEmail } from "@/components/email-list/EmailContents";
@@ -233,6 +238,9 @@ function ReplyPanel({
 
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [reply, setReply] = useState<string | null>(null);
+  // Generated replies arrive as HTML; generated nudges arrive as plain text.
+  const [replyIsHtml, setReplyIsHtml] = useState(false);
+  const [instruction, setInstruction] = useState("");
   // scroll to the reply panel when it first opens
   useEffect(() => {
     if (defaultShowReply && replyRef.current) {
@@ -243,72 +251,110 @@ function ReplyPanel({
     }
   }, [defaultShowReply]);
 
-  useEffect(() => {
-    async function generateReply() {
-      const isSent = message.labelIds?.includes("SENT");
-
-      // Doesn't need a nudge if it's not sent
-      if (!isSent) return;
-
+  const generateDraft = useCallback(
+    async (customInstruction?: string) => {
       setIsGeneratingReply(true);
 
-      const result = await generateNudgeReplyAction(emailAccountId, {
-        messages: [
-          {
-            id: message.id,
-            textHtml: message.textHtml,
-            textPlain: message.textPlain,
-            date: message.headers.date,
-            from: message.headers.from,
-            to: message.headers.to,
-            subject: message.headers.subject,
-          },
-        ],
-      });
-      if (result?.serverError) {
-        console.error(result);
-        setReply("");
-      } else {
-        setReply(result?.data?.text || "");
-      }
-      setIsGeneratingReply(false);
-    }
+      const isSent = message.labelIds?.includes("SENT");
 
-    // Only generate a nudge if there's no draft message and generateNudge is true
-    if (generateNudge && !draftMessage) generateReply();
-  }, [generateNudge, message, draftMessage, emailAccountId]);
+      // The nudge action stays cached for the auto-open case; everything else
+      // (inbound replies, and any AI-prompted regeneration) goes through the
+      // grounded draft action so it can read attachments and follow instructions.
+      if (isSent && !customInstruction) {
+        const result = await generateNudgeReplyAction(emailAccountId, {
+          messages: [
+            {
+              id: message.id,
+              textHtml: message.textHtml,
+              textPlain: message.textPlain,
+              date: message.headers.date,
+              from: message.headers.from,
+              to: message.headers.to,
+              subject: message.headers.subject,
+            },
+          ],
+        });
+        if (result?.serverError) console.error(result);
+        setReply(result?.data?.text ?? "");
+        setReplyIsHtml(false);
+      } else {
+        const result = await generateReplyDraftAction(emailAccountId, {
+          threadId: message.threadId,
+          instruction: customInstruction,
+        });
+        if (result?.serverError) console.error(result);
+        setReply(result?.data?.text ?? "");
+        setReplyIsHtml(result?.data?.isHtml ?? false);
+      }
+
+      setIsGeneratingReply(false);
+    },
+    [emailAccountId, message],
+  );
+
+  useEffect(() => {
+    // Auto-generate a ready-made draft when the panel opens with no saved draft.
+    if (generateNudge && !draftMessage) generateDraft();
+  }, [generateNudge, draftMessage, generateDraft]);
 
   const replyingToEmail: ReplyingToEmail = useMemo(() => {
     if (showReply) {
-      if (draftMessage) return prepareDraftReplyEmail(draftMessage);
-
-      // use nudge if available
+      // A freshly generated draft (auto-open or AI prompt) wins over a saved
+      // draft so regenerating actually replaces what's shown.
       if (reply) {
-        // Convert nudge text into HTML paragraphs
-        const replyHtml = reply
-          ? reply
-              .split("\n")
-              .filter((line) => line.trim())
-              .map((line) => `<p>${line}</p>`)
-              .join("")
-          : "";
-
+        const replyHtml = replyIsHtml ? reply : plainTextToHtml(reply);
         return prepareReplyingToEmail(message, replyHtml, {
           replyAll,
           userEmail,
         });
       }
 
+      if (draftMessage) return prepareDraftReplyEmail(draftMessage);
+
       return prepareReplyingToEmail(message, "", { replyAll, userEmail });
     }
     return prepareForwardingEmail(message);
-  }, [showReply, message, draftMessage, reply, replyAll, userEmail]);
+  }, [
+    showReply,
+    message,
+    draftMessage,
+    reply,
+    replyIsHtml,
+    replyAll,
+    userEmail,
+  ]);
 
   return (
     <>
       <Separator className="my-4" />
 
       <div ref={replyRef}>
+        {showReply && (
+          <div className="mb-2 flex items-center gap-2">
+            <Input
+              type="text"
+              value={instruction}
+              onChange={(event) => setInstruction(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !isGeneratingReply) {
+                  event.preventDefault();
+                  generateDraft(instruction.trim() || undefined);
+                }
+              }}
+              disabled={isGeneratingReply}
+              placeholder="Tell the AI how to write this reply, then Generate…"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              Icon={SparklesIcon}
+              disabled={isGeneratingReply}
+              onClick={() => generateDraft(instruction.trim() || undefined)}
+            >
+              Generate
+            </Button>
+          </div>
+        )}
         {isGeneratingReply ? (
           <div className="flex items-center justify-center">
             <Loading />
@@ -338,6 +384,14 @@ function ReplyPanel({
       </div>
     </>
   );
+}
+
+function plainTextToHtml(text: string) {
+  return text
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => `<p>${line}</p>`)
+    .join("");
 }
 
 const prepareReplyingToEmail = (

@@ -53,6 +53,7 @@ export async function fetchMessagesAndGenerateDraft(
   logger: Logger,
   selectedRuleId?: string,
   readAttachments = false,
+  instruction?: string,
 ): Promise<string> {
   const result = await fetchMessagesAndGenerateDraftWithConfidenceThreshold(
     emailAccount,
@@ -63,6 +64,7 @@ export async function fetchMessagesAndGenerateDraft(
     DraftReplyConfidence.ALL_EMAILS,
     selectedRuleId,
     readAttachments,
+    instruction,
   );
 
   if (result.draft == null) {
@@ -81,6 +83,7 @@ export async function fetchMessagesAndGenerateDraftWithConfidenceThreshold(
   minimumConfidence: DraftReplyConfidence,
   selectedRuleId?: string,
   readAttachments = false,
+  instruction?: string,
 ): Promise<DraftGenerationResult> {
   const { threadMessages, previousConversationMessages } = testMessage
     ? { threadMessages: [testMessage], previousConversationMessages: null }
@@ -96,6 +99,7 @@ export async function fetchMessagesAndGenerateDraftWithConfidenceThreshold(
       minimumConfidence,
       selectedRuleId,
       readAttachments,
+      instruction,
     );
 
   if (draft == null) {
@@ -184,10 +188,16 @@ async function generateDraftContent(
   minimumConfidence: DraftReplyConfidence,
   selectedRuleId?: string,
   readAttachments = false,
+  instruction?: string,
 ): Promise<DraftGenerationResult> {
   const lastMessage = threadMessages.at(-1);
 
   if (!lastMessage) throw new Error("No message provided");
+
+  // The global account switch forces attachment reading on for every draft,
+  // regardless of the per-rule flag.
+  const effectiveReadAttachments =
+    readAttachments || emailAccount.alwaysReadDraftAttachments;
 
   const cachedReply = await getReplyWithConfidence({
     emailAccountId: emailAccount.id,
@@ -195,7 +205,9 @@ async function generateDraftContent(
     ruleId: selectedRuleId,
   });
 
-  if (cachedReply && !readAttachments) {
+  // A custom instruction produces a one-off draft, so never serve it from (or
+  // write it to) the shared cache.
+  if (cachedReply && !effectiveReadAttachments && !instruction) {
     const meetsThreshold = meetsDraftReplyConfidenceRequirement({
       draftConfidence: cachedReply.confidence,
       minimumConfidence,
@@ -284,7 +296,7 @@ async function generateDraftContent(
         selectedAttachments: [],
         attachmentContext: null,
       });
-  const incomingAttachmentContextPromise = readAttachments
+  const incomingAttachmentContextPromise = effectiveReadAttachments
     ? getIncomingAttachmentContext({
         messages: threadMessages,
         emailContent: lastMessageContent,
@@ -471,6 +483,7 @@ async function generateDraftContent(
     meetingContext,
     attachmentContext: attachmentSelection.attachmentContext,
     incomingAttachmentContext: incomingAttachmentContext.content,
+    instruction,
   });
 
   if (
@@ -487,20 +500,21 @@ async function generateDraftContent(
     });
 
     try {
-      await saveReply({
-        emailAccountId: emailAccount.id,
-        messageId: lastMessage.id,
-        reply,
-        confidence,
-        attribution,
-        draftContextMetadata,
-        ...(selectedRuleId
-          ? {
-              attachments: attachmentSelection.selectedAttachments,
-              ruleId: selectedRuleId,
-            }
-          : {}),
-      });
+      if (!instruction)
+        await saveReply({
+          emailAccountId: emailAccount.id,
+          messageId: lastMessage.id,
+          reply,
+          confidence,
+          attribution,
+          draftContextMetadata,
+          ...(selectedRuleId
+            ? {
+                attachments: attachmentSelection.selectedAttachments,
+                ruleId: selectedRuleId,
+              }
+            : {}),
+        });
     } catch (error) {
       logger.error("Failed to cache low-confidence draft", {
         error,
@@ -521,20 +535,21 @@ async function generateDraftContent(
   }
 
   try {
-    await saveReply({
-      emailAccountId: emailAccount.id,
-      messageId: lastMessage.id,
-      reply,
-      confidence,
-      attribution,
-      draftContextMetadata,
-      ...(selectedRuleId
-        ? {
-            attachments: attachmentSelection.selectedAttachments,
-            ruleId: selectedRuleId,
-          }
-        : {}),
-    });
+    if (!instruction)
+      await saveReply({
+        emailAccountId: emailAccount.id,
+        messageId: lastMessage.id,
+        reply,
+        confidence,
+        attribution,
+        draftContextMetadata,
+        ...(selectedRuleId
+          ? {
+              attachments: attachmentSelection.selectedAttachments,
+              ruleId: selectedRuleId,
+            }
+          : {}),
+      });
   } catch (error) {
     logger.error("Failed to cache draft", {
       error,

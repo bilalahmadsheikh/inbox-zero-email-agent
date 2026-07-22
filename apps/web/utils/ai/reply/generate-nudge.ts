@@ -8,9 +8,11 @@ import { createDraftAttributionTracker } from "@/utils/ai/reply/draft-attributio
 export async function aiGenerateNudge({
   messages,
   emailAccount,
+  instruction,
 }: {
   messages: EmailForLLM[];
   emailAccount: EmailAccountWithAI;
+  instruction?: string | null;
   onFinish?: (completion: string) => Promise<void>;
 }) {
   const system = `You are an expert at writing follow-up emails that get responses.
@@ -22,10 +24,19 @@ Don't mention that you're an AI.
 Don't reply with a Subject. Only reply with the body of the email.
 Keep it short.`;
 
+  const userInstruction = instruction?.trim()
+    ? `The user asked you to write this follow-up a specific way. Follow this instruction as closely as possible while keeping it polite and appropriate:
+<user_instruction>
+${instruction.trim()}
+</user_instruction>
+
+`
+    : "";
+
   const prompt = `Here is the context of the email thread (from oldest to newest):
 ${getEmailListPrompt({ messages, messageMaxLength: 3000 })}
-     
-Write a brief follow-up email to politely nudge for a response.
+
+${userInstruction}Write a brief follow-up email to politely nudge for a response.
 
 ${getTodayForLLM()}
 IMPORTANT: The person you're writing an email for is: ${messages.at(-1)?.from}.`;

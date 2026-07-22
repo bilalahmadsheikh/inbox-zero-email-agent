@@ -154,6 +154,10 @@ model EmailAccount {
   draftReplyConfidence      DraftReplyConfidence @default(ALL_EMAILS)
   draftCleanupDays          Int?                 @default(14)
   allowHiddenAiDraftLinks   Boolean              @default(false)
+  // Global "read attachments before drafting" switch. When true, every draft or
+  // reply the AI generates reads supported incoming documents, regardless of the
+  // per-rule readAttachments flag on individual actions.
+  alwaysReadDraftAttachments Boolean             @default(false)
   rulesRevision             Int                  @default(0)
 
   meetingBriefingsEnabled       Boolean @default(false)

@@ -8,6 +8,7 @@ import {
   saveDigestScheduleBody,
   updateDigestItemsBody,
   toggleDigestBody,
+  toggleAlwaysReadDraftAttachmentsBody,
 } from "@/utils/actions/settings.validation";
 import { DEFAULT_PROVIDER, Provider } from "@/utils/llms/config";
 import prisma from "@/utils/prisma";
@@ -42,6 +43,16 @@ export const updateEmailSettingsAction = actionClient
       });
     },
   );
+
+export const toggleAlwaysReadDraftAttachmentsAction = actionClient
+  .metadata({ name: "toggleAlwaysReadDraftAttachments" })
+  .inputSchema(toggleAlwaysReadDraftAttachmentsBody)
+  .action(async ({ ctx: { emailAccountId }, parsedInput: { enabled } }) => {
+    await prisma.emailAccount.update({
+      where: { id: emailAccountId },
+      data: { alwaysReadDraftAttachments: enabled },
+    });
+  });
 
 export const updateAiSettingsAction = actionClientUser
   .metadata({ name: "updateAiSettings" })

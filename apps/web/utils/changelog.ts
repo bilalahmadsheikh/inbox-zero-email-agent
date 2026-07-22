@@ -9,6 +9,15 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.7",
+    date: "2026-07-23",
+    notes: [
+      "Reply Zero drafts for you: opening Reply on an incoming email now writes a ready-to-edit draft automatically, and Waiting still writes a follow-up — both editable before you send.",
+      'Ask AI in Reply Zero: a new prompt box lets you tell the AI how to write the reply or nudge (e.g. "accept and ask about the start date" or "politely decline") and regenerate as many times as you like.',
+      'New global setting "Read attachments before drafting": turn it on to have every AI draft and reply read supported documents (PDF, Word) first, everywhere including Reply Zero. You can still enable attachment reading for a single rule instead.',
+    ],
+  },
+  {
     version: "2.6",
     date: "2026-07-23",
     notes: [

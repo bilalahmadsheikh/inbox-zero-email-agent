@@ -11,6 +11,13 @@ export const saveDigestScheduleBody = z.object({
 });
 export type SaveDigestScheduleBody = z.infer<typeof saveDigestScheduleBody>;
 
+export const toggleAlwaysReadDraftAttachmentsBody = z.object({
+  enabled: z.boolean(),
+});
+export type ToggleAlwaysReadDraftAttachmentsBody = z.infer<
+  typeof toggleAlwaysReadDraftAttachmentsBody
+>;
+
 export const saveEmailUpdateSettingsBody = z.object({
   statsEmailFrequency: z.enum([Frequency.WEEKLY, Frequency.NEVER]),
   summaryEmailFrequency: z.enum([Frequency.WEEKLY, Frequency.NEVER]),

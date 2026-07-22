@@ -53,6 +53,7 @@ import {
   LOW_TRUST_STATIC_FROM_OUTBOUND_MESSAGE,
 } from "@/utils/rule/static-from-risk";
 import {
+  isDraftCreationActionType,
   isDraftReplyActionType,
   isMessagingChannelActionType,
   isMessagingDraftActionType,
@@ -900,7 +901,7 @@ export function limitDraftEmailActions<
 >(matches: T[], logger: Logger): T[] {
   const draftCandidates = matches.flatMap((match) =>
     match.rule.actions
-      .filter((action) => isDraftReplyActionType(action.type))
+      .filter((action) => isDraftCreationActionType(action.type))
       .map((action) => ({
         match,
         action,
@@ -949,7 +950,7 @@ export function limitDraftEmailActions<
     }
 
     const hasExtraDrafts = match.rule.actions.some((action) =>
-      isDraftReplyActionType(action.type),
+      isDraftCreationActionType(action.type),
     );
 
     if (!hasExtraDrafts) {
@@ -961,7 +962,7 @@ export function limitDraftEmailActions<
       rule: {
         ...match.rule,
         actions: match.rule.actions.filter(
-          (action) => !isDraftReplyActionType(action.type),
+          (action) => !isDraftCreationActionType(action.type),
         ),
       },
     };

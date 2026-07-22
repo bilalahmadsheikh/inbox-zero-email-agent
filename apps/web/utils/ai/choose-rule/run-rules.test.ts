@@ -967,6 +967,42 @@ describe("limitDraftEmailActions", () => {
     expect(result[1].rule.actions[0].id).toBe("draft-2");
   });
 
+  it("does not strip REPLY send actions when limiting drafts", () => {
+    // A REPLY sends; it must never be treated as a dedupable draft, even when a
+    // fixed-content draft on another matched rule would otherwise be preferred.
+    const matches = [
+      {
+        rule: createRule("rule-1", null, [
+          getAction({
+            id: "reply-1",
+            type: ActionType.REPLY,
+            content: null,
+            ruleId: "rule-1",
+          }),
+        ]),
+      },
+      {
+        rule: createRule("rule-2", null, [
+          getAction({
+            id: "draft-1",
+            type: ActionType.DRAFT_EMAIL,
+            content: "Template",
+            ruleId: "rule-2",
+          }),
+        ]),
+      },
+    ];
+
+    const result = limitDraftEmailActions(matches, logger);
+
+    expect(result[0].rule.actions.map((action) => action.id)).toContain(
+      "reply-1",
+    );
+    expect(result[1].rule.actions.map((action) => action.id)).toContain(
+      "draft-1",
+    );
+  });
+
   it("keeps the first draft when multiple drafts share identical fixed content", () => {
     const matches = [
       {

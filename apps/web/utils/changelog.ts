@@ -9,6 +9,21 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.6",
+    date: "2026-07-23",
+    notes: [
+      "Attachment-aware drafts now recognize when part of a lengthy document could not be read, clearly mark the missing section, and avoid implying that the entire document was reviewed.",
+    ],
+  },
+  {
+    version: "2.5",
+    date: "2026-07-22",
+    notes: [
+      "Fixed a case where an auto-reply rule could be silently skipped: when more than one rule matched the same email, a rule that sends a reply is no longer mistaken for a draft and dropped — it always sends.",
+      "Attachment-aware rules read large documents faster by processing several sections of a document at once (bounded to stay gentle on the AI service), with no change to what's extracted.",
+    ],
+  },
+  {
     version: "2.4",
     date: "2026-07-22",
     notes: [

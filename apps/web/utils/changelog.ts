@@ -9,6 +9,16 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.8",
+    date: "2026-07-24",
+    notes: [
+      "Bulk delete and archive by sender are dramatically faster. Gmail now removes emails in large batches instead of one conversation at a time, and Outlook sends its requests in parallel — with several senders processed at once.",
+      "Bulk cleanups now tell you how many emails were removed and let you retry any senders that failed, instead of finishing silently.",
+      'You can now ask the assistant to delete every email from a sender — it moves them all to trash (after you confirm the card), instead of only the handful currently on screen. This mirrors the existing "archive all from sender" action.',
+      "When you ask the assistant to show or count all mail from a sender, it can pull more messages per search so it surfaces more of them at once.",
+    ],
+  },
+  {
     version: "2.7",
     date: "2026-07-23",
     notes: [

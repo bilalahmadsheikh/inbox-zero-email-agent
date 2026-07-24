@@ -5,6 +5,7 @@ export const manageInboxActions = [
   "remove_label_threads",
   "mark_read_threads",
   "bulk_archive_senders",
+  "bulk_trash_senders",
   "unsubscribe_senders",
 ] as const;
 
@@ -20,6 +21,7 @@ const threadIdManageInboxActions = [
 
 const senderManageInboxActions = [
   "bulk_archive_senders",
+  "bulk_trash_senders",
   "unsubscribe_senders",
 ] as const satisfies readonly ManageInboxAction[];
 

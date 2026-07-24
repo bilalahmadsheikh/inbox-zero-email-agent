@@ -47,6 +47,14 @@ export interface SentMessagePage {
   nextPageToken?: string;
 }
 
+// Outcome of a bulk archive/trash-by-sender run. `failedSenders` lists senders
+// that hit at least one error so the caller can report and retry just those.
+export type BulkSenderActionResult = {
+  movedCount: number;
+  failedCount: number;
+  failedSenders: string[];
+};
+
 export interface EmailProvider {
   archiveMessage(messageId: string): Promise<void>;
   archiveThread(threadId: string, ownerEmail: string): Promise<void>;
@@ -60,12 +68,12 @@ export interface EmailProvider {
     fromEmails: string[],
     ownerEmail: string,
     emailAccountId: string,
-  ): Promise<void>;
+  ): Promise<BulkSenderActionResult>;
   bulkTrashFromSenders(
     fromEmails: string[],
     ownerEmail: string,
     emailAccountId: string,
-  ): Promise<void>;
+  ): Promise<BulkSenderActionResult>;
   checkIfReplySent(senderEmail: string): Promise<boolean>;
   countReceivedMessages(
     senderEmail: string,

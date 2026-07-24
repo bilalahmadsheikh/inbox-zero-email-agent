@@ -57,6 +57,10 @@ import { extractErrorInfo, isRetryableError } from "@/utils/outlook/retry";
 import { microsoftGraphPageTokenSchema } from "@/utils/outlook/page-token";
 
 const SEARCH_INBOX_MAX_RESULTS = 20;
+// The model may request up to this many per page (e.g. when asked to show or
+// count all matching messages); the default stays at SEARCH_INBOX_MAX_RESULTS
+// so ordinary lookups don't pull more than they need.
+const SEARCH_INBOX_MAX_LIMIT = 50;
 const OUTLOOK_EMPTY_PAGE_AUTOPAGINATION_LIMIT = 5;
 const MAX_SENDER_CATEGORIZATION_WAIT_MS = 1500;
 const OUTLOOK_SCOPE_SUFFIX_TERMS = new Set([
@@ -604,9 +608,11 @@ const searchInboxBaseFields = {
     .number()
     .int()
     .min(1)
-    .max(SEARCH_INBOX_MAX_RESULTS)
+    .max(SEARCH_INBOX_MAX_LIMIT)
     .default(SEARCH_INBOX_MAX_RESULTS)
-    .describe("Maximum number of messages to return."),
+    .describe(
+      "Maximum number of messages to return (up to 50). Request a higher value when the user wants to see or count as many matching messages as possible.",
+    ),
   pageToken: microsoftGraphPageTokenSchema.describe(
     "Use the page token returned from a prior search to paginate.",
   ),
@@ -665,7 +671,7 @@ const gmailSearchInboxTool = ({
 }: InboxToolOptions) =>
   tool({
     description:
-      "Search inbox messages and return concise message metadata. Limit must be between 1 and 20 messages per call. If hasMore=true, more matches remain; for bulk or all-matching requests, keep calling searchInbox with nextPageToken until hasMore=false before reporting completion. totalReturned is only the number of messages returned by this call, so do not present it or a single search page as an exact mailbox, folder, or label count. If the tool returns an error or provider search feedback instead of messages, treat the lookup as inconclusive rather than evidence that the email is absent.",
+      "Search inbox messages and return concise message metadata. Limit must be between 1 and 50 messages per call. If hasMore=true, more matches remain; for bulk or all-matching requests, keep calling searchInbox with nextPageToken until hasMore=false before reporting completion. totalReturned is only the number of messages returned by this call, so do not present it or a single search page as an exact mailbox, folder, or label count. If the tool returns an error or provider search feedback instead of messages, treat the lookup as inconclusive rather than evidence that the email is absent.",
     inputSchema: gmailSearchInboxInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "search_inbox", email, logger });
@@ -709,7 +715,7 @@ const outlookSearchInboxTool = ({
 }: InboxToolOptions) =>
   tool({
     description:
-      "Search inbox messages and return concise message metadata. Limit must be between 1 and 20 messages per call. If hasMore=true, more matches remain; for bulk or all-matching requests, keep calling searchInbox with nextPageToken until hasMore=false before reporting completion, even when the current page has zero messages. Outlook filtered searches can return an empty page before later matching pages. totalReturned is only the number of messages returned by this call, so do not present it or a single search page as an exact mailbox, folder, or category count. If the tool returns an error or provider search feedback instead of messages, treat the lookup as inconclusive rather than evidence that the email is absent.",
+      "Search inbox messages and return concise message metadata. Limit must be between 1 and 50 messages per call. If hasMore=true, more matches remain; for bulk or all-matching requests, keep calling searchInbox with nextPageToken until hasMore=false before reporting completion, even when the current page has zero messages. Outlook filtered searches can return an empty page before later matching pages. totalReturned is only the number of messages returned by this call, so do not present it or a single search page as an exact mailbox, folder, or category count. If the tool returns an error or provider search feedback instead of messages, treat the lookup as inconclusive rather than evidence that the email is absent.",
     inputSchema: outlookSearchInboxInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "search_inbox", email, logger });
@@ -975,6 +981,7 @@ const microsoftManageInboxActions = [
   "remove_category_threads",
   "mark_read_threads",
   "bulk_archive_senders",
+  "bulk_trash_senders",
   "unsubscribe_senders",
 ] as const;
 
@@ -982,7 +989,7 @@ const outlookManageInboxInputSchema = z.object({
   action: z
     .enum(microsoftManageInboxActions)
     .describe(
-      "archive_threads: archive by ID (default unless user says delete/trash). trash_threads: move to trash. categorize_threads: apply a category (requires categoryName). remove_category_threads: remove an existing category (requires categoryName). mark_read_threads: mark read/unread. bulk_archive_senders: archive ALL emails from senders server-wide after the user confirms that broad scope (never for trash/delete). unsubscribe_senders: unsubscribe and archive from senders (only for explicit unsubscribe requests).",
+      "archive_threads: archive by ID (default unless user says delete/trash). trash_threads: move to trash. categorize_threads: apply a category (requires categoryName). remove_category_threads: remove an existing category (requires categoryName). mark_read_threads: mark read/unread. bulk_archive_senders: archive ALL emails from senders server-wide after the user confirms that broad scope. bulk_trash_senders: move ALL emails from senders to trash server-wide after the user confirms — use this (not trash_threads) when the user wants to delete every email from a sender, not just the ones already shown. unsubscribe_senders: unsubscribe and archive from senders (only for explicit unsubscribe requests).",
     ),
   threadIds: threadIdsSchema
     .nullish()
@@ -1010,7 +1017,7 @@ const outlookManageInboxInputSchema = z.object({
   fromEmails: senderEmailsSchema
     .nullish()
     .describe(
-      "Required for bulk_archive_senders and unsubscribe_senders. Sender email addresses to act on.",
+      "Required for bulk_archive_senders, bulk_trash_senders, and unsubscribe_senders. Sender email addresses to act on.",
     ),
 });
 
@@ -1018,7 +1025,7 @@ const gmailManageInboxInputSchema = z.object({
   action: z
     .enum(manageInboxActions)
     .describe(
-      "archive_threads: archive by ID (default unless user says delete/trash). trash_threads: move to trash. label_threads: apply a label (requires labelName). remove_label_threads: remove an existing label (requires labelName). mark_read_threads: mark read/unread. bulk_archive_senders: archive ALL emails from senders server-wide after the user confirms that broad scope (never for trash/delete). unsubscribe_senders: unsubscribe and archive from senders (only for explicit unsubscribe requests).",
+      "archive_threads: archive by ID (default unless user says delete/trash). trash_threads: move to trash. label_threads: apply a label (requires labelName). remove_label_threads: remove an existing label (requires labelName). mark_read_threads: mark read/unread. bulk_archive_senders: archive ALL emails from senders server-wide after the user confirms that broad scope. bulk_trash_senders: move ALL emails from senders to trash server-wide after the user confirms — use this (not trash_threads) when the user wants to delete every email from a sender, not just the ones already shown. unsubscribe_senders: unsubscribe and archive from senders (only for explicit unsubscribe requests).",
     ),
   threadIds: threadIdsSchema
     .nullish()
@@ -1046,7 +1053,7 @@ const gmailManageInboxInputSchema = z.object({
   fromEmails: senderEmailsSchema
     .nullish()
     .describe(
-      "Required for bulk_archive_senders and unsubscribe_senders. Sender email addresses to act on.",
+      "Required for bulk_archive_senders, bulk_trash_senders, and unsubscribe_senders. Sender email addresses to act on.",
     ),
 });
 
@@ -1130,7 +1137,7 @@ const buildManageInboxTool = ({
 
   return tool({
     description:
-      "Run inbox actions on threads or senders. For emails already shown or found in this turn, prefer thread actions with threadIds; those execute immediately. Do not widen a limited thread-level request into sender-wide cleanup. Only use sender-wide cleanup (bulk_archive_senders, unsubscribe_senders) with fromEmails when the user clearly wants all mail from those senders. Sender-wide actions do NOT execute immediately: they return requiresConfirmation and only run after the user approves the card in the UI, so tell the user to confirm there and never claim the cleanup already happened.",
+      "Run inbox actions on threads or senders. For emails already shown or found in this turn, prefer thread actions with threadIds; those execute immediately. Do not widen a limited thread-level request into sender-wide cleanup. When the user wants to act on EVERY email from a sender (e.g. 'delete/archive all emails from X'), use sender-wide cleanup with fromEmails — bulk_trash_senders to delete all, bulk_archive_senders to archive all, unsubscribe_senders for unsubscribe requests — rather than searching and acting on individual threadIds, which only covers the messages currently shown. Sender-wide actions do NOT execute immediately: they return requiresConfirmation and only run after the user approves the card in the UI, so tell the user to confirm there and never claim the cleanup already happened.",
     inputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "manage_inbox", email, logger });
@@ -1155,7 +1162,7 @@ const buildManageInboxTool = ({
       if (isSenderAction && !parsedInput.fromEmails?.length) {
         return {
           error:
-            'No sender-level action was taken. "fromEmails" is required for bulk_archive_senders and unsubscribe_senders. If you only meant the emails already shown, use archive_threads with threadIds instead.',
+            'No sender-level action was taken. "fromEmails" is required for bulk_archive_senders, bulk_trash_senders, and unsubscribe_senders. If you only meant the emails already shown, use archive_threads or trash_threads with threadIds instead.',
         };
       }
 
@@ -1179,7 +1186,7 @@ const buildManageInboxTool = ({
           if (!normalizedFromEmails.length) {
             return {
               error:
-                'No sender-level action was taken. "fromEmails" is required for bulk_archive_senders and unsubscribe_senders. If you only meant the emails already shown, use archive_threads with threadIds instead.',
+                'No sender-level action was taken. "fromEmails" is required for bulk_archive_senders, bulk_trash_senders, and unsubscribe_senders. If you only meant the emails already shown, use archive_threads or trash_threads with threadIds instead.',
             };
           }
 
@@ -2642,7 +2649,7 @@ export async function executeSenderWideInboxAction({
   provider: string;
   userEmail: string;
   logger: Logger;
-  action: "bulk_archive_senders" | "unsubscribe_senders";
+  action: "bulk_archive_senders" | "bulk_trash_senders" | "unsubscribe_senders";
   fromEmails: string[];
 }) {
   const normalizedFromEmails = normalizeSenderEmails(fromEmails);
@@ -2693,6 +2700,24 @@ export async function executeSenderWideInboxAction({
       failedSenders,
       autoUnsubscribeCount,
       autoUnsubscribeAttemptedCount,
+    };
+  }
+
+  if (action === "bulk_trash_senders") {
+    const result = await emailProvider.bulkTrashFromSenders(
+      normalizedFromEmails,
+      userEmail,
+      emailAccountId,
+    );
+
+    return {
+      success: result.failedCount === 0,
+      action,
+      sendersCount: normalizedFromEmails.length,
+      senders: normalizedFromEmails,
+      movedCount: result.movedCount,
+      failedCount: result.failedCount,
+      failedSenders: result.failedSenders,
     };
   }
 

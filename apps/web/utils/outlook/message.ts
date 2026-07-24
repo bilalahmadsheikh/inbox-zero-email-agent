@@ -478,19 +478,19 @@ export async function queryBatchMessages(
 ) {
   const { searchQuery, dateFilters, pageToken, folderId } = options;
 
-  const MAX_RESULTS = 20;
-
-  const maxResults = Math.min(options.maxResults || MAX_RESULTS, MAX_RESULTS);
-
-  // Is this true for Microsoft Graph API or was it copy pasted from Gmail?
-  if (options.maxResults && options.maxResults > MAX_RESULTS) {
-    logger.warn(
-      "Max results is greater than 20, which will cause rate limiting",
-      {
-        maxResults,
-      },
-    );
-  }
+  const MAX_RESULTS_CEILING = 50;
+  const DEFAULT_MAX_RESULTS = 20;
+  // How many messages to try to return. The post-fetch folder/metadata/draft
+  // filtering below shrinks each Outlook page, so we fetch and accumulate
+  // several pages until we reach this many (or run out of pages).
+  const target = Math.min(
+    options.maxResults || DEFAULT_MAX_RESULTS,
+    MAX_RESULTS_CEILING,
+  );
+  // Graph caps $search pages small, so keep each page modest and reach `target`
+  // by accumulating pages.
+  const perPageTop = Math.min(target, 25);
+  const MAX_PAGE_FETCHES = 8;
 
   const [folderIds, categoryMap] = await Promise.all([
     getFolderIds(client, logger, { includeDrafts: false }),
@@ -503,6 +503,42 @@ export async function queryBatchMessages(
     categoryNames: options.categoryNames,
   });
 
+  const filterRawMessages = (value: Message[]) =>
+    value.filter((message) => {
+      if (folderId && message.parentFolderId !== folderId) return false;
+      return matchesOutlookMetadataFilters(message, metadataSearch.filters);
+    });
+
+  // Follows @odata.nextLink pages (filtering + converting each) until we have
+  // `target` messages, run out of pages, or hit the fetch ceiling. Returns the
+  // token after the last fetched page so callers can keep paginating.
+  const accumulatePages = async (
+    firstMessages: ParsedMessage[],
+    firstNextLink: string | undefined,
+    postFilter: (value: Message[]) => Message[],
+  ): Promise<{ messages: ParsedMessage[]; nextPageToken?: string }> => {
+    const collected = [...firstMessages];
+    let token = firstNextLink;
+    let fetches = 1;
+    while (collected.length < target && token && fetches < MAX_PAGE_FETCHES) {
+      const currentToken = token;
+      const response: { value: Message[]; "@odata.nextLink"?: string } =
+        await withOutlookRetry(
+          () => client.getClient().api(currentToken).get(),
+          logger,
+        );
+      const converted = await convertMessages(
+        postFilter(response.value ?? []),
+        folderIds,
+        categoryMap,
+      );
+      collected.push(...converted);
+      token = response["@odata.nextLink"];
+      fetches += 1;
+    }
+    return { messages: collected, nextPageToken: token };
+  };
+
   const nextLink = resolveMicrosoftGraphNextLink(pageToken);
   if (nextLink) {
     const response: { value: Message[]; "@odata.nextLink"?: string } =
@@ -511,17 +547,17 @@ export async function queryBatchMessages(
         logger,
       );
 
-    const filteredMessages = response.value.filter((message) => {
-      if (folderId && message.parentFolderId !== folderId) return false;
-      return matchesOutlookMetadataFilters(message, metadataSearch.filters);
-    });
     const messages = await convertMessages(
-      filteredMessages,
+      filterRawMessages(response.value ?? []),
       folderIds,
       categoryMap,
     );
 
-    return { messages, nextPageToken: response["@odata.nextLink"] };
+    return accumulatePages(
+      messages,
+      response["@odata.nextLink"],
+      filterRawMessages,
+    );
   }
 
   const rawSearchQuery = stripStandaloneOutlookStateTerms(
@@ -532,7 +568,7 @@ export async function queryBatchMessages(
   const effectiveSearchQuery = cleanedSearchQuery || undefined;
 
   logger.info("Building Outlook request", {
-    maxResults,
+    target,
     hasSearchQuery: !!effectiveSearchQuery,
     hasDateFilters: !!(dateFilters && dateFilters.length > 0),
     pageToken,
@@ -542,9 +578,7 @@ export async function queryBatchMessages(
   });
 
   // Build the base request
-  let request = createMessagesRequest(client).top(maxResults);
-
-  let nextPageToken: string | undefined;
+  let request = createMessagesRequest(client).top(perPageTop);
 
   // Determine if we have a search query vs pure filters
   const hasSearchQuery = !!effectiveSearchQuery;
@@ -571,26 +605,23 @@ export async function queryBatchMessages(
     const response: { value: Message[]; "@odata.nextLink"?: string } =
       await withOutlookRetry(() => request.get(), logger);
 
-    const filteredMessages = response.value.filter((message) => {
-      if (folderId && message.parentFolderId !== folderId) return false;
-      return matchesOutlookMetadataFilters(message, metadataSearch.filters);
-    });
     const messages = await convertMessages(
-      filteredMessages,
+      filterRawMessages(response.value ?? []),
       folderIds,
       categoryMap,
     );
 
-    nextPageToken = response["@odata.nextLink"];
-
     logger.info("Search results", {
       totalFound: response.value.length,
-      filteredByFolder: folderId ? filteredMessages.length : undefined,
       messageCount: messages.length,
-      hasNextPageToken: !!nextPageToken,
+      hasNextPageToken: !!response["@odata.nextLink"],
     });
 
-    return { messages, nextPageToken };
+    return accumulatePages(
+      messages,
+      response["@odata.nextLink"],
+      filterRawMessages,
+    );
   } else {
     // Filter path - use $filter parameter for date filters or folder-only queries
     const filters: string[] = [];
@@ -631,20 +662,22 @@ export async function queryBatchMessages(
     const response: { value: Message[]; "@odata.nextLink"?: string } =
       await withOutlookRetry(() => request.get(), logger);
     const messages = await convertMessages(
-      response.value,
+      response.value ?? [],
       folderIds,
       categoryMap,
     );
 
-    nextPageToken = response["@odata.nextLink"];
-
     logger.info("Filter results", {
       messageCount: messages.length,
-      hasNextPageToken: !!nextPageToken,
+      hasNextPageToken: !!response["@odata.nextLink"],
       combinedFilter,
     });
 
-    return { messages, nextPageToken };
+    return accumulatePages(
+      messages,
+      response["@odata.nextLink"],
+      (value) => value,
+    );
   }
 }
 

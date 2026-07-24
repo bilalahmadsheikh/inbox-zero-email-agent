@@ -18,11 +18,12 @@ export const bulkArchiveAction = actionClient
         logger,
       });
 
-      await emailProvider.bulkArchiveFromSenders(
+      const result = await emailProvider.bulkArchiveFromSenders(
         froms,
         emailAccount.email,
         emailAccountId,
       );
+      return { result };
     },
   );
 
@@ -40,10 +41,11 @@ export const bulkTrashAction = actionClient
         logger,
       });
 
-      await emailProvider.bulkTrashFromSenders(
+      const result = await emailProvider.bulkTrashFromSenders(
         froms,
         emailAccount.email,
         emailAccountId,
       );
+      return { result };
     },
   );

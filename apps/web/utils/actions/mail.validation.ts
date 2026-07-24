@@ -36,7 +36,11 @@ export type DeleteScheduledEmailBody = z.infer<typeof deleteScheduledEmailBody>;
 // Confirms a sender-wide cleanup the chat prepared; the user's click on the
 // confirmation card is what authorizes the bulk archive / unsubscribe run.
 export const confirmSenderWideInboxActionBody = z.object({
-  action: z.enum(["bulk_archive_senders", "unsubscribe_senders"]),
+  action: z.enum([
+    "bulk_archive_senders",
+    "bulk_trash_senders",
+    "unsubscribe_senders",
+  ]),
   fromEmails: z.array(z.string().trim().min(1)).min(1).max(200),
 });
 export type ConfirmSenderWideInboxActionBody = z.infer<

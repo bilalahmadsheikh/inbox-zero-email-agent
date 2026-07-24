@@ -928,22 +928,43 @@ export function useBulkDelete<T extends Row>({
     },
   );
 
+  const runBulkTrash = async (froms: string[]) => {
+    const label = froms.length === 1 ? froms[0] : `${froms.length} senders`;
+    const toastId = toast.loading(`Deleting emails from ${label}...`);
+
+    const response = await executeBulkTrash({ froms });
+
+    if (response?.serverError) {
+      toast.error(
+        response.serverError || "There was an error trashing the emails",
+        { id: toastId },
+      );
+      return;
+    }
+
+    const summary = response?.data?.result;
+    if (summary && summary.failedCount > 0) {
+      toast.error(
+        `Deleted ${summary.movedCount} emails, but ${summary.failedCount} sender${
+          summary.failedCount > 1 ? "s" : ""
+        } failed.`,
+        {
+          id: toastId,
+          action: {
+            label: "Retry failed",
+            onClick: () => runBulkTrash(summary.failedSenders),
+          },
+        },
+      );
+      return;
+    }
+
+    toast.success(`Deleted emails from ${label}`, { id: toastId });
+  };
+
   const onBulkDelete = (items: T[]) => {
     posthog.capture("Clicked Bulk Delete");
-
-    const promise = executeBulkTrash({ froms: items.map((item) => item.name) });
-
-    const displayNames = formatSenderNames(items);
-
-    toast.promise(promise, {
-      loading: `Deleting emails from ${displayNames}...`,
-      success: `Deleted emails from ${displayNames}`,
-      error: (error: unknown) =>
-        getBulkActionErrorMessage(
-          error,
-          "There was an error trashing the emails",
-        ),
-    });
+    runBulkTrash(items.map((item) => item.name));
   };
 
   return { onBulkDelete, isBulkDeleting: isExecuting };

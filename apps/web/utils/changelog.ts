@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.9",
+    date: "2026-07-24",
+    notes: [
+      "The assistant no longer fails silently: if a reply gets cut off because it reached its length limit, it now says so and suggests continuing or splitting the request; and if a chat request errors out, it shows a clear message instead of stopping with nothing.",
+      'You can now ask the assistant to move emails by attachment name into a folder — e.g. "move all emails with a CV or profile attachment into a CVs folder." It creates the folder first, then finds emails by their attachment file names (which regular search couldn\'t match) and moves them in. On Gmail, the assistant can now also search attachment file names directly with filename:.',
+    ],
+  },
+  {
     version: "2.8",
     date: "2026-07-24",
     notes: [

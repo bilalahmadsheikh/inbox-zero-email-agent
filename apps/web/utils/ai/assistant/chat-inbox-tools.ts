@@ -625,7 +625,7 @@ const gmailSearchInboxInputSchema = z.object({
     .min(1)
     .max(500)
     .describe(
-      "Search query using Gmail syntax. Supports: from:, to:, subject:, in:inbox, is:unread, has:attachment, after:YYYY/MM/DD, before:YYYY/MM/DD, label:, newer_than:, older_than:.",
+      "Search query using Gmail syntax. Supports: from:, to:, subject:, in:inbox, is:unread, has:attachment, filename: (matches attachment file names, e.g. filename:CV or filename:pdf), after:YYYY/MM/DD, before:YYYY/MM/DD, label:, newer_than:, older_than:.",
     ),
   ...searchInboxBaseFields,
 });

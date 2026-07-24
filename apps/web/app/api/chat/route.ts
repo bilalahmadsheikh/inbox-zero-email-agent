@@ -32,7 +32,11 @@ import {
   mergeSeenRulesRevision,
   saveLastSeenRulesRevision,
 } from "@/utils/ai/assistant/chat-seen-rules-revision";
-import { getToolFailureWarning } from "@/utils/ai/assistant/chat-response-guard";
+import {
+  getToolFailureWarning,
+  TOKEN_LIMIT_WARNING,
+  CHAT_ERROR_MESSAGE,
+} from "@/utils/ai/assistant/chat-response-guard";
 import { flushLoggerSafely } from "@/utils/logger-flush";
 
 export const maxDuration = 120;
@@ -267,21 +271,45 @@ export const POST = withEmailAccount("chat", async (request) => {
           writer.write(chunk);
         }
 
-        const warning = getToolFailureWarning(responseMessage);
-        if (!warning) return;
+        const warnings: string[] = [];
 
-        request.logger.warn("Assistant chat completed with tool failures", {
-          chatId: chat.id,
-        });
+        const toolWarning = getToolFailureWarning(responseMessage);
+        if (toolWarning) {
+          request.logger.warn("Assistant chat completed with tool failures", {
+            chatId: chat.id,
+          });
+          warnings.push(toolWarning);
+        }
+
+        // Tell the user when the model was cut off by its output token limit
+        // instead of letting the reply end silently mid-thought.
+        const finishReason = await Promise.resolve(result.finishReason).catch(
+          () => undefined,
+        );
+        if (finishReason === "length") {
+          request.logger.warn("Assistant chat truncated at token limit", {
+            chatId: chat.id,
+          });
+          warnings.push(TOKEN_LIMIT_WARNING);
+        }
+
+        if (!warnings.length) return;
 
         const warningPartId = crypto.randomUUID();
         writer.write({ type: "text-start", id: warningPartId });
         writer.write({
           type: "text-delta",
           id: warningPartId,
-          delta: `\n\n${warning}`,
+          delta: `\n\n${warnings.join("\n\n")}`,
         });
         writer.write({ type: "text-end", id: warningPartId });
+      },
+      onError: (error) => {
+        request.logger.error("Assistant chat stream error", {
+          error,
+          chatId: chat.id,
+        });
+        return CHAT_ERROR_MESSAGE;
       },
       onFinish: async ({ messages }) => {
         const persistableMessages = messages.filter(

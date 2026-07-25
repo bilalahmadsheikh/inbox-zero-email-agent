@@ -24,7 +24,11 @@ import {
   getMeetingContext,
   formatMeetingContextForPrompt,
 } from "@/utils/meeting-briefs/recipient-context";
-import { DraftReplyConfidence } from "@/generated/prisma/enums";
+import {
+  DraftReplyConfidence,
+  ReplyMemoryScopeType,
+} from "@/generated/prisma/enums";
+import { extractDomainFromEmail, isPublicEmailDomain } from "@/utils/email";
 import { meetsDraftReplyConfidenceRequirement } from "@/utils/ai/reply/draft-confidence";
 import type { DraftAttribution } from "@/utils/ai/reply/draft-attribution";
 import { selectDraftAttachmentsForRule } from "@/utils/attachments/draft-attachments";
@@ -416,6 +420,19 @@ async function generateDraftContent(
     emailAccount.timezone,
   );
   const precedentThreadCount = emailHistoryContext?.relevantEmails.length ?? 0;
+  // For a first-contact sender (no reply history or saved memories about
+  // them yet), fall back to a weak domain-based relationship signal so the
+  // model has something to calibrate tone with. Real precedent always wins,
+  // so this is only computed when there's none.
+  const hasSenderOrDomainMemory = selectedReplyMemories.some(
+    (memory) =>
+      memory.scopeType === ReplyMemoryScopeType.SENDER ||
+      memory.scopeType === ReplyMemoryScopeType.DOMAIN,
+  );
+  const domainRelationshipSignal =
+    !senderReplyExamples?.content && !hasSenderOrDomainMemory
+      ? getDomainRelationshipSignal(senderEmail)
+      : null;
   const draftContextMetadata: DraftContextMetadata = {
     replyMemories: {
       count: selectedReplyMemories.length,
@@ -434,6 +451,7 @@ async function generateDraftContent(
       precedentThreadCount,
       sameSenderReplyExamplesInjected: !!senderReplyExamples?.content,
       sameSenderReplyExampleCount: senderReplyExamples?.count ?? 0,
+      domainRelationshipSignalInjected: !!domainRelationshipSignal,
     },
     calendar: {
       injected: !!calendarAvailability,
@@ -483,6 +501,7 @@ async function generateDraftContent(
     meetingContext,
     attachmentContext: attachmentSelection.attachmentContext,
     incomingAttachmentContext: incomingAttachmentContext.content,
+    domainRelationshipSignal,
     instruction,
   });
 
@@ -567,4 +586,15 @@ async function generateDraftContent(
       ? { attachments: attachmentSelection.selectedAttachments }
       : {}),
   };
+}
+
+function getDomainRelationshipSignal(senderEmail: string): string | null {
+  if (!senderEmail) return null;
+
+  const domain = extractDomainFromEmail(senderEmail).toLowerCase();
+  if (!domain) return null;
+
+  return isPublicEmailDomain(domain)
+    ? "this sender's address is on a personal/free email provider, which may indicate a personal contact rather than a business one"
+    : "this sender's address is on a distinct company domain, which may indicate a professional/business contact";
 }

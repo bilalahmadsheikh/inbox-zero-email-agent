@@ -10,7 +10,9 @@ export const getUserInfoPrompt = ({
   emailAccount,
   prefix = "The user you are acting on behalf of is:",
 }: {
-  emailAccount: EmailAccountWithAI & { name?: string | null };
+  emailAccount: Pick<EmailAccountWithAI, "email" | "about"> & {
+    name?: string | null;
+  };
   prefix?: string;
 }) => {
   const info = [
@@ -32,6 +34,36 @@ export const getUserInfoPrompt = ({
 <user_info>
 ${info.map((i) => `<${i.label}>${i.value}</${i.label}>`).join("\n")}
 </user_info>`.trim();
+};
+
+/**
+ * Resolves which writing style text should drive a draft: an explicit manual
+ * style always wins; the learned style is only promoted to the effective
+ * style when no manual style exists, otherwise it's kept as a lower-priority
+ * advisory alongside the manual style; falls back to `defaultWritingStyle`
+ * when neither is set.
+ */
+export const resolveEffectiveWritingStyle = ({
+  writingStyle,
+  learnedWritingStyle,
+  defaultWritingStyle,
+}: {
+  writingStyle?: string | null;
+  learnedWritingStyle?: string | null;
+  defaultWritingStyle: string;
+}): { effective: string; advisoryLearned: string | null } => {
+  const normalizedWritingStyle = writingStyle?.trim() || null;
+  const normalizedLearnedWritingStyle = learnedWritingStyle?.trim() || null;
+
+  return {
+    effective:
+      normalizedWritingStyle ||
+      normalizedLearnedWritingStyle ||
+      defaultWritingStyle,
+    advisoryLearned: normalizedWritingStyle
+      ? normalizedLearnedWritingStyle
+      : null,
+  };
 };
 
 export const getUserRulesPrompt = ({

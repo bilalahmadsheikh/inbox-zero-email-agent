@@ -17,7 +17,7 @@ export async function collectSenderReplyExamples({
   currentMessageIds,
   logger,
 }: {
-  emailAccount: EmailAccountWithAI;
+  emailAccount: Pick<EmailAccountWithAI, "email">;
   emailProvider: EmailProvider;
   senderEmail: string;
   currentMessageIds: Set<string>;

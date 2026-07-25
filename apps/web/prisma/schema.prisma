@@ -150,6 +150,7 @@ model EmailAccount {
   autoCategorizeSenders     Boolean              @default(false)
   multiRuleSelectionEnabled Boolean              @default(false)
   triageLabelsEnabled       Boolean              @default(false) // apply Priority/Urgent-Important-FYI labels in the mailbox
+  learnedPatternsEnabled    Boolean              @default(false) // auto-learn sender patterns from AI rule matches and label removals
   sensitiveDataPolicy       String?
   draftReplyConfidence      DraftReplyConfidence @default(ALL_EMAILS)
   draftCleanupDays          Int?                 @default(14)

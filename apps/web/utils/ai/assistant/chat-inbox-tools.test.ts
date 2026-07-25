@@ -9,6 +9,7 @@ import {
   executeSenderWideInboxAction,
   forwardEmailTool,
   getAccountOverviewTool,
+  getRecipientContextTool,
   rescheduleScheduledEmailTool,
   getSenderCategorizationStatusTool,
   getSenderCategoryOverviewTool,
@@ -19,11 +20,19 @@ import {
   sendEmailTool,
   startSenderCategorizationTool,
 } from "./chat-inbox-tools";
+import { getReplyMemoriesForPrompt } from "@/utils/ai/reply/reply-memory";
+import { collectSenderReplyExamples } from "@/utils/reply-tracker/sender-reply-examples";
 
 vi.mock("@/utils/prisma");
 vi.mock("@/utils/email/provider");
 vi.mock("@/utils/posthog", () => ({
   posthogCaptureEvent: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("@/utils/ai/reply/reply-memory", () => ({
+  getReplyMemoriesForPrompt: vi.fn(),
+}));
+vi.mock("@/utils/reply-tracker/sender-reply-examples", () => ({
+  collectSenderReplyExamples: vi.fn(),
 }));
 
 const { mockVerifyRecurrenceRequest, mockVerifyScheduledSendIntent } =
@@ -1552,6 +1561,108 @@ function collectSchemaDescriptions(schema: unknown): string[] {
 
   return descriptions;
 }
+
+describe("getRecipientContextTool", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns a company-domain signal for a distinct company domain", async () => {
+    vi.mocked(createEmailProvider).mockResolvedValue({} as any);
+    vi.mocked(getReplyMemoriesForPrompt).mockResolvedValue({
+      content: null,
+      selectedMemories: [],
+    });
+    vi.mocked(collectSenderReplyExamples).mockResolvedValue(null);
+
+    const toolInstance = getRecipientContextTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      recipientEmail: "colleague@acmecorp.com",
+    });
+
+    expect(result).toEqual({
+      domainSignal: "company-domain",
+      knownContext: null,
+      pastEmailExamples: null,
+      pastEmailExampleCount: 0,
+    });
+  });
+
+  it("returns a personal-provider signal for a free email domain", async () => {
+    vi.mocked(createEmailProvider).mockResolvedValue({} as any);
+    vi.mocked(getReplyMemoriesForPrompt).mockResolvedValue({
+      content: null,
+      selectedMemories: [],
+    });
+    vi.mocked(collectSenderReplyExamples).mockResolvedValue(null);
+
+    const toolInstance = getRecipientContextTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      recipientEmail: "mom@gmail.com",
+    });
+
+    expect(result).toMatchObject({ domainSignal: "personal-provider" });
+  });
+
+  it("includes known context and past email examples when present", async () => {
+    vi.mocked(createEmailProvider).mockResolvedValue({} as any);
+    vi.mocked(getReplyMemoriesForPrompt).mockResolvedValue({
+      content: "Prefers a casual, first-name tone.",
+      selectedMemories: [],
+    });
+    vi.mocked(collectSenderReplyExamples).mockResolvedValue({
+      content: "<reply_example>Hey! Sounds good.</reply_example>",
+      count: 2,
+    });
+
+    const toolInstance = getRecipientContextTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      recipientEmail: "friend@gmail.com",
+    });
+
+    expect(result).toEqual({
+      domainSignal: "personal-provider",
+      knownContext: "Prefers a casual, first-name tone.",
+      pastEmailExamples: "<reply_example>Hey! Sounds good.</reply_example>",
+      pastEmailExampleCount: 2,
+    });
+  });
+
+  it("returns a graceful error when the lookup fails", async () => {
+    vi.mocked(createEmailProvider).mockRejectedValue(new Error("boom"));
+
+    const toolInstance = getRecipientContextTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      recipientEmail: "someone@example.com",
+    });
+
+    expect(result).toEqual({ error: "Failed to load recipient context" });
+  });
+});
 
 describe("chat inbox tools - bulk pagination guidance (INB-134)", () => {
   beforeEach(() => {

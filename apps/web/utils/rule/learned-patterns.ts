@@ -4,6 +4,22 @@ import { GroupItemType, type GroupItemSource } from "@/generated/prisma/enums";
 import { isDuplicateError } from "@/utils/prisma-helpers";
 
 /**
+ * Whether automatic learned-pattern creation/consumption is enabled for this
+ * account. Manual editing (settings UI, chat tools) is unaffected by this
+ * flag and always available.
+ */
+export async function isLearnedPatternsEnabled(
+  emailAccountId: string,
+): Promise<boolean> {
+  const emailAccount = await prisma.emailAccount.findUnique({
+    where: { id: emailAccountId },
+    select: { learnedPatternsEnabled: true },
+  });
+
+  return emailAccount?.learnedPatternsEnabled ?? false;
+}
+
+/**
  * Saves a learned pattern for a rule
  * - Creates a group for the rule if one doesn't exist
  * - Adds the from pattern to the group

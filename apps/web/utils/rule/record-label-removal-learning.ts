@@ -1,7 +1,10 @@
 import { GroupItemSource, type SystemType } from "@/generated/prisma/enums";
 import type { Logger } from "@/utils/logger";
 import { shouldLearnFromLabelRemoval } from "@/utils/rule/consts";
-import { saveLearnedPattern } from "@/utils/rule/learned-patterns";
+import {
+  isLearnedPatternsEnabled,
+  saveLearnedPattern,
+} from "@/utils/rule/learned-patterns";
 
 export async function recordLabelRemovalLearning({
   sender,
@@ -29,6 +32,11 @@ export async function recordLabelRemovalLearning({
     logger.info("Label removal does not match a learnable system rule", {
       systemType,
     });
+    return;
+  }
+
+  if (!(await isLearnedPatternsEnabled(emailAccountId))) {
+    logger.trace("Learned patterns disabled, skipping label removal learning");
     return;
   }
 

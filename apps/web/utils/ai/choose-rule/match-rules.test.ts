@@ -1068,6 +1068,80 @@ describe("findMatchingRule", () => {
     );
   });
 
+  it("does not match a group rule when learned patterns are disabled", async () => {
+    const rule = getRule({ groupId: "group1" });
+
+    prisma.group.findMany.mockResolvedValue([
+      getGroup({
+        id: "group1",
+        items: [
+          getGroupItem({ type: GroupItemType.FROM, value: "test@example.com" }),
+        ],
+        rule,
+      }),
+    ]);
+
+    const rules = [rule];
+    const message = getMessage({
+      headers: getHeaders({ from: "test@example.com" }),
+    });
+    const emailAccount = getEmailAccount({ learnedPatternsEnabled: false });
+
+    const result = await findMatchingRules({
+      rules,
+      message,
+      emailAccount,
+      provider,
+      modelType: "default",
+      logger,
+    });
+
+    // The learned pattern is skipped entirely, so the rule falls through to
+    // AI evaluation instead of being short-circuited by the group match.
+    expect(result.matches).toHaveLength(0);
+    expect(prisma.group.findMany).not.toHaveBeenCalled();
+  });
+
+  it("does not apply a learned exclusion pattern when learned patterns are disabled", async () => {
+    const rule = getRule({ groupId: "group1", from: "*@example.com" });
+
+    prisma.group.findMany.mockResolvedValue([
+      getGroup({
+        id: "group1",
+        items: [
+          getGroupItem({
+            type: GroupItemType.FROM,
+            value: "test@example.com",
+            exclude: true,
+          }),
+        ],
+        rule,
+      }),
+    ]);
+
+    const rules = [rule];
+    const message = getMessage({
+      headers: getHeaders({ from: "test@example.com" }),
+    });
+    const emailAccount = getEmailAccount({ learnedPatternsEnabled: false });
+
+    const result = await findMatchingRules({
+      rules,
+      message,
+      emailAccount,
+      provider,
+      modelType: "default",
+      logger,
+    });
+
+    // With the exclusion pattern inert, the rule's static `from` condition
+    // matches normally instead of being excluded.
+    expect(result.matches[0]?.rule.id).toBe(rule.id);
+    expect(result.matches[0]?.matchReasons).toEqual([
+      { type: ConditionType.STATIC },
+    ]);
+  });
+
   it("should NOT match when group doesn't match and no other conditions", async () => {
     const rule = getRule({
       groupId: "correctGroup", // Rule specifically looks for correctGroup

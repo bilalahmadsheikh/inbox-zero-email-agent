@@ -5,6 +5,7 @@ import {
   CONVERSATION_TRACKING_META_RULE_ID,
   limitDraftEmailActions,
   runRules,
+  shouldAnalyzeSenderPattern,
 } from "./run-rules";
 import {
   ActionType,
@@ -1551,6 +1552,103 @@ describe("runRules - double draft prevention", () => {
     expect(executedDraftContents[0]).toBe(
       "Hi {{name}}, Please submit via our form.",
     );
+  });
+});
+
+describe("shouldAnalyzeSenderPattern", () => {
+  const aiMatchResult = {
+    rule: { systemType: null } as any,
+    matchReasons: [{ type: ConditionType.AI }] as any,
+  };
+
+  it("returns false when learned patterns are disabled", () => {
+    expect(
+      shouldAnalyzeSenderPattern({
+        isTest: false,
+        result: aiMatchResult,
+        learnedPatternsEnabled: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false in test mode even when enabled", () => {
+    expect(
+      shouldAnalyzeSenderPattern({
+        isTest: true,
+        result: aiMatchResult,
+        learnedPatternsEnabled: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false when there is no matched rule", () => {
+    expect(
+      shouldAnalyzeSenderPattern({
+        isTest: false,
+        result: { rule: null, matchReasons: [] },
+        learnedPatternsEnabled: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false for conversation-status rules", () => {
+    expect(
+      shouldAnalyzeSenderPattern({
+        isTest: false,
+        result: {
+          rule: { systemType: SystemType.TO_REPLY } as any,
+          matchReasons: [{ type: ConditionType.AI }] as any,
+        },
+        learnedPatternsEnabled: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false for the cold email rule", () => {
+    expect(
+      shouldAnalyzeSenderPattern({
+        isTest: false,
+        result: {
+          rule: { systemType: SystemType.COLD_EMAIL } as any,
+          matchReasons: [{ type: ConditionType.AI }] as any,
+        },
+        learnedPatternsEnabled: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false when already matched via a static or learned-pattern reason", () => {
+    expect(
+      shouldAnalyzeSenderPattern({
+        isTest: false,
+        result: {
+          rule: { systemType: null } as any,
+          matchReasons: [{ type: ConditionType.STATIC }] as any,
+        },
+        learnedPatternsEnabled: true,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldAnalyzeSenderPattern({
+        isTest: false,
+        result: {
+          rule: { systemType: null } as any,
+          matchReasons: [{ type: ConditionType.LEARNED_PATTERN }] as any,
+        },
+        learnedPatternsEnabled: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true for a genuine AI match when enabled", () => {
+    expect(
+      shouldAnalyzeSenderPattern({
+        isTest: false,
+        result: aiMatchResult,
+        learnedPatternsEnabled: true,
+      }),
+    ).toBe(true);
   });
 });
 

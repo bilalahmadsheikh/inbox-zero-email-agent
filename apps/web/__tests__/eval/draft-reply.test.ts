@@ -1021,6 +1021,141 @@ thanks,`,
       );
     });
 
+    describe("relationship-aware tone calibration", () => {
+      const neutralSubject = "Weekend";
+      const neutralContent = `Hey,
+
+Are you around this weekend?
+
+Jamie`;
+
+      test(
+        "first-contact sender on a personal email domain gets a warmer, casual reply",
+        async () => {
+          const messages = [
+            {
+              ...getEmail({
+                from: "Jamie <jamie@gmail.com>",
+                to: emailAccount.email,
+                subject: neutralSubject,
+                content: neutralContent,
+              }),
+              date: new Date("2026-05-20T09:00:00Z"),
+            },
+          ];
+
+          const result = await aiDraftReplyWithConfidence({
+            messages,
+            emailAccount,
+            knowledgeBaseContent: null,
+            emailHistorySummary: null,
+            emailHistoryContext: null,
+            calendarAvailability: null,
+            writingStyle: null,
+            mcpContext: null,
+            meetingContext: null,
+            domainRelationshipSignal:
+              "this sender's address is on a personal/free email provider, which may indicate a personal contact rather than a business one",
+          });
+
+          const testName = "personal-domain first contact tone";
+          const judgeResult = await judgeEvalOutput({
+            input: formatThreadForJudge(messages),
+            output: result.reply,
+            expected:
+              "A short, warm, casual reply appropriate for a personal contact such as a friend or family member, not a formal business reply.",
+            criterion: {
+              name: "Warm casual tone for a personal contact",
+              description:
+                "Given a weak relationship signal that this sender is likely a personal contact (personal email domain), the draft should read as warm and casual - not stiffly formal, and not using business register such as 'Dear', formal sign-offs, or corporate phrasing.",
+            },
+          });
+          const pass = judgeResult.pass;
+
+          evalReporter.record({
+            testName,
+            model: model.label,
+            pass,
+            expected: "warm, casual tone",
+            actual: formatSemanticJudgeActual(result.reply, judgeResult),
+          });
+
+          expect(
+            pass,
+            `Draft should read as warm and casual for a likely personal contact.\n\nReply:\n${result.reply}\n\nJudge: ${JSON.stringify(
+              judgeResult,
+              null,
+              2,
+            )}`,
+          ).toBe(true);
+        },
+        TIMEOUT,
+      );
+
+      test(
+        "first-contact sender on a company email domain gets a more professional reply",
+        async () => {
+          const messages = [
+            {
+              ...getEmail({
+                from: "Jamie <jamie@acmecorp.com>",
+                to: emailAccount.email,
+                subject: neutralSubject,
+                content: neutralContent,
+              }),
+              date: new Date("2026-05-20T09:00:00Z"),
+            },
+          ];
+
+          const result = await aiDraftReplyWithConfidence({
+            messages,
+            emailAccount,
+            knowledgeBaseContent: null,
+            emailHistorySummary: null,
+            emailHistoryContext: null,
+            calendarAvailability: null,
+            writingStyle: null,
+            mcpContext: null,
+            meetingContext: null,
+            domainRelationshipSignal:
+              "this sender's address is on a distinct company domain, which may indicate a professional/business contact",
+          });
+
+          const testName = "company-domain first contact tone";
+          const judgeResult = await judgeEvalOutput({
+            input: formatThreadForJudge(messages),
+            output: result.reply,
+            expected:
+              "A short, precise, professional reply appropriate for a business contact, without slang, emoji, or overly familiar personal language.",
+            criterion: {
+              name: "Professional tone for a business contact",
+              description:
+                "Given a weak relationship signal that this sender is likely a business contact (distinct company email domain), the draft should read as professional and precise - not overly familiar, and without slang or emoji.",
+            },
+          });
+          const pass = judgeResult.pass;
+
+          evalReporter.record({
+            testName,
+            model: model.label,
+            pass,
+            expected: "professional, precise tone",
+            actual: formatSemanticJudgeActual(result.reply, judgeResult),
+          });
+
+          expect(
+            pass,
+            `Draft should read as professional for a likely business contact.\n\nReply:\n${result.reply}\n\nJudge: ${JSON.stringify(
+              judgeResult,
+              null,
+              2,
+            )}`,
+          ).toBe(true);
+        },
+        TIMEOUT,
+      );
+    });
+
     describe("grounding and uncertainty", () => {
       test(
         "does not invent pricing terms without pricing context",

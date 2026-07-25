@@ -4,7 +4,11 @@ import { createScopedLogger } from "@/utils/logger";
 import { createGenerateObject } from "@/utils/llms/index";
 import type { EmailAccountWithAI } from "@/utils/llms/types";
 import type { EmailForLLM } from "@/utils/types";
-import { getEmailListPrompt, getTodayForLLM } from "@/utils/ai/helpers";
+import {
+  getEmailListPrompt,
+  getTodayForLLM,
+  resolveEffectiveWritingStyle,
+} from "@/utils/ai/helpers";
 import { getModelForUseCase, LlmUseCase } from "@/utils/llms/use-cases";
 import { appendOllamaOnlySystemGuidance } from "@/utils/llms/ollama-guidance";
 import type { ReplyContextCollectorResult } from "@/utils/ai/reply/reply-context-collector";
@@ -47,6 +51,8 @@ Write an email that follows up on the previous conversation.
 Your reply should aim to continue the conversation or provide new information based on the context or knowledge base. If you have nothing substantial to add, keep the reply minimal.
 By default, keep replies concise, direct, friendly, plainspoken, and no longer than needed. Prefer short declarative sentences over polished or overly elaborate phrasing.
 The user's writing style can override these defaults.
+
+Calibrate tone and formality to the apparent relationship with the sender, the way a thoughtful person naturally writes differently to different people. Infer this from cues already available to you: the sender's own tone, phrasing, and salutation in their message; their email domain; and any sender reply examples, reply memories, or relationship signal provided below. Write more precise and professional for a business or work contact, and warmer and more casual for a personal contact such as family or a close friend. When no relationship signal is available, default to a professional but friendly tone.
 `;
 
 const defaultWritingStyle = `Keep it concise, direct, and friendly.
@@ -77,6 +83,7 @@ const getUserPrompt = ({
   hasConfiguredSignature,
   instruction,
   currentDate,
+  domainRelationshipSignal,
 }: {
   messages: (EmailForLLM & { to: string })[];
   emailAccount: DraftEmailAccount;
@@ -95,6 +102,7 @@ const getUserPrompt = ({
   hasConfiguredSignature: boolean;
   instruction?: string | null;
   currentDate?: Date;
+  domainRelationshipSignal?: string | null;
 }) => {
   const userAbout = emailAccount.about
     ? `Context about the user:
@@ -157,6 +165,14 @@ ${emailHistoryContext.notes || "No notes"}
 <sender_reply_examples>
 ${senderReplyExamples}
 </sender_reply_examples>
+`
+    : "";
+
+  // Only provided for first-contact senders with no reply examples or reply
+  // memories yet, as a weak starting signal for relationship/formality — it
+  // never overrides real precedent from the two contexts above.
+  const domainRelationshipContext = domainRelationshipSignal
+    ? `Weak relationship signal (no prior reply history with this sender): ${domainRelationshipSignal}
 `
     : "";
 
@@ -246,6 +262,7 @@ ${learnedReplyMemories}
 ${historicalContext}
 ${precedentHistoryContext}
 ${senderReplyExamplesContext}
+${domainRelationshipContext}
 ${writingStylePrompt}
 ${learnedWritingStylePrompt}
 ${signatureContext}
@@ -301,6 +318,7 @@ export async function aiDraftReplyWithConfidence({
   hasConfiguredSignature = false,
   instruction = null,
   currentDate,
+  domainRelationshipSignal = null,
 }: {
   messages: (EmailForLLM & { to: string })[];
   emailAccount: DraftEmailAccount;
@@ -319,6 +337,7 @@ export async function aiDraftReplyWithConfidence({
   hasConfiguredSignature?: boolean;
   instruction?: string | null;
   currentDate?: Date;
+  domainRelationshipSignal?: string | null;
 }): Promise<DraftReplyResult> {
   logger.info("Drafting email reply", {
     messageCount: messages.length,
@@ -332,15 +351,14 @@ export async function aiDraftReplyWithConfidence({
       : null,
   });
 
-  const normalizedWritingStyle = writingStyle?.trim() || null;
-  const normalizedLearnedWritingStyle = learnedWritingStyle?.trim() || null;
-  const effectiveWritingStyle =
-    normalizedWritingStyle ||
-    normalizedLearnedWritingStyle ||
-    defaultWritingStyle;
-  const advisoryLearnedWritingStyle = normalizedWritingStyle
-    ? normalizedLearnedWritingStyle
-    : null;
+  const {
+    effective: effectiveWritingStyle,
+    advisoryLearned: advisoryLearnedWritingStyle,
+  } = resolveEffectiveWritingStyle({
+    writingStyle,
+    learnedWritingStyle,
+    defaultWritingStyle,
+  });
 
   const prompt = getUserPrompt({
     messages,
@@ -360,6 +378,7 @@ export async function aiDraftReplyWithConfidence({
     hasConfiguredSignature,
     instruction,
     currentDate,
+    domainRelationshipSignal,
   });
 
   const modelOptions = getModelForUseCase(
@@ -424,6 +443,7 @@ export async function aiDraftReply({
   incomingAttachmentContext = null,
   hasConfiguredSignature = false,
   currentDate,
+  domainRelationshipSignal = null,
 }: {
   messages: (EmailForLLM & { to: string })[];
   emailAccount: DraftEmailAccount;
@@ -441,6 +461,7 @@ export async function aiDraftReply({
   incomingAttachmentContext?: string | null;
   hasConfiguredSignature?: boolean;
   currentDate?: Date;
+  domainRelationshipSignal?: string | null;
 }) {
   const result = await aiDraftReplyWithConfidence({
     messages,
@@ -459,6 +480,7 @@ export async function aiDraftReply({
     incomingAttachmentContext,
     hasConfiguredSignature,
     currentDate,
+    domainRelationshipSignal,
   });
 
   return result.reply;

@@ -42,7 +42,14 @@ export async function getEmailAccountWithAi({
   emailAccountId,
 }: {
   emailAccountId: string;
-}): Promise<(EmailAccountWithAI & { name: string | null }) | null> {
+}): Promise<
+  | (EmailAccountWithAI & {
+      name: string | null;
+      writingStyle: string | null;
+      learnedWritingStyle: string | null;
+    })
+  | null
+> {
   return prisma.emailAccount.findUnique({
     where: { id: emailAccountId },
     select: {
@@ -56,6 +63,8 @@ export async function getEmailAccountWithAi({
       calendarBookingLink: true,
       alwaysReadDraftAttachments: true,
       name: true,
+      writingStyle: true,
+      learnedWritingStyle: true,
       user: {
         select: {
           aiProvider: true,
@@ -75,6 +84,7 @@ export async function getEmailAccountWithAi({
 export type EmailAccountForRuleExecution = EmailAccountWithAI & {
   name: string | null;
   draftReplyConfidence: DraftReplyConfidence;
+  learnedPatternsEnabled: boolean;
 };
 
 export async function getEmailAccountForRuleExecution({
@@ -96,6 +106,7 @@ export async function getEmailAccountForRuleExecution({
       alwaysReadDraftAttachments: true,
       name: true,
       draftReplyConfidence: true,
+      learnedPatternsEnabled: true,
       user: {
         select: {
           aiProvider: true,

@@ -28,6 +28,7 @@ vi.mock("@/utils/prisma", () => ({
 
 vi.mock("@/utils/rule/learned-patterns", () => ({
   saveLearnedPattern: vi.fn().mockResolvedValue(undefined),
+  isLearnedPatternsEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("@/utils/gmail/label", () => ({

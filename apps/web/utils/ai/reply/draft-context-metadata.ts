@@ -22,6 +22,7 @@ export const draftContextMetadataSchema = z.object({
     precedentThreadCount: z.number(),
     sameSenderReplyExamplesInjected: z.boolean(),
     sameSenderReplyExampleCount: z.number(),
+    domainRelationshipSignalInjected: z.boolean(),
   }),
   calendar: z.object({
     injected: z.boolean(),

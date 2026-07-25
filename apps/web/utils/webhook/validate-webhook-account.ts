@@ -35,6 +35,7 @@ const webhookEmailAccountSelect = {
   draftReplyConfidence: true,
   lastSyncedHistoryId: true,
   autoCategorizeSenders: true,
+  learnedPatternsEnabled: true,
   filingEnabled: true,
   filingPrompt: true,
   filingConfirmationSendEmail: true,

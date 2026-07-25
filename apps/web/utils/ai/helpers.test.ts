@@ -3,6 +3,7 @@ import {
   getUserInfoPrompt,
   getUserRulesPrompt,
   getEmailListPrompt,
+  resolveEffectiveWritingStyle,
 } from "./helpers";
 import { getEmailAccount, getEmail } from "@/__tests__/helpers";
 import { stringifyEmail } from "@/utils/stringify-email";
@@ -73,6 +74,72 @@ describe("getUserInfoPrompt", () => {
     expect(result).toBe(`<user_info>
 <email>test@example.com</email>
 </user_info>`);
+  });
+});
+
+describe("resolveEffectiveWritingStyle", () => {
+  const defaultWritingStyle = "Default style.";
+
+  it("uses the manual writing style when set", () => {
+    const result = resolveEffectiveWritingStyle({
+      writingStyle: "Be terse.",
+      learnedWritingStyle: null,
+      defaultWritingStyle,
+    });
+
+    expect(result).toEqual({ effective: "Be terse.", advisoryLearned: null });
+  });
+
+  it("uses the learned writing style as the effective style when no manual style is set", () => {
+    const result = resolveEffectiveWritingStyle({
+      writingStyle: null,
+      learnedWritingStyle: "Learned: be warm.",
+      defaultWritingStyle,
+    });
+
+    expect(result).toEqual({
+      effective: "Learned: be warm.",
+      advisoryLearned: null,
+    });
+  });
+
+  it("demotes the learned style to advisory when a manual style is also set", () => {
+    const result = resolveEffectiveWritingStyle({
+      writingStyle: "Be terse.",
+      learnedWritingStyle: "Learned: be warm.",
+      defaultWritingStyle,
+    });
+
+    expect(result).toEqual({
+      effective: "Be terse.",
+      advisoryLearned: "Learned: be warm.",
+    });
+  });
+
+  it("falls back to the default style when neither is set", () => {
+    const result = resolveEffectiveWritingStyle({
+      writingStyle: null,
+      learnedWritingStyle: null,
+      defaultWritingStyle,
+    });
+
+    expect(result).toEqual({
+      effective: defaultWritingStyle,
+      advisoryLearned: null,
+    });
+  });
+
+  it("treats whitespace-only styles as unset", () => {
+    const result = resolveEffectiveWritingStyle({
+      writingStyle: "   ",
+      learnedWritingStyle: "   ",
+      defaultWritingStyle,
+    });
+
+    expect(result).toEqual({
+      effective: defaultWritingStyle,
+      advisoryLearned: null,
+    });
   });
 });
 

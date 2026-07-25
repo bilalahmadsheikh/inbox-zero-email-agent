@@ -210,6 +210,7 @@ export function getEmailAccount(
     timezone: null,
     calendarBookingLink: null,
     draftReplyConfidence: overrides.draftReplyConfidence ?? "MEDIUM",
+    learnedPatternsEnabled: overrides.learnedPatternsEnabled ?? true,
     user: {
       aiModel: null,
       aiProvider: null,

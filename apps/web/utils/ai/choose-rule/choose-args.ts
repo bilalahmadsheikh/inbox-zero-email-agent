@@ -25,6 +25,7 @@ const MODULE = "choose-args";
 
 export type EmailAccountForDrafting = EmailAccountWithAI & {
   draftReplyConfidence: DraftReplyConfidence;
+  learnedPatternsEnabled: boolean;
 };
 
 type DraftAttributionFields = {

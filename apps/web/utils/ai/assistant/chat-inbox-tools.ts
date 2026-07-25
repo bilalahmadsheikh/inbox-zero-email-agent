@@ -6,9 +6,14 @@ import { posthogCaptureEvent } from "@/utils/posthog";
 import { createEmailProvider } from "@/utils/email/provider";
 import { cancelScheduledEmailChain } from "@/utils/scheduled-send/cancel";
 import {
+  extractDomainFromEmail,
+  extractEmailAddress,
   extractUniqueEmailAddresses,
   hasOnlyValidRecipients,
+  isPublicEmailDomain,
 } from "@/utils/email";
+import { getReplyMemoriesForPrompt } from "@/utils/ai/reply/reply-memory";
+import { collectSenderReplyExamples } from "@/utils/reply-tracker/sender-reply-examples";
 import { getRuleLabel } from "@/utils/rule/consts";
 import { ScheduledEmailStatus, SystemType } from "@/generated/prisma/enums";
 import {
@@ -1298,6 +1303,78 @@ const buildManageInboxTool = ({
 
 export type ManageInboxTool = InferUITool<ReturnType<typeof manageInboxTool>>;
 
+export const getRecipientContextTool = ({
+  email,
+  emailAccountId,
+  provider,
+  logger,
+}: {
+  email: string;
+  emailAccountId: string;
+  provider: string;
+  logger: Logger;
+}) =>
+  tool({
+    description:
+      "Look up known context and a relationship signal for a specific email address before drafting a brand-new email to them with sendEmail or draftEmail. Returns a domain signal (personal/free-email provider vs. a distinct company domain), any saved facts/preferences/procedures about that address, and up to 3 real past emails sent to them for tone and formality precedent. Use this once per new recipient before writing a NEW email so the draft's tone matches the real relationship (e.g. warmer and casual for a personal contact, precise and professional for a business one) instead of one fixed tone for everyone. Do not use this for replies - the thread being replied to already shows this context directly. Skip it when the user gave explicit tone instructions for this email, or you already have this recipient's context from earlier in this conversation.",
+    inputSchema: z.object({
+      recipientEmail: z
+        .string()
+        .trim()
+        .min(1)
+        .describe(
+          "The email address of the person you're about to write a new email to.",
+        ),
+    }),
+    execute: async ({ recipientEmail }) => {
+      trackToolCall({ tool: "get_recipient_context", email, logger });
+
+      const normalizedRecipientEmail =
+        extractEmailAddress(recipientEmail) || recipientEmail.trim();
+      const domain = extractDomainFromEmail(
+        normalizedRecipientEmail,
+      ).toLowerCase();
+
+      try {
+        const [emailProvider, memories] = await Promise.all([
+          createEmailProvider({ emailAccountId, provider, logger }),
+          getReplyMemoriesForPrompt({
+            emailAccountId,
+            senderEmail: normalizedRecipientEmail,
+            emailContent: "",
+            logger,
+          }),
+        ]);
+
+        const examples = await collectSenderReplyExamples({
+          emailAccount: { email },
+          emailProvider,
+          senderEmail: normalizedRecipientEmail,
+          currentMessageIds: new Set(),
+          logger,
+        });
+
+        return {
+          domainSignal: domain
+            ? isPublicEmailDomain(domain)
+              ? ("personal-provider" as const)
+              : ("company-domain" as const)
+            : ("unknown" as const),
+          knownContext: memories.content,
+          pastEmailExamples: examples?.content ?? null,
+          pastEmailExampleCount: examples?.count ?? 0,
+        };
+      } catch (error) {
+        logger.error("Failed to load recipient context", { error });
+        return { error: "Failed to load recipient context" };
+      }
+    },
+  });
+
+export type GetRecipientContextTool = InferUITool<
+  ReturnType<typeof getRecipientContextTool>
+>;
+
 export const sendEmailTool = ({
   email,
   emailAccountId,
@@ -1313,7 +1390,7 @@ export const sendEmailTool = ({
 }) =>
   tool({
     description:
-      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely. If the user asks for a draft to review and send themselves, use draftEmail instead. If the user asks to send an email that was already saved with draftEmail in this conversation, pass that draft's id as supersedesDraftId so the leftover draft is removed after the send instead of surviving as a duplicate.",
+      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely. If the user asks for a draft to review and send themselves, use draftEmail instead. If the user asks to send an email that was already saved with draftEmail in this conversation, pass that draft's id as supersedesDraftId so the leftover draft is removed after the send instead of surviving as a duplicate. For a brand-new email (not a reply) to a recipient you don't already have context on, call getRecipientContext first so the tone matches the real relationship.",
     inputSchema: sendEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "send_email", email, logger });
@@ -1383,7 +1460,7 @@ export const draftEmailTool = ({
 }) =>
   tool({
     description:
-      "Create an email draft saved to the user's Drafts folder without sending anything. Use whenever the user asks to draft, write up, or prepare an email for them to review and send themselves - including when they have not decided whether to send now or later. The draft is created immediately; there is no confirmation step and nothing is sent. Use sendEmail instead only when the user clearly wants the email sent, immediately or scheduled. When revising a draft made earlier in this conversation, pass its draftId as replacesDraftId so the old version is removed. If the user later asks to send a drafted email from chat, call sendEmail with supersedesDraftId set to the draftId returned here so the draft is cleaned up rather than left as a duplicate.",
+      "Create an email draft saved to the user's Drafts folder without sending anything. Use whenever the user asks to draft, write up, or prepare an email for them to review and send themselves - including when they have not decided whether to send now or later. The draft is created immediately; there is no confirmation step and nothing is sent. Use sendEmail instead only when the user clearly wants the email sent, immediately or scheduled. When revising a draft made earlier in this conversation, pass its draftId as replacesDraftId so the old version is removed. If the user later asks to send a drafted email from chat, call sendEmail with supersedesDraftId set to the draftId returned here so the draft is cleaned up rather than left as a duplicate. For a brand-new email (not a reply, no replyToMessageId) to a recipient you don't already have context on, call getRecipientContext first so the tone matches the real relationship.",
     inputSchema: draftEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "draft_email", email, logger });

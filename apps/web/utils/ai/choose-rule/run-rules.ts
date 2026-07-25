@@ -265,6 +265,7 @@ export async function runRules({
         result,
         message,
         emailAccountId: emailAccount.id,
+        learnedPatternsEnabled: emailAccount.learnedPatternsEnabled,
         queuedSenderPatternAnalyses,
         logger,
       });
@@ -684,6 +685,7 @@ async function analyzeSenderPatternIfAiMatch({
   result,
   message,
   emailAccountId,
+  learnedPatternsEnabled,
   queuedSenderPatternAnalyses,
   logger,
 }: {
@@ -691,10 +693,11 @@ async function analyzeSenderPatternIfAiMatch({
   result: { rule?: Rule | null; matchReasons?: MatchReason[] };
   message: ParsedMessage;
   emailAccountId: string;
+  learnedPatternsEnabled: boolean;
   queuedSenderPatternAnalyses: Set<string>;
   logger: Logger;
 }) {
-  if (shouldAnalyzeSenderPattern({ isTest, result })) {
+  if (shouldAnalyzeSenderPattern({ isTest, result, learnedPatternsEnabled })) {
     const fromAddress = extractEmailAddress(message.headers.from);
     if (fromAddress) {
       const normalizedFromAddress = fromAddress.toLowerCase();
@@ -735,13 +738,16 @@ async function analyzeSenderPatternIfAiMatch({
   }
 }
 
-function shouldAnalyzeSenderPattern({
+export function shouldAnalyzeSenderPattern({
   isTest,
   result,
+  learnedPatternsEnabled,
 }: {
   isTest: boolean;
   result: { rule?: Rule | null; matchReasons?: MatchReason[] };
+  learnedPatternsEnabled: boolean;
 }) {
+  if (!learnedPatternsEnabled) return false;
   if (isTest) return false;
   if (!result.rule) return false;
   if (isConversationStatusType(result.rule.systemType)) return false;

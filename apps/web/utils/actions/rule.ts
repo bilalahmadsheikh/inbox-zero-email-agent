@@ -10,6 +10,7 @@ import {
   enableDraftRepliesBody,
   enableMultiRuleSelectionBody,
   enableTriageLabelsBody,
+  enableLearnedPatternsBody,
   updateDraftReplyConfidenceBody,
   deleteRuleBody,
   createRulesOnboardingBody,
@@ -283,6 +284,16 @@ export const enableTriageLabelsAction = actionClient
     await prisma.emailAccount.update({
       where: { id: emailAccountId },
       data: { triageLabelsEnabled: enable },
+    });
+  });
+
+export const enableLearnedPatternsAction = actionClient
+  .metadata({ name: "enableLearnedPatterns" })
+  .inputSchema(enableLearnedPatternsBody)
+  .action(async ({ ctx: { emailAccountId }, parsedInput: { enable } }) => {
+    await prisma.emailAccount.update({
+      where: { id: emailAccountId },
+      data: { learnedPatternsEnabled: enable },
     });
   });
 

@@ -2,6 +2,7 @@ import {
   createOrGetFolderTool,
   listFoldersTool,
   moveThreadsToFolderTool,
+  moveAttachmentEmailsToFolderTool,
 } from "./chat-folder-tools";
 import {
   createOrGetCategoryTool,
@@ -38,5 +39,6 @@ export const microsoftChatProviderConfig: AssistantChatProviderConfig = {
     listFolders: listFoldersTool(options),
     createOrGetFolder: createOrGetFolderTool(options),
     moveThreadsToFolder: moveThreadsToFolderTool(options),
+    moveAttachmentEmailsToFolder: moveAttachmentEmailsToFolderTool(options),
   }),
 };

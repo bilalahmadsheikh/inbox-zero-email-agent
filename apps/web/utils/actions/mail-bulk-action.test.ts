@@ -38,6 +38,11 @@ describe("bulkArchiveAction", () => {
         provider: "google",
       }),
     );
+    mockBulkArchiveFromSenders.mockResolvedValue({
+      movedCount: 3,
+      failedCount: 0,
+      failedSenders: [],
+    });
     mockCreateEmailProvider.mockResolvedValue({
       bulkArchiveFromSenders: mockBulkArchiveFromSenders,
     });
@@ -49,7 +54,11 @@ describe("bulkArchiveAction", () => {
     });
 
     expect(result?.serverError).toBeUndefined();
-    expect(result?.data).toBeUndefined();
+    expect(result?.data?.result).toEqual({
+      movedCount: 3,
+      failedCount: 0,
+      failedSenders: [],
+    });
     expect(mockCreateEmailProvider).toHaveBeenCalledWith({
       emailAccountId: "account-1",
       provider: "google",
@@ -76,7 +85,7 @@ describe("bulkArchiveAction", () => {
     });
 
     expect(result?.serverError).toBeUndefined();
-    expect(result?.data).toBeUndefined();
+    expect(result?.data?.result.movedCount).toBe(3);
     expect(mockCreateEmailProvider).toHaveBeenCalledWith({
       emailAccountId: "account-1",
       provider: "microsoft",

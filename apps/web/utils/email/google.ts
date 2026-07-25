@@ -76,12 +76,17 @@ import type {
   EmailFilter,
   EmailSignature,
   SentMessagePage,
+  BulkSenderActionResult,
 } from "@/utils/email/types";
+import { runWithBoundedConcurrency } from "@/utils/async";
 import { createScopedLogger, type Logger } from "@/utils/logger";
 import { getGmailSignatures } from "@/utils/gmail/signature-settings";
 import { withRateLimitRecording } from "@/utils/email/rate-limit";
 import { shouldSkipAutoDraft } from "@/utils/auto-draft";
 import { extractUniqueEmailAddresses } from "@/utils/email";
+
+// How many senders to process in parallel during bulk archive/trash.
+const BULK_SENDER_CONCURRENCY = 3;
 
 export class GmailProvider implements EmailProvider {
   readonly name = "google";
@@ -361,28 +366,61 @@ export class GmailProvider implements EmailProvider {
     }
   }
 
-  // We don't have permissions for Gmail bulkDelete, so we have to do it one thread at a time
-  private async archiveMessagesFromSenders(
-    senders: string[],
-    ownerEmail: string,
-    emailAccountId: string,
-    options?: { continueOnError?: boolean },
-  ): Promise<number> {
+  // Adding the TRASH label (and dropping INBOX) moves messages to Trash in one
+  // batched call. Works under gmail.modify — no delete scope needed, unlike
+  // users.messages.delete / batchDelete.
+  private async trashMessagesBulk(messageIds: string[]): Promise<void> {
+    if (messageIds.length === 0) return;
+    await this.client.users.messages.batchModify({
+      userId: "me",
+      requestBody: {
+        ids: messageIds,
+        addLabelIds: [GmailLabel.TRASH],
+        removeLabelIds: [GmailLabel.INBOX],
+      },
+    });
+  }
+
+  // Shared engine for bulk archive/trash by sender. Paginates each sender's
+  // messages and applies the action in batched calls (batchModify moves up to
+  // 1000 ids at once), processing several senders concurrently. Each sender is
+  // isolated so one failure never aborts the rest.
+  private async bulkModifyMessagesFromSenders({
+    senders,
+    ownerEmail,
+    emailAccountId,
+    action,
+    inboxOnly,
+    applyBatch,
+    continueOnError = true,
+  }: {
+    senders: string[];
+    ownerEmail: string;
+    emailAccountId: string;
+    action: "archive" | "trash";
+    inboxOnly: boolean;
+    applyBatch: (messageIds: string[]) => Promise<void>;
+    continueOnError?: boolean;
+  }): Promise<BulkSenderActionResult> {
     const log = this.logger.with({
-      action: "archiveMessagesFromSenders",
+      action: `bulk-${action}-from-senders`,
       emailAccountId,
       email: ownerEmail,
       sendersCount: senders.length,
     });
-    const continueOnError = options?.continueOnError ?? true;
 
-    if (senders.length === 0) return 0;
+    const validSenders = senders.filter((sender): sender is string =>
+      Boolean(sender),
+    );
+    if (validSenders.length === 0) {
+      return { movedCount: 0, failedCount: 0, failedSenders: [] };
+    }
 
-    let archivedMessagesCount = 0;
-
-    for (const sender of senders) {
-      if (!sender) continue;
-
+    const processSender = async (
+      sender: string,
+    ): Promise<{ movedCount: number; failed: boolean }> => {
+      let movedCount = 0;
+      let failed = false;
       const publishedThreadIds = new Set<string>();
       let nextPageToken: string | undefined;
 
@@ -391,43 +429,40 @@ export class GmailProvider implements EmailProvider {
           const { messages, nextPageToken: token } = await getMessages(
             this.client,
             {
-              query: `from:${sender} in:inbox`,
+              query: inboxOnly ? `from:${sender} in:inbox` : `from:${sender}`,
               maxResults: 500,
               pageToken: nextPageToken,
             },
           );
 
-          const batchThreadIds = new Set(messages.map((msg) => msg.threadId));
-          const batchMessageIds = messages.map((msg) => msg.id);
+          const messageIds = messages.map((message) => message.id);
+          if (messageIds.length > 0) {
+            await applyBatch(messageIds);
+            movedCount += messageIds.length;
 
-          if (batchMessageIds.length > 0) {
-            await this.archiveMessagesBulk(batchMessageIds);
-            archivedMessagesCount += batchMessageIds.length;
+            const newThreadIds = Array.from(
+              new Set(messages.map((message) => message.threadId)),
+            ).filter((threadId) => !publishedThreadIds.has(threadId));
 
-            const newThreadIds = Array.from(batchThreadIds).filter(
-              (threadId) => !publishedThreadIds.has(threadId),
-            );
-
-            const promises = [
+            await Promise.all([
               updateEmailMessagesForSender({
                 sender,
-                messageIds: batchMessageIds,
+                messageIds,
                 emailAccountId,
-                action: "archive",
+                action,
               }),
-            ];
-
-            if (newThreadIds.length > 0) {
-              promises.push(
-                publishBulkActionToTinybird({
-                  threadIds: newThreadIds,
-                  action: "archive",
-                  ownerEmail,
-                }),
-              );
-            }
-
-            await Promise.all(promises);
+              ...(newThreadIds.length > 0
+                ? [
+                    publishBulkActionToTinybird({
+                      threadIds: newThreadIds,
+                      action,
+                      ownerEmail,
+                    }),
+                  ]
+                : []),
+            ]).catch((error) =>
+              log.error("Failed to track bulk action", { sender, error }),
+            );
 
             newThreadIds.forEach((threadId) =>
               publishedThreadIds.add(threadId),
@@ -436,146 +471,58 @@ export class GmailProvider implements EmailProvider {
 
           nextPageToken = token;
         } catch (error) {
-          log.error("Failed to archive messages from sender", {
-            sender,
-            error,
-          });
-          if (!continueOnError) {
-            throw error;
-          }
-          // continue processing remaining pages
+          log.error("Failed to process sender", { sender, error });
+          if (!continueOnError) throw error;
+          failed = true;
           nextPageToken = undefined;
         }
       } while (nextPageToken);
-    }
 
-    log.info("Completed bulk archive from senders");
-    return archivedMessagesCount;
-  }
+      return { movedCount, failed };
+    };
 
-  private async trashThreadsFromSenders(
-    senders: string[],
-    ownerEmail: string,
-    emailAccountId: string,
-  ): Promise<void> {
-    const log = this.logger.with({
-      action: "bulkTrashFromSenders",
-      emailAccountId,
-      email: ownerEmail,
-      sendersCount: senders.length,
+    // continueOnError=false callers pass a single sender and want a throw on
+    // failure, so run sequentially; otherwise fan out across senders.
+    const settled = await runWithBoundedConcurrency({
+      items: validSenders,
+      concurrency: continueOnError ? BULK_SENDER_CONCURRENCY : 1,
+      run: (sender) => processSender(sender),
     });
 
-    if (senders.length === 0) {
-      return;
-    }
-
-    for (const sender of senders) {
-      if (!sender) {
-        continue;
-      }
-
-      const allThreadIds = new Set<string>();
-      const threadToMessages = new Map<string, string[]>();
-      let nextPageToken: string | undefined;
-
-      do {
-        try {
-          const { messages, nextPageToken: token } = await getMessages(
-            this.client,
-            {
-              query: `from:${sender}`,
-              maxResults: 500,
-              pageToken: nextPageToken,
-            },
-          );
-
-          messages.forEach((msg) => {
-            allThreadIds.add(msg.threadId);
-            const existingMessages = threadToMessages.get(msg.threadId) || [];
-            existingMessages.push(msg.id);
-            threadToMessages.set(msg.threadId, existingMessages);
-          });
-
-          nextPageToken = token;
-        } catch (error) {
-          log.error("Failed to get messages from sender", {
-            sender,
-            error,
-          });
-          // continue processing remaining senders
-          nextPageToken = undefined;
+    let movedCount = 0;
+    let failedCount = 0;
+    const failedSenders: string[] = [];
+    for (const { item: sender, result } of settled) {
+      if (result.status === "fulfilled") {
+        movedCount += result.value.movedCount;
+        if (result.value.failed) {
+          failedCount += 1;
+          failedSenders.push(sender);
         }
-      } while (nextPageToken);
-
-      // Trash threads one by one (no bulk delete permission in Gmail)
-      if (allThreadIds.size > 0) {
-        const successfullyTrashedThreadIds = new Set<string>();
-
-        for (const threadId of allThreadIds) {
-          try {
-            await this.trashThread(threadId, ownerEmail, "automation");
-            successfullyTrashedThreadIds.add(threadId);
-          } catch (error) {
-            log.error("Failed to trash thread for sender", {
-              sender,
-              threadId,
-              error,
-            });
-            // Continue processing remaining threads
-          }
-        }
-
-        if (successfullyTrashedThreadIds.size > 0) {
-          try {
-            const successfulMessageIds: string[] = [];
-            for (const threadId of successfullyTrashedThreadIds) {
-              const messages = threadToMessages.get(threadId) || [];
-              successfulMessageIds.push(...messages);
-            }
-
-            const promises = [
-              publishBulkActionToTinybird({
-                threadIds: Array.from(successfullyTrashedThreadIds),
-                action: "trash",
-                ownerEmail,
-              }),
-            ];
-
-            if (successfulMessageIds.length > 0) {
-              promises.push(
-                updateEmailMessagesForSender({
-                  sender,
-                  messageIds: successfulMessageIds,
-                  emailAccountId,
-                  action: "trash",
-                }),
-              );
-            }
-
-            await Promise.all(promises);
-          } catch (error) {
-            log.error("Failed to track trash operation for sender", {
-              sender,
-              error,
-            });
-          }
-        }
+      } else {
+        if (!continueOnError) throw result.reason;
+        failedCount += 1;
+        failedSenders.push(sender);
       }
     }
 
-    log.info("Completed bulk trash from senders");
+    log.info("Completed bulk action from senders", { movedCount, failedCount });
+    return { movedCount, failedCount, failedSenders };
   }
 
   async bulkArchiveFromSenders(
     fromEmails: string[],
     ownerEmail: string,
     emailAccountId: string,
-  ): Promise<void> {
-    await this.archiveMessagesFromSenders(
-      fromEmails,
+  ): Promise<BulkSenderActionResult> {
+    return this.bulkModifyMessagesFromSenders({
+      senders: fromEmails,
       ownerEmail,
       emailAccountId,
-    );
+      action: "archive",
+      inboxOnly: true,
+      applyBatch: (messageIds) => this.archiveMessagesBulk(messageIds),
+    });
   }
 
   async bulkArchiveSenderOrThrow(
@@ -583,24 +530,33 @@ export class GmailProvider implements EmailProvider {
     ownerEmail: string,
     emailAccountId: string,
   ): Promise<number> {
-    return this.withRateLimitTracking(
-      "bulk-archive-sender",
-      async () =>
-        await this.archiveMessagesFromSenders(
-          [fromEmail],
-          ownerEmail,
-          emailAccountId,
-          { continueOnError: false },
-        ),
-    );
+    return this.withRateLimitTracking("bulk-archive-sender", async () => {
+      const result = await this.bulkModifyMessagesFromSenders({
+        senders: [fromEmail],
+        ownerEmail,
+        emailAccountId,
+        action: "archive",
+        inboxOnly: true,
+        applyBatch: (messageIds) => this.archiveMessagesBulk(messageIds),
+        continueOnError: false,
+      });
+      return result.movedCount;
+    });
   }
 
   async bulkTrashFromSenders(
     fromEmails: string[],
     ownerEmail: string,
     emailAccountId: string,
-  ): Promise<void> {
-    await this.trashThreadsFromSenders(fromEmails, ownerEmail, emailAccountId);
+  ): Promise<BulkSenderActionResult> {
+    return this.bulkModifyMessagesFromSenders({
+      senders: fromEmails,
+      ownerEmail,
+      emailAccountId,
+      action: "trash",
+      inboxOnly: false,
+      applyBatch: (messageIds) => this.trashMessagesBulk(messageIds),
+    });
   }
 
   async trashThread(

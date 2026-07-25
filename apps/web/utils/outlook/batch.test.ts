@@ -101,7 +101,7 @@ describe("moveMessagesForSenders", () => {
       batchPost,
     });
 
-    const movedCount = await moveMessagesForSenders({
+    const result = await moveMessagesForSenders({
       client,
       senders: ["sender@example.com"],
       destinationId: "deleteditems",
@@ -111,7 +111,8 @@ describe("moveMessagesForSenders", () => {
       logger: createTestLogger(),
     });
 
-    expect(movedCount).toBe(9);
+    expect(result.movedCount).toBe(9);
+    expect(result.failedCount).toBe(0);
     expect(batchPost).toHaveBeenCalledTimes(3);
     expect(batchPost.mock.calls.map(([body]) => body.requests.length)).toEqual([
       4, 4, 1,

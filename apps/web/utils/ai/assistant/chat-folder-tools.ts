@@ -4,6 +4,11 @@ import { createEmailProvider } from "@/utils/email/provider";
 import type { Logger } from "@/utils/logger";
 import { FOLDER_SEPARATOR, type OutlookFolder } from "@/utils/outlook/folders";
 import { posthogCaptureEvent } from "@/utils/posthog";
+import { runWithBoundedConcurrency } from "@/utils/async";
+
+const MAX_ATTACHMENT_SCAN_PAGES = 20;
+const ATTACHMENT_SCAN_PAGE_SIZE = 50;
+const MOVE_TO_FOLDER_CONCURRENCY = 5;
 
 type FolderToolOptions = {
   email: string;
@@ -203,12 +208,149 @@ export const moveThreadsToFolderTool = ({
     },
   });
 
+export const moveAttachmentEmailsToFolderTool = ({
+  email,
+  emailAccountId,
+  provider,
+  logger,
+}: FolderToolOptions) =>
+  tool({
+    description:
+      "Find emails whose ATTACHMENT FILE NAMES contain given words (e.g. 'CV' or 'profile') and move them into an Outlook mail folder. The folder is created first (or reused if it already exists), then the matching emails are moved into it. Use this for requests like 'move all emails with a CV attachment into a CVs folder' — searchInbox cannot match attachment file names, so use this tool instead of searching. Scans recent emails that have attachments; if it reports truncated=true, more may remain and it can be run again.",
+    inputSchema: z.object({
+      folderName: folderNameSchema,
+      attachmentNameIncludes: z
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(10)
+        .describe(
+          'Case-insensitive substrings matched against attachment file names, e.g. ["CV", "profile"]. An email matches when any of its attachments contains any of these in its name.',
+        ),
+    }),
+    execute: async ({ folderName, attachmentNameIncludes }) => {
+      trackToolCall({
+        tool: "move_attachment_emails_to_folder",
+        email,
+        logger,
+      });
+
+      try {
+        const emailProvider = await createEmailProvider({
+          emailAccountId,
+          provider,
+          logger,
+        });
+
+        const folderMatch = findFolderMatch(
+          flattenFolders(await emailProvider.getFolders()),
+          folderName,
+        );
+        if (folderMatch.ambiguous) {
+          return {
+            error:
+              "Multiple folders match that name. Use the folder path from listFolders.",
+          };
+        }
+        if (!folderMatch.folder && isFolderPath(folderName)) {
+          return {
+            error:
+              "Folder path not found. Use an existing path from listFolders.",
+          };
+        }
+
+        // Create/get the folder first so it exists before anything is moved.
+        const folderId =
+          folderMatch.folder?.id ??
+          (await emailProvider.getOrCreateFolderIdByName(folderName));
+        const folderCreated = !folderMatch.folder;
+
+        // searchInbox has no attachment-name filter, so read attachment
+        // metadata directly and keep threads whose attachment name matches.
+        const terms = [
+          ...new Set(attachmentNameIncludes.map((term) => term.toLowerCase())),
+        ];
+        const matchedThreadIds = new Set<string>();
+        let pageToken: string | undefined;
+        let scannedCount = 0;
+        let pages = 0;
+        let truncated = false;
+        let scanError: string | undefined;
+
+        do {
+          try {
+            const { messages, nextPageToken } =
+              await emailProvider.getMessagesWithAttachments({
+                maxResults: ATTACHMENT_SCAN_PAGE_SIZE,
+                pageToken,
+              });
+            scannedCount += messages.length;
+            for (const message of messages) {
+              const matches = message.attachments?.some((attachment) => {
+                const name = attachment.filename?.toLowerCase();
+                return !!name && terms.some((term) => name.includes(term));
+              });
+              if (matches) matchedThreadIds.add(message.threadId);
+            }
+            pageToken = nextPageToken;
+            pages += 1;
+            if (pages >= MAX_ATTACHMENT_SCAN_PAGES && pageToken) {
+              truncated = true;
+              break;
+            }
+          } catch (error) {
+            // Keep whatever we already matched and still move those, rather than
+            // failing the whole request when one attachment-scan page errors.
+            logger.error("Attachment scan page failed", { error, page: pages });
+            scanError =
+              error instanceof Error ? error.message : "attachment scan failed";
+            truncated = true;
+            break;
+          }
+        } while (pageToken);
+
+        const threadIds = [...matchedThreadIds];
+        const settled = await runWithBoundedConcurrency({
+          items: threadIds,
+          concurrency: MOVE_TO_FOLDER_CONCURRENCY,
+          run: (threadId) =>
+            emailProvider.moveThreadToFolder(threadId, email, folderId),
+        });
+        const failedCount = settled.filter(
+          ({ result }) => result.status === "rejected",
+        ).length;
+
+        return {
+          success: failedCount === 0 && !scanError,
+          folderName,
+          folderCreated,
+          attachmentNameIncludes,
+          scannedCount,
+          matchedCount: threadIds.length,
+          movedCount: threadIds.length - failedCount,
+          failedCount,
+          truncated,
+          ...(scanError ? { scanError } : {}),
+        };
+      } catch (error) {
+        logger.error("Failed to move attachment emails to folder", { error });
+        return {
+          error: `Failed to move attachment emails to folder: ${
+            error instanceof Error ? error.message : "unknown error"
+          }`,
+        };
+      }
+    },
+  });
+
 export type ListFoldersTool = InferUITool<ReturnType<typeof listFoldersTool>>;
 export type CreateOrGetFolderTool = InferUITool<
   ReturnType<typeof createOrGetFolderTool>
 >;
 export type MoveThreadsToFolderTool = InferUITool<
   ReturnType<typeof moveThreadsToFolderTool>
+>;
+export type MoveAttachmentEmailsToFolderTool = InferUITool<
+  ReturnType<typeof moveAttachmentEmailsToFolderTool>
 >;
 
 type FlattenedFolder = {

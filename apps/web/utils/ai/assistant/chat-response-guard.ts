@@ -3,6 +3,16 @@ import { isToolErrorHiddenFromUser } from "./tool-error-visibility";
 const TOOL_FAILURE_WARNING =
   "Some tool calls failed during this request. Review the failed action cards in this message before relying on the summary.";
 
+// Shown when the model stops because it hit its output token limit
+// (finishReason "length"), so the user knows the reply was cut off rather than
+// silently truncated.
+export const TOKEN_LIMIT_WARNING =
+  "⚠️ I reached my response length limit and stopped early, so this reply may be incomplete. Ask me to continue, or split this into smaller steps.";
+
+// Shown when the chat request fails outright instead of failing silently.
+export const CHAT_ERROR_MESSAGE =
+  "⚠️ Something went wrong and I couldn't finish this response. This can happen when a request is too large or the AI service is busy — please try again, or break it into smaller steps.";
+
 export function getToolFailureWarning(
   message:
     | {

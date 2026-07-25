@@ -282,7 +282,9 @@ export function ManageInboxResult({
     inProgress: isInProgress,
   });
   const isSenderAction =
-    action === "bulk_archive_senders" || action === "unsubscribe_senders";
+    action === "bulk_archive_senders" ||
+    action === "bulk_trash_senders" ||
+    action === "unsubscribe_senders";
   const completedCount = isSenderAction
     ? (sendersCount ?? senders?.length)
     : (successCount ?? requestedCount);
@@ -1810,19 +1812,21 @@ export function PendingManageInboxSendersCard({
     sendersCount?: number;
     successCount?: number;
     failedCount?: number;
+    movedCount?: number;
     autoUnsubscribeCount?: number;
   } | null>(null);
 
   const action = getOutputField<string>(output, "action");
   const senders = getOutputField<string[]>(output, "senders") ?? [];
   const isUnsubscribe = action === "unsubscribe_senders";
+  const isTrash = action === "bulk_trash_senders";
   const shownSenders = senders.slice(0, 8);
   const hiddenSenderCount = senders.length - shownSenders.length;
 
   const handleConfirm = async () => {
     if (
       !senders.length ||
-      (!isUnsubscribe && action !== "bulk_archive_senders")
+      (!isUnsubscribe && !isTrash && action !== "bulk_archive_senders")
     ) {
       toastError({ description: "Could not run this cleanup." });
       return;
@@ -1831,7 +1835,11 @@ export function PendingManageInboxSendersCard({
     setIsRunning(true);
     try {
       const actionResult = await confirmSenderWideInboxAction(emailAccountId, {
-        action: isUnsubscribe ? "unsubscribe_senders" : "bulk_archive_senders",
+        action: isUnsubscribe
+          ? "unsubscribe_senders"
+          : isTrash
+            ? "bulk_trash_senders"
+            : "bulk_archive_senders",
         fromEmails: senders,
       });
       if (actionResult?.serverError) {
@@ -1843,7 +1851,9 @@ export function PendingManageInboxSendersCard({
       toastSuccess({
         description: isUnsubscribe
           ? "Unsubscribe requests sent and senders archived."
-          : "Archived all email from these senders.",
+          : isTrash
+            ? "Moved all email from these senders to trash."
+            : "Archived all email from these senders.",
       });
     } catch {
       toastError({ description: "Could not run this cleanup." });
@@ -1852,9 +1862,12 @@ export function PendingManageInboxSendersCard({
     }
   };
 
+  const senderLabel = senders.length === 1 ? "sender" : "senders";
   const title = isUnsubscribe
-    ? `Unsubscribe from ${senders.length} ${senders.length === 1 ? "sender" : "senders"}`
-    : `Archive all email from ${senders.length} ${senders.length === 1 ? "sender" : "senders"}`;
+    ? `Unsubscribe from ${senders.length} ${senderLabel}`
+    : isTrash
+      ? `Delete all email from ${senders.length} ${senderLabel}`
+      : `Archive all email from ${senders.length} ${senderLabel}`;
 
   return (
     <Card>
@@ -1889,7 +1902,9 @@ export function PendingManageInboxSendersCard({
           <p className="text-sm text-muted-foreground">
             {isUnsubscribe
               ? `Processed ${result.sendersCount ?? senders.length} senders (${result.autoUnsubscribeCount ?? 0} auto-unsubscribed${result.failedCount ? `, ${result.failedCount} failed` : ""}) and archived their email.`
-              : `Archived all existing email from ${result.sendersCount ?? senders.length} senders.`}
+              : isTrash
+                ? `Moved all existing email from ${result.sendersCount ?? senders.length} senders to trash${result.failedCount ? ` (${result.failedCount} failed)` : ""}.`
+                : `Archived all existing email from ${result.sendersCount ?? senders.length} senders.`}
           </p>
         ) : (
           <>
@@ -1899,12 +1914,18 @@ export function PendingManageInboxSendersCard({
             >
               <AlertTriangleIcon className="size-4 text-amber-600" />
               <AlertTitle>
-                {isUnsubscribe ? "Confirm unsubscribe" : "Confirm bulk archive"}
+                {isUnsubscribe
+                  ? "Confirm unsubscribe"
+                  : isTrash
+                    ? "Confirm bulk delete"
+                    : "Confirm bulk archive"}
               </AlertTitle>
               <AlertDescription className="text-sm text-muted-foreground">
                 {isUnsubscribe
                   ? "This sends real unsubscribe requests to these senders and archives all their existing email."
-                  : "This archives every existing email from these senders, not just the ones shown in chat."}
+                  : isTrash
+                    ? "This moves every existing email from these senders to trash, not just the ones shown in chat."
+                    : "This archives every existing email from these senders, not just the ones shown in chat."}
               </AlertDescription>
             </Alert>
 
@@ -1922,6 +1943,8 @@ export function PendingManageInboxSendersCard({
                   </>
                 ) : isUnsubscribe ? (
                   "Unsubscribe & archive"
+                ) : isTrash ? (
+                  "Delete all"
                 ) : (
                   "Archive all"
                 )}
@@ -2434,6 +2457,9 @@ export function getManageInboxActionLabel({
 }) {
   if (action === "bulk_archive_senders") {
     return inProgress ? "Bulk archiving senders" : "Bulk archived senders";
+  }
+  if (action === "bulk_trash_senders") {
+    return inProgress ? "Bulk deleting senders" : "Bulk deleted senders";
   }
   if (action === "unsubscribe_senders") {
     return inProgress ? "Unsubscribing senders" : "Unsubscribed senders";

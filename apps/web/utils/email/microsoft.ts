@@ -64,6 +64,7 @@ import type {
   EmailFilter,
   EmailSignature,
   SentMessagePage,
+  BulkSenderActionResult,
 } from "@/utils/email/types";
 import { unwatchOutlook, watchOutlook } from "@/utils/outlook/watch";
 import { escapeODataString } from "@/utils/outlook/odata-escape";
@@ -1931,8 +1932,8 @@ export class OutlookProvider implements EmailProvider {
     fromEmails: string[],
     ownerEmail: string,
     emailAccountId: string,
-  ): Promise<void> {
-    await moveMessagesForSenders({
+  ): Promise<BulkSenderActionResult> {
+    return moveMessagesForSenders({
       client: this.client,
       senders: fromEmails,
       destinationId: "archive",
@@ -1948,7 +1949,7 @@ export class OutlookProvider implements EmailProvider {
     ownerEmail: string,
     emailAccountId: string,
   ): Promise<number> {
-    return moveMessagesForSenders({
+    const result = await moveMessagesForSenders({
       client: this.client,
       senders: [fromEmail],
       destinationId: "archive",
@@ -1958,14 +1959,15 @@ export class OutlookProvider implements EmailProvider {
       logger: this.logger,
       continueOnError: false,
     });
+    return result.movedCount;
   }
 
   async bulkTrashFromSenders(
     fromEmails: string[],
     ownerEmail: string,
     emailAccountId: string,
-  ): Promise<void> {
-    await moveMessagesForSenders({
+  ): Promise<BulkSenderActionResult> {
+    return moveMessagesForSenders({
       client: this.client,
       senders: fromEmails,
       destinationId: "deleteditems",

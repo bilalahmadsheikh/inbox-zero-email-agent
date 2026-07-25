@@ -9,6 +9,24 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "2.9",
+    date: "2026-07-24",
+    notes: [
+      "The assistant no longer fails silently: if a reply gets cut off because it reached its length limit, it now says so and suggests continuing or splitting the request; and if a chat request errors out, it shows a clear message instead of stopping with nothing.",
+      'You can now ask the assistant to move emails by attachment name into a folder — e.g. "move all emails with a CV or profile attachment into a CVs folder." It creates the folder first, then finds emails by their attachment file names (which regular search couldn\'t match) and moves them in. On Gmail, the assistant can now also search attachment file names directly with filename:.',
+    ],
+  },
+  {
+    version: "2.8",
+    date: "2026-07-24",
+    notes: [
+      "Bulk delete and archive by sender are dramatically faster. Gmail now removes emails in large batches instead of one conversation at a time, and Outlook sends its requests in parallel — with several senders processed at once.",
+      "Bulk cleanups now tell you how many emails were removed and let you retry any senders that failed, instead of finishing silently.",
+      'You can now ask the assistant to delete every email from a sender — it moves them all to trash (after you confirm the card), instead of only the handful currently on screen. This mirrors the existing "archive all from sender" action.',
+      "When you ask the assistant to show or count all mail from a sender, it can pull more messages per search so it surfaces more of them at once.",
+    ],
+  },
+  {
     version: "2.7",
     date: "2026-07-23",
     notes: [

@@ -6,9 +6,15 @@ import {
   publishBulkActionToTinybird,
   updateEmailMessagesForSender,
 } from "@/utils/email/bulk-action-tracking";
+import { runWithBoundedConcurrency } from "@/utils/async";
+import type { BulkSenderActionResult } from "@/utils/email/types";
 
 const GRAPH_JSON_BATCH_LIMIT = 20; // Microsoft Graph JSON batching limit
 const GRAPH_MOVE_BATCH_LIMIT = 4;
+// Send several $batch requests at once instead of strictly one after another.
+const GRAPH_BATCH_CONCURRENCY = 3;
+// Process a few senders in parallel during bulk archive/trash.
+const OUTLOOK_SENDER_CONCURRENCY = 2;
 
 type GraphBatchRequestItem<TBody = unknown> = {
   id: string;
@@ -61,35 +67,38 @@ async function batch<TRequestBody = unknown, TResponseBody = unknown>({
     GRAPH_JSON_BATCH_LIMIT,
   );
 
+  const chunks: GraphBatchRequestItem<TRequestBody>[][] = [];
   for (let start = 0; start < requests.length; start += effectiveChunkSize) {
-    const chunk = requests.slice(start, start + effectiveChunkSize);
+    chunks.push(requests.slice(start, start + effectiveChunkSize));
+  }
 
-    try {
+  const settled = await runWithBoundedConcurrency({
+    items: chunks,
+    concurrency: GRAPH_BATCH_CONCURRENCY,
+    run: async (chunk) => {
       const response = (await graphClient
         .api("/$batch")
         .post({ requests: chunk })) as GraphBatchResponse<TResponseBody>;
+      return response?.responses ?? [];
+    },
+  });
 
-      const responses = response?.responses ?? [];
-      const requestsById = new Map(
-        chunk.map((request) => [request.id, request]),
-      );
-
-      responses.forEach((res) => {
-        aggregatedResponses.push(res);
-        if (res.status >= 400 && onFailure) {
-          onFailure({
-            request: requestsById.get(res.id),
-            response: res,
-          });
-        }
-      });
-    } catch (error) {
+  for (const { item: chunk, result } of settled) {
+    if (result.status === "rejected") {
       logger.error("Graph batch request failed", {
         ...context,
         chunkSize: chunk.length,
-        error,
+        error: result.reason,
       });
-      throw error;
+      throw result.reason;
+    }
+
+    const requestsById = new Map(chunk.map((request) => [request.id, request]));
+    for (const res of result.value) {
+      aggregatedResponses.push(res);
+      if (res.status >= 400 && onFailure) {
+        onFailure({ request: requestsById.get(res.id), response: res });
+      }
     }
   }
 
@@ -206,8 +215,9 @@ export async function moveMessagesForSenders({
   emailAccountId: string;
   continueOnError?: boolean;
   logger: Logger;
-}): Promise<number> {
-  if (senders.length === 0) return 0;
+}): Promise<BulkSenderActionResult> {
+  if (senders.length === 0)
+    return { movedCount: 0, failedCount: 0, failedSenders: [] };
 
   // Resolve the actual inbox folder ID for archive filtering
   // parentFolderId on messages is the real folder ID (a GUID), not the well-known name
@@ -228,11 +238,18 @@ export async function moveMessagesForSenders({
     }
   }
 
-  let movedMessagesCount = 0;
+  const validSenders = senders.filter((sender): sender is string =>
+    Boolean(sender),
+  );
+  if (validSenders.length === 0) {
+    return { movedCount: 0, failedCount: 0, failedSenders: [] };
+  }
 
-  for (const sender of senders) {
-    if (!sender) continue;
-
+  const processSender = async (
+    sender: string,
+  ): Promise<{ movedCount: number; failed: boolean }> => {
+    let movedCount = 0;
+    let failed = false;
     const processedMessageIds = new Set<string>();
     const publishedThreadIds = new Set<string>();
     const fromFilter = `from/emailAddress/address eq '${escapeODataString(sender)}'`;
@@ -303,7 +320,7 @@ export async function moveMessagesForSenders({
             const promises: Promise<unknown>[] = [];
 
             if (movedMessageIds.length > 0) {
-              movedMessagesCount += movedMessageIds.length;
+              movedCount += movedMessageIds.length;
               promises.push(
                 updateEmailMessagesForSender({
                   sender,
@@ -330,10 +347,13 @@ export async function moveMessagesForSenders({
               publishedThreadIds.add(threadId),
             );
 
-            if (hasErrors && !continueOnError) {
-              throw new Error(
-                "Graph batch returned one or more error responses.",
-              );
+            if (hasErrors) {
+              failed = true;
+              if (!continueOnError) {
+                throw new Error(
+                  "Graph batch returned one or more error responses.",
+                );
+              }
             }
           } catch (error) {
             logger.error("Failed to move or track messages", {
@@ -344,6 +364,7 @@ export async function moveMessagesForSenders({
               messageIds,
               error,
             });
+            failed = true;
             if (!continueOnError) throw error;
           } finally {
             messageIds.forEach((id) => processedMessageIds.add(id));
@@ -361,11 +382,37 @@ export async function moveMessagesForSenders({
           action,
           error,
         });
+        failed = true;
         if (!continueOnError) throw error;
         nextLink = undefined;
       }
     } while (nextLink);
+
+    return { movedCount, failed };
+  };
+
+  const settled = await runWithBoundedConcurrency({
+    items: validSenders,
+    concurrency: continueOnError ? OUTLOOK_SENDER_CONCURRENCY : 1,
+    run: (sender) => processSender(sender),
+  });
+
+  let movedCount = 0;
+  let failedCount = 0;
+  const failedSenders: string[] = [];
+  for (const { item: sender, result } of settled) {
+    if (result.status === "fulfilled") {
+      movedCount += result.value.movedCount;
+      if (result.value.failed) {
+        failedCount += 1;
+        failedSenders.push(sender);
+      }
+    } else {
+      if (!continueOnError) throw result.reason;
+      failedCount += 1;
+      failedSenders.push(sender);
+    }
   }
 
-  return movedMessagesCount;
+  return { movedCount, failedCount, failedSenders };
 }

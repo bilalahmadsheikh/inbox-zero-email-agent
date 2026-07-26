@@ -9,6 +9,16 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "3.0",
+    date: "2026-07-26",
+    notes: [
+      "The assistant now writes in your own voice everywhere, not just in replies: your writing style and account context now also shape new emails you ask it to draft or send in chat.",
+      "Tone now adapts to who you're emailing: replies and new emails read warmer and more casual for a personal contact, and more precise and professional for a business one, instead of one fixed tone for everyone.",
+      'New "Learned patterns" toggle in Settings (off by default): lets the assistant automatically learn which senders consistently match the same rule, with a plain-language explanation of what it does. Existing rules and manually added patterns work the same whether it\'s on or off.',
+      'The per-account settings row on the Settings page is now labeled "Account Settings" for clarity.',
+    ],
+  },
+  {
     version: "2.9",
     date: "2026-07-24",
     notes: [

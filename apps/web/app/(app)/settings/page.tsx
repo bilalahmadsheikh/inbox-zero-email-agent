@@ -30,6 +30,7 @@ import { WebhookSection } from "@/app/(app)/[emailAccountId]/settings/WebhookSec
 import { CopyRulesSection } from "@/app/(app)/[emailAccountId]/settings/CopyRulesSection";
 import { RuleImportExportSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/RuleImportExportSetting";
 import { ToggleAllRulesSection } from "@/app/(app)/[emailAccountId]/settings/ToggleAllRulesSection";
+import { LearnedPatternsSection } from "@/app/(app)/[emailAccountId]/settings/LearnedPatternsSection";
 import type { GetEmailAccountsResponse } from "@/app/api/user/email-accounts/route";
 import { LoadingContent } from "@/components/LoadingContent";
 import { PageHeader } from "@/components/PageHeader";
@@ -262,6 +263,7 @@ function EmailAccountSettingsCard({
             </Badge>
           </Link>
         )}
+        <span className="text-xs text-muted-foreground">Account Settings</span>
         <ChevronRightIcon
           className={cn(
             "size-4 text-muted-foreground transition-transform",
@@ -274,6 +276,7 @@ function EmailAccountSettingsCard({
         <>
           <OrgAnalyticsConsentSection emailAccountId={emailAccount.id} />
           <ToggleAllRulesSection emailAccountId={emailAccount.id} />
+          <LearnedPatternsSection emailAccountId={emailAccount.id} />
           <RuleImportExportSetting emailAccountId={emailAccount.id} />
           <CopyRulesSection
             emailAccountId={emailAccount.id}

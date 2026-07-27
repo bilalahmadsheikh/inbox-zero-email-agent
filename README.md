@@ -16,7 +16,7 @@ Zynbox is an AI email operations assistant powered by Devaicon. It organizes you
 
 ## Self-Hosting
 
-> **Prerequisites:** Docker and Node.js v24+
+> **Prerequisites:** Docker and Node.js version v24+
 
 ```bash
 npx @inbox-zero/cli setup

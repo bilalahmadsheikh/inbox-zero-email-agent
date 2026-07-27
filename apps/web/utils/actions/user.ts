@@ -62,7 +62,9 @@ export const saveWritingStyleAction = actionClient
     async ({ parsedInput: { writingStyle }, ctx: { emailAccountId } }) => {
       await prisma.emailAccount.update({
         where: { id: emailAccountId },
-        data: { writingStyle },
+        // Null the timestamp so the user's manual style is never auto-refreshed
+        // by the drift-triggered analysis.
+        data: { writingStyle, writingStyleUpdatedAt: null },
       });
     },
   );

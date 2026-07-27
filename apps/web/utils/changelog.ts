@@ -9,6 +9,13 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "3.1",
+    date: "2026-07-26",
+    notes: [
+      "Your writing-style profile now keeps itself current: after you've sent enough new mail, the assistant quietly re-learns your style from your recent sent emails, instead of relying on a one-time snapshot. It now samples your 50 most recent sent emails (up from 20), and a style you set or edit by hand is never overwritten.",
+    ],
+  },
+  {
     version: "3.0",
     date: "2026-07-26",
     notes: [

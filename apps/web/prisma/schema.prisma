@@ -128,6 +128,10 @@ model EmailAccount {
 
   about                          String?
   writingStyle                   String?
+  // When the analyzed writing style was last auto-generated/verified from sent
+  // mail. Drives the drift-triggered refresh. Null means a manually-set (or
+  // legacy) style that is never auto-refreshed.
+  writingStyleUpdatedAt          DateTime?
   signature                      String? // User's email signature from provider or manually set
   includeReferralSignature       Boolean   @default(false)
   watchEmailsExpirationDate      DateTime?

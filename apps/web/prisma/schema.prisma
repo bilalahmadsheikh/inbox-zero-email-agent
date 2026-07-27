@@ -163,6 +163,10 @@ model EmailAccount {
   // reply the AI generates reads supported incoming documents, regardless of the
   // per-rule readAttachments flag on individual actions.
   alwaysReadDraftAttachments Boolean             @default(false)
+  // User controls for attachment reading (file types, max size, sender
+  // allow/deny lists, file-name exclusions). Shape: attachmentSettingsSchema in
+  // utils/attachments/settings.ts. Null = defaults.
+  attachmentSettings        Json?
   rulesRevision             Int                  @default(0)
 
   meetingBriefingsEnabled       Boolean @default(false)

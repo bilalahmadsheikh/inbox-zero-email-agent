@@ -34,6 +34,7 @@ async function getEmailAccount({
       draftReplyConfidence: true,
       allowHiddenAiDraftLinks: true,
       alwaysReadDraftAttachments: true,
+      attachmentSettings: true,
       timezone: true,
       calendarBookingLink: true,
       signature: true,

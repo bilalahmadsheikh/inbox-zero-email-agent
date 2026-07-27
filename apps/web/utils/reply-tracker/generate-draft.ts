@@ -37,6 +37,10 @@ import { getReplyMemoriesForPrompt } from "@/utils/ai/reply/reply-memory";
 import type { DraftContextMetadata } from "@/utils/ai/reply/draft-context-metadata";
 import { collectSenderReplyExamples } from "@/utils/reply-tracker/sender-reply-examples";
 import { getIncomingAttachmentContext } from "@/utils/ai/reply/incoming-attachment-context";
+import {
+  resolveAttachmentSettings,
+  senderMatchesList,
+} from "@/utils/attachments/settings";
 
 export type DraftGenerationResult = {
   attachments?: SelectedAttachment[];
@@ -198,10 +202,28 @@ async function generateDraftContent(
 
   if (!lastMessage) throw new Error("No message provided");
 
-  // The global account switch forces attachment reading on for every draft,
-  // regardless of the per-rule flag.
-  const effectiveReadAttachments =
-    readAttachments || emailAccount.alwaysReadDraftAttachments;
+  // Attachment-read decision, in precedence order:
+  //   1. denied sender  -> never read
+  //   2. allowed sender -> always read
+  //   3. otherwise      -> per-rule flag OR the global "always read" switch
+  const attachmentSettings = resolveAttachmentSettings(
+    emailAccount.attachmentSettings,
+  );
+  const senderAddress = (
+    extractEmailAddress(lastMessage.headers.from) || lastMessage.headers.from
+  ).toLowerCase();
+
+  let effectiveReadAttachments: boolean;
+  if (senderMatchesList(senderAddress, attachmentSettings.denySenders)) {
+    effectiveReadAttachments = false;
+  } else if (
+    senderMatchesList(senderAddress, attachmentSettings.allowSenders)
+  ) {
+    effectiveReadAttachments = true;
+  } else {
+    effectiveReadAttachments =
+      readAttachments || emailAccount.alwaysReadDraftAttachments;
+  }
 
   const cachedReply = await getReplyWithConfidence({
     emailAccountId: emailAccount.id,

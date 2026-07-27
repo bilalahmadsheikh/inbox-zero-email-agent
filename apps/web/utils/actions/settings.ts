@@ -11,6 +11,7 @@ import {
   toggleAlwaysReadDraftAttachmentsBody,
 } from "@/utils/actions/settings.validation";
 import { DEFAULT_PROVIDER, Provider } from "@/utils/llms/config";
+import { attachmentSettingsSchema } from "@/utils/attachments/settings";
 import prisma from "@/utils/prisma";
 import {
   calculateNextScheduleDate,
@@ -51,6 +52,16 @@ export const toggleAlwaysReadDraftAttachmentsAction = actionClient
     await prisma.emailAccount.update({
       where: { id: emailAccountId },
       data: { alwaysReadDraftAttachments: enabled },
+    });
+  });
+
+export const updateAttachmentSettingsAction = actionClient
+  .metadata({ name: "updateAttachmentSettings" })
+  .inputSchema(attachmentSettingsSchema)
+  .action(async ({ ctx: { emailAccountId }, parsedInput }) => {
+    await prisma.emailAccount.update({
+      where: { id: emailAccountId },
+      data: { attachmentSettings: parsedInput as Prisma.InputJsonValue },
     });
   });
 

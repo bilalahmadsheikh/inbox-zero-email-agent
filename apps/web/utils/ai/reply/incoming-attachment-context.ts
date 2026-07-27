@@ -11,9 +11,12 @@ import {
 } from "@/utils/drive/document-extraction";
 import { escapeHtml } from "@/utils/string";
 import { runWithBoundedConcurrency } from "@/utils/async";
+import {
+  resolveAttachmentSettings,
+  attachmentMimeToFileType,
+} from "@/utils/attachments/settings";
 
 const MAX_ATTACHMENTS = 3;
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const DIRECT_CONTEXT_LENGTH = 12_000;
 const MAX_EXTRACTED_LENGTH = 1_200_000;
 const MAX_PDF_PAGES = 300;
@@ -54,6 +57,8 @@ export async function getIncomingAttachmentContext({
   provider: EmailProvider;
   logger: Logger;
 }): Promise<IncomingAttachmentContext> {
+  const settings = resolveAttachmentSettings(emailAccount.attachmentSettings);
+
   const candidates = messages
     .flatMap((message) =>
       (message.attachments ?? []).map((attachment) => ({
@@ -61,13 +66,27 @@ export async function getIncomingAttachmentContext({
         attachment,
       })),
     )
-    .filter(
-      ({ attachment }) =>
-        attachment.attachmentId &&
-        attachment.mimeType &&
-        isExtractableMimeType(attachment.mimeType) &&
-        (!attachment.size || attachment.size <= MAX_ATTACHMENT_BYTES),
-    )
+    .filter(({ attachment }) => {
+      if (!attachment.attachmentId || !attachment.mimeType) return false;
+      if (!isExtractableMimeType(attachment.mimeType)) return false;
+
+      // User-selected file types.
+      const fileType = attachmentMimeToFileType(attachment.mimeType);
+      if (!fileType || !settings.fileTypes.includes(fileType)) return false;
+
+      // User-configured max size.
+      if (attachment.size && attachment.size > settings.maxSizeBytes) {
+        return false;
+      }
+
+      // File-name privacy exclusions.
+      const name = attachment.filename?.toLowerCase() ?? "";
+      if (settings.nameExclusions.some((term) => name.includes(term))) {
+        return false;
+      }
+
+      return true;
+    })
     .slice(-MAX_ATTACHMENTS);
 
   if (!candidates.length) {

@@ -4,6 +4,7 @@ import { DigestSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/D
 import { DraftConfidenceSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/DraftConfidenceSetting";
 import { DraftReplies } from "@/app/(app)/[emailAccountId]/assistant/settings/DraftReplies";
 import { DraftAttachmentsSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/DraftAttachmentsSetting";
+import { AttachmentSettings } from "@/app/(app)/[emailAccountId]/assistant/settings/AttachmentSettings";
 import { DraftKnowledgeSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/DraftKnowledgeSetting";
 import { FollowUpRemindersSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/FollowUpRemindersSetting";
 import { HiddenAiDraftLinksSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/HiddenAiDraftLinksSetting";
@@ -27,6 +28,7 @@ export function SettingsTab() {
           <DraftReplies />
           <DraftConfidenceSetting />
           <DraftAttachmentsSetting />
+          <AttachmentSettings />
         </div>
       )}
 

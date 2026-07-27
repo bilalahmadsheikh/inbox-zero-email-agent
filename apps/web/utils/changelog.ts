@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "3.2",
+    date: "2026-07-28",
+    notes: [
+      "New attachment reading controls in Settings: choose which file types the AI reads (PDF, Word, text), cap the maximum file size, always read attachments from senders/domains you trust, never read from ones you don't, and skip files whose name contains sensitive words (e.g. medical, passport). These apply everywhere the AI reads incoming documents to draft or reply.",
+      "Attachment rules and these settings now work as one system: your file-type, size, and never-read settings also apply to any rule that reads attachments. The rule editor notes this, the settings list which rules read attachments, and when the assistant creates an attachment rule in chat it tells you it follows your global settings.",
+    ],
+  },
+  {
     version: "3.1",
     date: "2026-07-26",
     notes: [

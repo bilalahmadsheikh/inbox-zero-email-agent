@@ -591,22 +591,30 @@ function ActionCard({
       )}
       {(actionType === ActionType.DRAFT_EMAIL ||
         actionType === ActionType.REPLY) && (
-        <div className="mt-2 flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={readAttachmentsChecked}
-            onCheckedChange={(checked) =>
-              setValue(`actions.${index}.readAttachments`, checked === true)
-            }
-            aria-label="Read incoming attachments"
-            id={`actions.${index}.readAttachments`}
-          />
-          <label
-            htmlFor={`actions.${index}.readAttachments`}
-            className="cursor-pointer text-muted-foreground"
-          >
-            Read supported incoming documents before preparing the response
-          </label>
-        </div>
+        <>
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={readAttachmentsChecked}
+              onCheckedChange={(checked) =>
+                setValue(`actions.${index}.readAttachments`, checked === true)
+              }
+              aria-label="Read incoming attachments"
+              id={`actions.${index}.readAttachments`}
+            />
+            <label
+              htmlFor={`actions.${index}.readAttachments`}
+              className="cursor-pointer text-muted-foreground"
+            >
+              Read supported incoming documents before preparing the response
+            </label>
+          </div>
+          {readAttachmentsChecked && (
+            <p className="ml-6 mt-1 text-xs text-muted-foreground">
+              Reading here still follows your global Attachment Settings — file
+              types, size limit, and never-read senders all apply.
+            </p>
+          )}
+        </>
       )}
       {renderFieldRows(nonExpandableFields, renderField)}
       {isDraftReplyActionType(rawActionType)

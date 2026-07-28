@@ -1,4 +1,4 @@
-# Zynbox by DEVAICON
+# Zynbox by DEVAICON team
 
 Zynbox is an AI email operations assistant powered by Devaicon. It organizes your inbox, drafts replies in your voice, helps clean noisy subscriptions, prepares meeting context, and keeps important messages from slipping through.
 

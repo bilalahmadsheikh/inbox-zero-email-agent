@@ -33,7 +33,7 @@ import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EXTENSION_URL } from "@/utils/config";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
-import { env } from "@/env";
+import { isPremiumBypassed } from "@/utils/premium";
 import { Referrals } from "@/components/ReferralDialog";
 
 export function NavUser() {
@@ -171,7 +171,7 @@ export function NavUser() {
           <DropdownMenuSeparator />
 
           <DropdownMenuGroup>
-            {!env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS && (
+            {!isPremiumBypassed() && (
               <DropdownMenuItem asChild>
                 <Link
                   href="/premium"
@@ -202,7 +202,7 @@ export function NavUser() {
                 Feature Requests
               </Link>
             </DropdownMenuItem>
-            {!env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS && (
+            {!isPremiumBypassed() && (
               <DropdownMenuItem
                 onSelect={() => {
                   closeMobileSidebar("left-sidebar");

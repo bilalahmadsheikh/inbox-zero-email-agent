@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { env } from "@/env";
+import { isPremiumBypassed } from "@/utils/premium";
 import { Logo } from "@/components/new-landing/common/Logo";
 import { cn } from "@/utils";
 import { FooterLineLogo } from "@/components/new-landing/FooterLineLogo";
@@ -17,7 +17,7 @@ interface FooterProps {
 }
 
 export function Footer({ className, variant = "default" }: FooterProps) {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) {
+  if (isPremiumBypassed()) {
     return (
       <footer className="border-t border-[var(--landing-border)] bg-[var(--landing-bg-soft)] bg-cover bg-center bg-no-repeat overflow-hidden transition-colors">
         <div className={cn("overflow-hidden px-6 py-12 lg:px-8", className)}>

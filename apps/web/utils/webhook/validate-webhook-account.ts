@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { env } from "@/env";
 import {
   getUserTier,
   hasAiAccess,
+  isPremiumBypassed,
   isPremiumRecord,
   premiumEntitlementSelect,
 } from "@/utils/premium";
@@ -294,7 +294,7 @@ export async function validateWebhookAccount(
 function getWebhookAccountPremium(
   emailAccount: NonNullable<ValidatedWebhookAccountData>,
 ) {
-  return env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS
+  return isPremiumBypassed()
     ? {
         tier: "PROFESSIONAL_ANNUALLY" as const,
         stripeSubscriptionStatus: "active",

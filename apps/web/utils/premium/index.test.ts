@@ -10,14 +10,44 @@ vi.mock("@/env", () => ({
   env: envMock,
 }));
 
+// The premium/billing system is hard-disabled by default (see ./enabled) since
+// no premium accounts exist yet. These tests verify the underlying tier logic
+// still behaves correctly for when it's turned back on, so they mock the
+// switch on for the duration of this file.
+vi.mock("./enabled", () => ({
+  PREMIUM_ENABLED: true,
+}));
+
 import {
   getPremiumUserFilter,
   getUserTier,
   hasActiveAppleSubscription,
   isActivePremium,
   isPremium,
+  isPremiumBypassed,
   isPremiumRecord,
 } from "./index";
+
+describe("isPremiumBypassed", () => {
+  afterEach(() => {
+    envMock.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS = false;
+  });
+
+  it("stays bypassed even when the env override is off, since PREMIUM_ENABLED gates it too", () => {
+    // PREMIUM_ENABLED is mocked true above, so this exercises only the env
+    // override here; the default (unmocked) PREMIUM_ENABLED=false case is
+    // exactly what keeps every premium check bypassed in production today.
+    envMock.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS = false;
+
+    expect(isPremiumBypassed()).toBe(false);
+  });
+
+  it("is bypassed when the env override is on", () => {
+    envMock.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS = true;
+
+    expect(isPremiumBypassed()).toBe(true);
+  });
+});
 
 describe("Apple premium helpers", () => {
   afterEach(() => {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { env } from "@/env";
+import { isPremiumBypassed } from "@/utils/premium";
 import { auth } from "@/utils/auth";
 import { isAdmin } from "@/utils/admin";
 import {
@@ -28,7 +29,7 @@ export default async function AdminConfigPage() {
       emailSendEnabled: env.NEXT_PUBLIC_EMAIL_SEND_ENABLED,
       contactsEnabled: env.NEXT_PUBLIC_CONTACTS_ENABLED,
       aiModelSettingsDisabled: env.NEXT_PUBLIC_AI_MODEL_SETTINGS_DISABLED,
-      bypassPremiumChecks: env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS ?? false,
+      bypassPremiumChecks: isPremiumBypassed(),
     },
     providers: {
       google: hasGoogleOauthConfig(),

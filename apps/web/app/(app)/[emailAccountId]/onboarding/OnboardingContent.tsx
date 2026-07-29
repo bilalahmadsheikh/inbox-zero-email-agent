@@ -24,6 +24,7 @@ import { prefixPath } from "@/utils/path";
 import { useAccount } from "@/providers/EmailAccountProvider";
 import { useSignUpEvent } from "@/hooks/useSignupEvent";
 import { isDefined } from "@/utils/types";
+import { isPremiumBypassed } from "@/utils/premium";
 import { env } from "@/env";
 import { StepCompanySize } from "@/app/(app)/[emailAccountId]/onboarding/StepCompanySize";
 import { StepHowYouHeard } from "@/app/(app)/[emailAccountId]/onboarding/StepHowYouHeard";
@@ -112,7 +113,7 @@ export function OnboardingContent({ step }: OnboardingContentProps) {
     autoDraftDisabled:
       Boolean(env.NEXT_PUBLIC_AUTO_DRAFT_DISABLED) ||
       isDraftRepliesDisabledByRuleState(rules),
-    isSelfHosted: Boolean(env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS),
+    isSelfHosted: isPremiumBypassed(),
   }).filter((key) => isDefined(stepMap[key]));
   const steps = visibleStepKeys.map((key) => stepMap[key]).filter(isDefined);
 

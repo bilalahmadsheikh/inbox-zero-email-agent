@@ -38,6 +38,27 @@ export async function ensureEmailAccountsWatched({
   return await watchEmailAccounts(emailAccounts, logger);
 }
 
+// Fire-and-forget: sets up (or renews) the "new mail" watch for every email
+// account belonging to this user, without blocking the caller (an OAuth
+// redirect). Call this whenever a user signs in or connects/reconnects an
+// account, so a freshly connected mailbox starts being processed immediately
+// instead of waiting for the hourly watch/all cron. Safe to call repeatedly —
+// existing valid subscriptions are reused/renewed, not duplicated.
+export function triggerWatchOnSignIn({
+  userId,
+  logger,
+}: {
+  userId: string;
+  logger: Logger;
+}) {
+  ensureEmailAccountsWatched({ userIds: [userId], logger }).catch((error) => {
+    logger.error("Failed to ensure email watch on sign-in", {
+      error,
+      userId,
+    });
+  });
+}
+
 async function getEmailAccountsToWatch(userIds: string[] | null) {
   return prisma.emailAccount.findMany({
     where: {

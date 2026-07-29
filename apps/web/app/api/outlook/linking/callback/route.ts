@@ -38,6 +38,7 @@ import {
 import { isDuplicateError } from "@/utils/prisma-helpers";
 import { SCOPES as OUTLOOK_SCOPES } from "@/utils/outlook/scopes";
 import type { Logger } from "@/utils/logger";
+import { triggerWatchOnSignIn } from "@/utils/email/watch-manager";
 
 export const GET = withError("outlook/linking/callback", async (request) => {
   const actorUserId = (await auth(request.headers))?.user.id ?? null;
@@ -324,6 +325,8 @@ export const GET = withError("outlook/linking/callback", async (request) => {
         }
       }
 
+      triggerWatchOnSignIn({ userId: targetUserId, logger });
+
       await setOAuthCodeResult(code, { success: "account_created_and_linked" });
       return createAccountLinkingRedirect({
         query: { success: "account_created_and_linked" },
@@ -355,6 +358,8 @@ export const GET = withError("outlook/linking/callback", async (request) => {
         providerEmailHash: hash(providerEmail),
         providerSubjectHash: hashOAuthAuditIdentifier(providerAccountId),
       });
+
+      triggerWatchOnSignIn({ userId: targetUserId, logger });
 
       await setOAuthCodeResult(code, { success: "tokens_updated" });
       return createAccountLinkingRedirect({
@@ -404,6 +409,8 @@ export const GET = withError("outlook/linking/callback", async (request) => {
       providerSubjectHash: hashOAuthAuditIdentifier(providerAccountId),
       sourceUserId: linkingResult.sourceUserId,
     });
+
+    triggerWatchOnSignIn({ userId: targetUserId, logger });
 
     await setOAuthCodeResult(code, { success: successMessage });
     return createAccountLinkingRedirect({

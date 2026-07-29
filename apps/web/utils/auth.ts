@@ -37,6 +37,7 @@ import {
 } from "@/utils/microsoft/oauth";
 import { createOutlookClient } from "@/utils/outlook/client";
 import { SCOPES as OUTLOOK_SCOPES } from "@/utils/outlook/scopes";
+import { triggerWatchOnSignIn } from "@/utils/email/watch-manager";
 import {
   claimPendingPremiumInvite,
   updateAccountSeats,
@@ -713,6 +714,11 @@ export async function handleLinkAccount(account: Account) {
       });
       captureException(error, { extra: { userId: account.userId } });
     });
+
+    // Start watching this account for incoming mail right away, instead of
+    // waiting for the hourly watch/all cron to pick up a freshly connected
+    // account.
+    triggerWatchOnSignIn({ userId: account.userId, logger });
 
     logger.info("[linkAccount] Successfully linked account", {
       email: user.email,

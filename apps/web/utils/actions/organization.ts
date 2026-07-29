@@ -22,6 +22,7 @@ import {
   removeFromPendingInvites,
   removeUserFromPremium,
 } from "@/utils/premium/seats";
+import { isPremiumBypassed } from "@/utils/premium";
 import { env } from "@/env";
 import { slugify } from "@/utils/string";
 import { posthogCaptureEvent } from "@/utils/posthog";
@@ -511,7 +512,7 @@ export const cancelInvitationAction = actionClientUser
   });
 
 async function getOrganizationPremium(organizationId: string) {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return;
+  if (isPremiumBypassed()) return;
   const owner = await prisma.member.findFirst({
     where: { organizationId, role: "owner" },
     select: {

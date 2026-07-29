@@ -1,11 +1,11 @@
 "use client";
 
-import { env } from "@/env";
 import { useUser } from "@/hooks/useUser";
 import {
   getUserTier,
   hasAiAccess,
   hasUnsubscribeAccess,
+  isPremiumBypassed,
   isPremiumRecord,
 } from "@/utils/premium";
 
@@ -16,7 +16,7 @@ export function usePremium() {
   const premium = data?.premium;
   const hasAiApiKey = data?.hasAiApiKey;
 
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) {
+  if (isPremiumBypassed()) {
     return {
       ...swrResponse,
       premium,

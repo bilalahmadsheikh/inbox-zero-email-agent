@@ -6,11 +6,11 @@ import { ensureEmailAccountsWatched } from "@/utils/email/watch-manager";
 import {
   getUserTier,
   hasTierAccess,
+  isPremiumBypassed,
   isPremiumRecord,
   premiumEntitlementSelect,
 } from "@/utils/premium";
 import { SafeError } from "@/utils/error";
-import { env } from "@/env";
 
 const logger = createScopedLogger("premium");
 
@@ -191,7 +191,7 @@ export async function checkHasAccess({
   userId: string;
   minimumTier: PremiumTier;
 }): Promise<boolean> {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return true;
+  if (isPremiumBypassed()) return true;
 
   const user = await prisma.user.findUnique({
     where: { id: userId },

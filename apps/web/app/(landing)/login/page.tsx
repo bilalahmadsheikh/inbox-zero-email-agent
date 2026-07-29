@@ -8,6 +8,7 @@ import {
   getRequiresReconsentDescription,
 } from "@/app/(landing)/login/messages";
 import { env } from "@/env";
+import { isPremiumBypassed } from "@/utils/premium";
 import { auth } from "@/utils/auth";
 import { isGoogleOauthEmulationEnabled } from "@/utils/google/oauth";
 import { getEnabledLoginProviders } from "@/utils/oauth/login-providers";
@@ -36,7 +37,7 @@ export default async function AuthenticationPage(props: {
   const searchParams = await props.searchParams;
   const session = await auth();
   const nextPath = normalizeInternalPath(searchParams?.next);
-  const isSelfHosted = env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS;
+  const isSelfHosted = isPremiumBypassed();
 
   if (session?.user && !searchParams?.error) {
     redirect(nextPath ?? WELCOME_PATH);

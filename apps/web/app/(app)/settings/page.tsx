@@ -50,6 +50,7 @@ import { useAccounts } from "@/hooks/useAccounts";
 import { useMessagingChannels } from "@/hooks/useMessagingChannels";
 import { useAccount } from "@/providers/EmailAccountProvider";
 import { cn } from "@/utils";
+import { isPremiumBypassed } from "@/utils/premium";
 import { env } from "@/env";
 
 export default function SettingsPage() {
@@ -119,7 +120,7 @@ export default function SettingsPage() {
           </LoadingContent>
         </SettingsGroup>
 
-        {!env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS && (
+        {!isPremiumBypassed() && (
           <SettingsGroup
             icon={<CreditCardIcon className="size-5" />}
             title="Billing"

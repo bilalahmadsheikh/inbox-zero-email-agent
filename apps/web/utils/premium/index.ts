@@ -1,6 +1,14 @@
 import type { PremiumTier } from "@/generated/prisma/enums";
 import type { Premium } from "@/generated/prisma/client";
 import { env } from "@/env";
+import { PREMIUM_ENABLED } from "@/utils/premium/enabled";
+
+// True when premium gating should be skipped entirely — everyone is treated as
+// fully entitled. PREMIUM_ENABLED is the primary switch (see enabled.ts); the
+// env override is kept so it still works if premium gets re-enabled later.
+export function isPremiumBypassed(): boolean {
+  return !PREMIUM_ENABLED || !!env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS;
+}
 
 const APPLE_ACTIVE_STATUSES = new Set([
   "ACTIVE",
@@ -70,7 +78,7 @@ export const isPremium = (
   appleSubscriptionStatus?: string | null,
   adminGrantExpiresAt?: Date | string | null,
 ): boolean => {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return true;
+  if (isPremiumBypassed()) return true;
 
   return (
     isPremiumStripe(stripeSubscriptionStatus) ||
@@ -98,7 +106,7 @@ type PremiumStatusRecord = {
 export const isPremiumRecord = (
   premium?: PremiumStatusRecord | null,
 ): boolean => {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return true;
+  if (isPremiumBypassed()) return true;
   if (!premium) return false;
 
   return (
@@ -110,7 +118,7 @@ export const isPremiumRecord = (
 export const isActivePremium = (
   premium?: PremiumStatusRecord | null,
 ): boolean => {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return true;
+  if (isPremiumBypassed()) return true;
 
   if (!premium) return false;
 
@@ -133,7 +141,7 @@ export const getUserTier = (
     | "stripeSubscriptionStatus"
   > | null,
 ) => {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) {
+  if (isPremiumBypassed()) {
     return "PROFESSIONAL_ANNUALLY" as const;
   }
 
@@ -200,7 +208,7 @@ export const hasUnsubscribeAccess = (
   tier: PremiumTier | null,
   unsubscribeCredits?: number | null,
 ): boolean => {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return true;
+  if (isPremiumBypassed()) return true;
 
   if (tier) return true;
   if (unsubscribeCredits && unsubscribeCredits > 0) return true;
@@ -211,7 +219,7 @@ export const hasAiAccess = (
   tier: PremiumTier | null,
   hasApiKey?: boolean | null,
 ) => {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return true;
+  if (isPremiumBypassed()) return true;
 
   if (!tier) return false;
 
@@ -232,7 +240,7 @@ export const hasTierAccess = ({
   tier: PremiumTier | null;
   minimumTier: PremiumTier;
 }): boolean => {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return true;
+  if (isPremiumBypassed()) return true;
 
   if (!tier) return false;
 
@@ -258,7 +266,7 @@ export function getPremiumUserFilter({
 }: {
   minimumTier?: PremiumTier;
 } = {}) {
-  if (env.NEXT_PUBLIC_BYPASS_PREMIUM_CHECKS) return {};
+  if (isPremiumBypassed()) return {};
 
   const minimumTiers = minimumTier ? getTiersAtOrAbove(minimumTier) : undefined;
   const tierFilter = minimumTiers

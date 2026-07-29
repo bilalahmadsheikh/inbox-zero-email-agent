@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "3.3",
+    date: "2026-07-29",
+    notes: [
+      "Fixed newly connected accounts sometimes showing no emails and never labeling or drafting anything: the premium/billing system inherited from the original project is now force-disabled (no premium accounts exist yet), so it can no longer accidentally block a connected account's mail processing regardless of deployment configuration.",
+      "New and reconnected accounts now start being watched for incoming mail immediately on sign-in, instead of waiting for the once-an-hour background check — so a freshly connected inbox begins labeling and drafting right away rather than up to an hour later.",
+    ],
+  },
+  {
     version: "3.2",
     date: "2026-07-28",
     notes: [

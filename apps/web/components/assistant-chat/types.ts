@@ -33,6 +33,7 @@ import type {
   SearchMemoriesTool,
 } from "@/utils/ai/assistant/chat-memory-tools";
 import type { GetCalendarEventsTool } from "@/utils/ai/assistant/chat-calendar-tools";
+import type { SearchDriveFilesTool } from "@/utils/ai/assistant/chat-drive-tools";
 
 // export type DataPart = { type: "append-message"; message: string };
 
@@ -71,6 +72,7 @@ export type ChatTools = {
   rescheduleScheduledEmail: RescheduleScheduledEmailTool;
   getCalendarEvents: GetCalendarEventsTool;
   readAttachment: ReadAttachmentTool;
+  searchDriveFiles: SearchDriveFilesTool;
 };
 
 // biome-ignore lint/complexity/noBannedTypes: ignore

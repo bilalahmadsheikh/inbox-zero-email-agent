@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { z } from "zod";
 import type { gmail_v1 } from "@googleapis/gmail";
 import MailComposer from "nodemailer/lib/mail-composer";
@@ -134,13 +135,12 @@ export async function sendEmailWithHtml(
 
   const raw = await createRawMailMessage({ ...body, messageText });
   const result = await withGmailRetry(() =>
-    gmail.users.messages.send({
-      userId: "me",
-      requestBody: {
-        threadId: body.replyToEmail ? body.replyToEmail.threadId : undefined,
+    gmail.users.messages.send(
+      buildGmailSendParams(
         raw,
-      },
-    }),
+        body.replyToEmail ? body.replyToEmail.threadId : undefined,
+      ),
+    ),
   );
   return result;
 }
@@ -216,13 +216,7 @@ export async function replyToEmail(
   });
 
   const result = await withGmailRetry(() =>
-    gmail.users.messages.send({
-      userId: "me",
-      requestBody: {
-        threadId: message.threadId,
-        raw,
-      },
-    }),
+    gmail.users.messages.send(buildGmailSendParams(raw, message.threadId)),
   );
 
   return result;
@@ -281,13 +275,7 @@ export async function forwardEmail(
   });
 
   const result = await withGmailRetry(() =>
-    gmail.users.messages.send({
-      userId: "me",
-      requestBody: {
-        threadId: message.threadId,
-        raw,
-      },
-    }),
+    gmail.users.messages.send(buildGmailSendParams(raw, message.threadId)),
   );
 
   return result;
@@ -356,15 +344,7 @@ async function createDraft(
   logger.info("Calling Gmail API to create draft");
 
   const result = await withGmailRetry(async () =>
-    gmail.users.drafts.create({
-      userId: "me",
-      requestBody: {
-        message: {
-          threadId,
-          raw,
-        },
-      },
-    }),
+    gmail.users.drafts.create(buildGmailDraftParams(raw, threadId)),
   );
 
   logger.info("Gmail API draft.create response received", {
@@ -418,4 +398,45 @@ function renderReplyBodyAsPlainText(textContent?: string) {
     .replace(/\r\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+// Gmail's JSON `raw` field tops out around 5 MB. Base64url inflates the MIME by
+// a third on top of each attachment's own base64, so a message carrying real
+// attachments reaches that ceiling well before its visible size suggests.
+// Anything larger has to go through the upload endpoint, which googleapis
+// selects when `media` is present, and which wants the decoded RFC822 bytes
+// rather than the encoded raw field.
+const GMAIL_JSON_RAW_LIMIT_BYTES = 5 * 1024 * 1024;
+
+function buildGmailSendParams(raw: string, threadId?: string) {
+  if (raw.length <= GMAIL_JSON_RAW_LIMIT_BYTES) {
+    return { userId: "me", requestBody: { threadId, raw } };
+  }
+
+  return {
+    userId: "me",
+    requestBody: { threadId },
+    media: buildRfc822Media(raw),
+  };
+}
+
+function buildGmailDraftParams(raw: string, threadId?: string) {
+  if (raw.length <= GMAIL_JSON_RAW_LIMIT_BYTES) {
+    return { userId: "me", requestBody: { message: { threadId, raw } } };
+  }
+
+  return {
+    userId: "me",
+    requestBody: { message: { threadId } },
+    media: buildRfc822Media(raw),
+  };
+}
+
+function buildRfc822Media(raw: string) {
+  return {
+    mimeType: "message/rfc822",
+    body: Readable.from(
+      Buffer.from(raw.replace(/-/gu, "+").replace(/_/gu, "/"), "base64"),
+    ),
+  };
 }

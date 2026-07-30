@@ -91,6 +91,7 @@ export interface EmailProvider {
     subject: string;
     messageHtml: string;
     replyToMessageId?: string; // For proper threading
+    attachments?: MailAttachment[];
   }): Promise<{ id: string }>;
   createFilter(options: {
     from: string;
@@ -291,11 +292,7 @@ export interface EmailProvider {
     replyTo?: string;
     subject: string;
     messageHtml: string;
-    attachments?: Array<{
-      filename: string;
-      content: string;
-      contentType: string;
-    }>;
+    attachments?: MailAttachment[];
   }): Promise<{
     messageId: string;
     threadId: string;

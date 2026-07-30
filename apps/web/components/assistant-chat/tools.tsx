@@ -43,6 +43,7 @@ import {
   CopyIcon,
   CheckIcon,
   SendIcon,
+  PaperclipIcon,
 } from "lucide-react";
 import {
   Popover,
@@ -110,6 +111,7 @@ import {
   RuleSummaryText,
 } from "@/components/assistant-chat/rule-summary-card";
 import { getPendingEmailSubjectPrefix } from "@/components/assistant-chat/helpers";
+import { selectedAttachmentSchema } from "@/utils/attachments/source-schema";
 
 export type ThreadLookup = EmailLookup;
 
@@ -666,10 +668,12 @@ function EmailActionResult({
       ? `repeats every ${repeatEveryMinutes} min, ${repeatCount} sends total`
       : null;
   const cancelOnReply = pendingAction?.cancelOnReply === true;
+  const attachments = getPendingAttachments(pendingAction);
   const canPickTime =
     !isConfirmed &&
     requiresConfirmation &&
     isPersistedMessage &&
+    attachments.length === 0 &&
     (actionType === "send_email" || actionType === "reply_email");
 
   const messageId =
@@ -856,6 +860,34 @@ function EmailActionResult({
               {getPendingEmailSubjectPrefix(actionType)}
               {displaySubject}
             </span>
+          </div>
+        )}
+
+        {attachments.length > 0 && (
+          <div className="border-b px-4 py-2.5">
+            <div className="flex items-start gap-2">
+              <PaperclipIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 space-y-1">
+                {attachments.map((attachment) => (
+                  <div
+                    key={`${attachment.driveConnectionId}:${attachment.fileId}`}
+                    className="min-w-0"
+                  >
+                    <div className="truncate text-sm text-foreground">
+                      {attachment.filename}
+                    </div>
+                    {/* Two files can share a name; the folder is what tells the
+                        user which one is about to leave their account. */}
+                    {attachment.path &&
+                      attachment.path !== attachment.filename && (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {attachment.path}
+                        </div>
+                      )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -2608,6 +2640,20 @@ function getPendingNumber(
   if (!source) return null;
   const value = source[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+// Validated with the same schema the server wrote these with, so the card can
+// never drift from the shape that actually gets attached.
+function getPendingAttachments(source: Record<string, unknown> | undefined) {
+  const parsed = selectedAttachmentSchema
+    .array()
+    .safeParse(source?.attachments);
+  if (!parsed.success) return [];
+
+  return parsed.data.filter(
+    (attachment) =>
+      attachment.driveConnectionId && attachment.fileId && attachment.filename,
+  );
 }
 
 function getPendingOrOutputString({

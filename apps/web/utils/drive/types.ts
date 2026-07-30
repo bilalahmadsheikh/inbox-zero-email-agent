@@ -90,6 +90,18 @@ export interface DriveProvider {
   readonly name: DriveProviderType;
 
   /**
+   * Find files by name across the whole drive, using the provider's own search
+   * index. Reaches files a folder walk would never get to, but each provider
+   * decides what "matches" means: Google matches name prefixes and word
+   * starts rather than arbitrary substrings, and OneDrive also matches file
+   * content. Callers needing stricter matching must filter the results.
+   */
+  searchFilesByName(
+    query: string,
+    options?: { limit?: number },
+  ): Promise<DriveFile[]>;
+
+  /**
    * For serialization/debugging
    */
   toJSON(): { name: string; type: string };

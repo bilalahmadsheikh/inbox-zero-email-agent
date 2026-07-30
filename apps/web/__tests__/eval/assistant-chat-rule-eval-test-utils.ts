@@ -167,10 +167,12 @@ export function configureRuleEvalProvider({
   mockCreateEmailProvider,
   ruleRows,
   includeCreateLabel = false,
+  includeFolderSupport = false,
 }: {
   mockCreateEmailProvider: AnyMock;
   ruleRows: RuleRow[];
   includeCreateLabel?: boolean;
+  includeFolderSupport?: boolean;
 }) {
   const labels = buildDefaultRuleLabels(ruleRows);
   const provider = {
@@ -193,6 +195,14 @@ export function configureRuleEvalProvider({
             name,
             type: "user",
           })),
+        }
+      : {}),
+    ...(includeFolderSupport
+      ? {
+          getOrCreateFolderIdByName: vi.fn(
+            async (name: string) =>
+              `folder-${name.toLowerCase().replace(/\s+/g, "-")}`,
+          ),
         }
       : {}),
   };

@@ -32,6 +32,8 @@ import {
   type ChatCreateRuleToolInvocation,
 } from "@/utils/ai/assistant/tools/rules/shared";
 import { createRule } from "@/utils/rule/rule";
+import { resolveCloudAttachmentsForOutgoingEmail } from "@/utils/attachments/draft-attachments";
+import type { SelectedAttachment } from "@/utils/attachments/source-schema";
 
 const CONFIRMATION_IN_PROGRESS_ERROR =
   "Email action confirmation already in progress";
@@ -476,6 +478,7 @@ async function executeAssistantEmailAction({
         sendAtOverride,
         repeatOverride,
         cancelOnReplyOverride,
+        logger,
       });
     case "forward_email":
       return confirmPendingForwardEmailAction({
@@ -538,6 +541,11 @@ async function confirmPendingSendEmailAction({
     sendAtOverride === undefined ? output.pendingAction.sendAt : sendAtOverride;
 
   if (requestedSendAt) {
+    if (output.pendingAction.attachments.length > 0) {
+      throw new SafeError(
+        "Cloud attachments are not supported for scheduled emails yet",
+      );
+    }
     const requested = new Date(requestedSendAt).getTime();
     if (requested > Date.now() + MAX_SCHEDULE_AHEAD_MS) {
       throw new SafeError("Send time can be at most 90 days in the future");
@@ -590,6 +598,11 @@ async function confirmPendingSendEmailAction({
   }
 
   const sentAfter = new Date();
+  const attachments = await resolveConfirmedCloudAttachments({
+    emailAccountId,
+    selectedAttachments: output.pendingAction.attachments,
+    logger,
+  });
 
   const result = await emailProvider.sendEmailWithHtml({
     to,
@@ -598,6 +611,7 @@ async function confirmPendingSendEmailAction({
     subject,
     messageHtml,
     ...(from ? { from } : {}),
+    ...(attachments.length > 0 ? { attachments } : {}),
   });
   const messageId = await resolveSentMessageId({
     emailProvider,
@@ -631,6 +645,7 @@ async function confirmPendingReplyEmailAction({
   sendAtOverride,
   repeatOverride,
   cancelOnReplyOverride,
+  logger,
 }: {
   output: PendingReplyEmailToolOutput;
   emailProvider: Awaited<ReturnType<typeof createEmailProvider>>;
@@ -640,6 +655,7 @@ async function confirmPendingReplyEmailAction({
   sendAtOverride?: string | null;
   repeatOverride?: { everyMinutes: number; count: number } | null;
   cancelOnReplyOverride?: boolean;
+  logger: Logger;
 }) {
   const sourceMessage = await emailProvider.getMessage(
     output.pendingAction.messageId,
@@ -654,6 +670,11 @@ async function confirmPendingReplyEmailAction({
     sendAtOverride === undefined ? output.pendingAction.sendAt : sendAtOverride;
 
   if (requestedSendAt) {
+    if (output.pendingAction.attachments.length > 0) {
+      throw new SafeError(
+        "Cloud attachments are not supported for scheduled emails yet",
+      );
+    }
     return scheduleReplyEmail({
       output,
       message,
@@ -667,6 +688,12 @@ async function confirmPendingReplyEmailAction({
     });
   }
 
+  const attachments = await resolveConfirmedCloudAttachments({
+    emailAccountId,
+    selectedAttachments: output.pendingAction.attachments,
+    logger,
+  });
+
   const sentFromUser = message.labelIds?.includes("SENT");
   const recipients = getReplyRecipients(message.headers, {
     sentFromUser,
@@ -678,6 +705,7 @@ async function confirmPendingReplyEmailAction({
     ...(from ? { from } : {}),
     to: recipients.to,
     cc: recipients.cc,
+    ...(attachments.length > 0 ? { attachments } : {}),
   };
   const sentAfter = new Date();
   await emailProvider.replyToEmail(
@@ -1305,10 +1333,42 @@ async function resolveSentMessageId({
   return null;
 }
 
+// Refuses the whole send when any chosen file fails, and phrases it so the user
+// knows nothing went out and that the card can simply be confirmed again.
+async function resolveConfirmedCloudAttachments({
+  emailAccountId,
+  selectedAttachments,
+  logger,
+}: {
+  emailAccountId: string;
+  selectedAttachments: SelectedAttachment[];
+  logger: Logger;
+}) {
+  const resolved = await resolveCloudAttachmentsForOutgoingEmail({
+    emailAccountId,
+    selectedAttachments,
+    logger,
+  });
+
+  if ("error" in resolved) {
+    throw new SafeError(
+      `${resolved.error} Nothing was sent. Confirm again to retry, or ask the assistant to pick a different file.`,
+    );
+  }
+
+  return resolved.attachments;
+}
+
 function getAssistantEmailActionErrorMessage(
   actionType: AssistantPendingEmailActionType,
   error?: unknown,
 ) {
+  // Deliberate guards in the execute path (schedule limits, attachment
+  // failures) already phrase their message for the user and explain whether a
+  // retry can work. The generic fallback would replace that with "Failed to
+  // send email", so the reason never reaches them.
+  if (error instanceof SafeError && error.safeMessage) return error.safeMessage;
+
   const fallback = ASSISTANT_EMAIL_ACTION_METADATA[actionType].errorMessage;
   const providerErrorMessage = getProviderErrorMessage(error);
 

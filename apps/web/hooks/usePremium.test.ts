@@ -18,6 +18,14 @@ vi.mock("@/hooks/useUser", () => ({
   useUser: () => mockUseUser(),
 }));
 
+// Premium is hard-disabled by default (see utils/premium/enabled), which grants
+// every entitlement. These tests cover the tier logic for when billing is turned
+// back on, so they mock the switch on for this file; that a test account is never
+// blocked today is asserted in utils/premium/enabled.test.ts.
+vi.mock("@/utils/premium/enabled", () => ({
+  PREMIUM_ENABLED: true,
+}));
+
 import { usePremium } from "./usePremium";
 
 describe("usePremium", () => {

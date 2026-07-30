@@ -15,6 +15,9 @@ export const selectedAttachmentSchema = z.object({
   fileId: z.string(),
   filename: z.string(),
   mimeType: z.string(),
+  // Folder path, shown on the confirmation card so two files with the same name
+  // are still tellable apart at the moment the user approves the send.
+  path: z.string().nullish(),
   reason: z.string().nullish(),
 });
 export type SelectedAttachment = z.infer<typeof selectedAttachmentSchema>;

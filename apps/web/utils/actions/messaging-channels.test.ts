@@ -576,7 +576,7 @@ describe("toggleRuleChannelAction", () => {
         actions: {
           where: {
             type: {
-              in: ["DRAFT_EMAIL", "DRAFT_MESSAGING_CHANNEL"],
+              in: ["DRAFT_EMAIL", "DRAFT_MESSAGING_CHANNEL", "REPLY"],
             },
           },
           select: { id: true },

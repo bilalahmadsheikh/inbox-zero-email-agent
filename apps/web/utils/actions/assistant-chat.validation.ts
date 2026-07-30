@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { messageContextSchema } from "@/utils/ai/assistant/chat-context-validation";
 import { inlineEmailActionSchema } from "@/utils/ai/assistant/inline-email-actions";
+import { selectedAttachmentSchema } from "@/utils/attachments/source-schema";
 
 export const assistantPendingEmailActionTypeSchema = z.enum([
   "send_email",
@@ -46,6 +47,7 @@ export const pendingSendEmailToolOutputSchema = z.object({
     supersedesDraftId: z.string().nullish(),
     // One-time stop condition: a reply from the recipient cancels the chain.
     cancelOnReply: z.boolean().nullish(),
+    attachments: selectedAttachmentSchema.array().max(3).optional().default([]),
   }),
   confirmationResult: confirmationResultSchema.optional(),
 });
@@ -68,6 +70,7 @@ export const pendingReplyEmailToolOutputSchema = z.object({
     repeatCount: z.number().nullish(),
     // One-time stop condition: a reply from the recipient cancels the chain.
     cancelOnReply: z.boolean().nullish(),
+    attachments: selectedAttachmentSchema.array().max(3).optional().default([]),
   }),
   reference: z
     .object({

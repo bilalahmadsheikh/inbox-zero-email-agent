@@ -20,6 +20,7 @@ import {
   configureRuleEvalProvider,
   configureRuleMutationMocks,
 } from "@/__tests__/eval/assistant-chat-rule-eval-test-utils";
+import { cloneEmailAccountForProvider } from "@/__tests__/eval/assistant-chat-inbox-workflows-test-utils";
 import type { getEmailAccount } from "@/__tests__/helpers";
 import { ActionType } from "@/generated/prisma/enums";
 import { createScopedLogger } from "@/utils/logger";
@@ -133,6 +134,7 @@ describe.runIf(shouldRunEval)("Eval: assistant chat rule creation", () => {
       mockCreateEmailProvider,
       ruleRows: defaultRuleRows,
       includeCreateLabel: true,
+      includeFolderSupport: true,
     });
   });
 
@@ -310,6 +312,70 @@ describe.runIf(shouldRunEval)("Eval: assistant chat rule creation", () => {
 
       expect(pass).toBe(true);
     }, 120_000);
+
+    test("uses label plus archive for a Gmail move-to-folder request, in one turn", async () => {
+      const request =
+        "Create a folder called Deals and move all emails from marketing and promotional senders onto that folder, including any new ones going forward.";
+      const { toolCalls, actual } = await runAssistantChat({
+        emailAccount: cloneEmailAccountForProvider(emailAccount, "google"),
+        messages: [{ role: "user", content: request }],
+      });
+
+      const createCall = getLastMatchingToolCall(
+        toolCalls,
+        "createRule",
+        isCreateRuleInput,
+      )?.input;
+
+      // No MOVE_FOLDER assertion: Gmail's createRule schema omits that action
+      // entirely, so the model cannot emit it and the check would always pass.
+      const pass =
+        !!createCall &&
+        hasLabelAction(createCall.actions, "Deals") &&
+        hasActionType(createCall.actions, ActionType.ARCHIVE);
+
+      evalReporter.record({
+        testName: "gmail move-to-folder uses label+archive",
+        model: model.label,
+        pass,
+        actual: createCall
+          ? `${actual} | actions=${summarizeActionTypes(createCall.actions)}`
+          : actual,
+      });
+
+      expect(pass).toBe(true);
+    }, 120_000);
+
+    test("uses MOVE_FOLDER for an Outlook move-to-folder request, not label+archive", async () => {
+      const request =
+        "Create a folder called Deals and move all emails from marketing and promotional senders onto that folder, including any new ones going forward.";
+      const { toolCalls, actual } = await runAssistantChat({
+        emailAccount: cloneEmailAccountForProvider(emailAccount, "microsoft"),
+        messages: [{ role: "user", content: request }],
+      });
+
+      const createCall = getLastMatchingToolCall(
+        toolCalls,
+        "createRule",
+        isCreateRuleInput,
+      )?.input;
+
+      const pass =
+        !!createCall &&
+        hasMoveFolderAction(createCall.actions, "Deals") &&
+        !hasActionType(createCall.actions, ActionType.LABEL);
+
+      evalReporter.record({
+        testName: "outlook move-to-folder uses MOVE_FOLDER",
+        model: model.label,
+        pass,
+        actual: createCall
+          ? `${actual} | actions=${summarizeActionTypes(createCall.actions)}`
+          : actual,
+      });
+
+      expect(pass).toBe(true);
+    }, 120_000);
   });
 
   afterAll(() => {
@@ -345,6 +411,7 @@ type CreateRuleInput = {
     type: ActionType;
     fields?: {
       label?: string | null;
+      folderName?: string | null;
     } | null;
   }>;
 };
@@ -386,6 +453,22 @@ function hasLabelAction(
     (action) =>
       action.type === ActionType.LABEL &&
       action.fields?.label === expectedLabel,
+  );
+}
+
+function hasMoveFolderAction(
+  actions: Array<{
+    type: ActionType;
+    fields?: {
+      folderName?: string | null;
+    } | null;
+  }>,
+  expectedFolderName: string,
+) {
+  return actions.some(
+    (action) =>
+      action.type === ActionType.MOVE_FOLDER &&
+      action.fields?.folderName === expectedFolderName,
   );
 }
 

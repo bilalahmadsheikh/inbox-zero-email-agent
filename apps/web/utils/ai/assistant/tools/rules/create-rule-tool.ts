@@ -1,6 +1,7 @@
 import { type InferUITool, tool } from "ai";
 import type { Logger } from "@/utils/logger";
 import { createRuleSchema } from "@/utils/ai/rule/create-rule-schema";
+import { isMicrosoftProvider } from "@/utils/email/provider-types";
 import {
   createRule,
   outboundActionsNeedChatRiskConfirmation,
@@ -33,8 +34,7 @@ export const createRuleTool = ({
   onRulesStateExposed?: (rulesRevision: number) => void;
 }) =>
   tool({
-    description:
-      "Create a new automation rule that runs on future incoming email. Incoming attachments are not read by default. When the user explicitly asks for an attachment-aware draft or reply rule, set fields.readAttachments=true on its DRAFT_EMAIL or REPLY action; that rule will then read supported documents and switch to large-document processing when needed. For a plain 'always read attachments from sender X' request with no other automated action, prefer telling the user to add that sender to the Attachment Settings allow-list instead of creating a rule. Whenever you create a rule with readAttachments=true, tell the user in chat that the rule reads attachments and still follows their global Attachment Settings (file types, size limit, and never-read senders), which they can adjust in Settings. Only call this when the user's CURRENT message directly asks for ongoing automation with enough condition and action detail, or confirms a concrete rule you proposed with its exact conditions and actions. A complaint, a one-time cleanup request, or a vague wish (e.g. being tired of promo emails) is NOT a rule request: handle the immediate need or propose the exact rule and ask before creating it. Rules with send, reply, forward, or webhook actions additionally return requiresConfirmation and only exist after the user confirms the card in the UI.",
+    description: buildCreateRuleDescription(provider),
     inputSchema: createRuleSchema(provider),
     execute: async ({ name, condition, actions }) => {
       trackRuleToolCall({ tool: "create_rule", email, logger });
@@ -120,3 +120,18 @@ export const createRuleTool = ({
   });
 
 export type CreateRuleTool = InferUITool<ReturnType<typeof createRuleTool>>;
+
+function buildCreateRuleDescription(provider: string) {
+  const folderPolicy = isMicrosoftProvider(provider)
+    ? "When the user asks to move matching email to a folder, use the MOVE_FOLDER action with fields.folderName — do not use LABEL for a folder move on this provider."
+    : "Gmail has no real folders: when the user asks to move matching email to a folder or out of the inbox, use a LABEL action for that folder name together with an ARCHIVE action (this combination is Gmail's folder equivalent). Use LABEL alone, with no ARCHIVE, when the user only asks to label or tag email without moving it out of the inbox.";
+
+  return [
+    "Create a new automation rule that runs on future incoming email.",
+    "Incoming attachments are not read by default. When the user explicitly asks for an attachment-aware draft or reply rule, set fields.readAttachments=true on its DRAFT_EMAIL or REPLY action; that rule will then read supported documents and switch to large-document processing when needed. For a plain 'always read attachments from sender X' request with no other automated action, prefer telling the user to add that sender to the Attachment Settings allow-list instead of creating a rule. Whenever you create a rule with readAttachments=true, tell the user in chat that the rule reads attachments and still follows their global Attachment Settings (file types, size limit, and never-read senders), which they can adjust in Settings.",
+    folderPolicy,
+    "Follow the user's own words for scope and actions — do not add actions they did not ask for or imply.",
+    "Only call this when the user's CURRENT message directly asks for ongoing automation with enough condition and action detail, or confirms a concrete rule you proposed with its exact conditions and actions. A complaint, a one-time cleanup request, or a vague wish (e.g. being tired of promo emails) is NOT a rule request: handle the immediate need or propose the exact rule and ask before creating it.",
+    "Rules with send, reply, forward, or webhook actions additionally return requiresConfirmation and only exist after the user confirms the card in the UI.",
+  ].join("\n\n");
+}

@@ -13,6 +13,43 @@ import type {
   UploadFileParams,
 } from "@/utils/drive/types";
 
+// Google-native formats that Drive can convert into a real file. PDF keeps the
+// document's layout for anything meant to be read; spreadsheets go to xlsx so
+// the recipient still gets usable cells.
+const GOOGLE_NATIVE_EXPORTS: Record<
+  string,
+  { mimeType: string; extension: string }
+> = {
+  "application/vnd.google-apps.document": {
+    mimeType: "application/pdf",
+    extension: "pdf",
+  },
+  "application/vnd.google-apps.presentation": {
+    mimeType: "application/pdf",
+    extension: "pdf",
+  },
+  "application/vnd.google-apps.drawing": {
+    mimeType: "application/pdf",
+    extension: "pdf",
+  },
+  "application/vnd.google-apps.spreadsheet": {
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    extension: "xlsx",
+  },
+};
+
+// Google-native types with no meaningful export. Offering them as attachments
+// only leads to a failure at send time, so they stay out of search results.
+const UNATTACHABLE_GOOGLE_MIME_TYPES = [
+  "application/vnd.google-apps.folder",
+  "application/vnd.google-apps.form",
+  "application/vnd.google-apps.site",
+  "application/vnd.google-apps.map",
+  "application/vnd.google-apps.script",
+  "application/vnd.google-apps.shortcut",
+];
+
 export class GoogleDriveProvider implements DriveProvider {
   readonly name = "google" as const;
   private readonly client: drive_v3.Drive;
@@ -243,11 +280,67 @@ export class GoogleDriveProvider implements DriveProvider {
     return files.map((file) => this.convertToFile(file));
   }
 
+  async searchFilesByName(
+    query: string,
+    options?: { limit?: number },
+  ): Promise<DriveFile[]> {
+    const terms = query.split(/\s+/u).filter(Boolean);
+    if (terms.length === 0) return [];
+
+    this.logger.trace("Searching files by name", { termCount: terms.length });
+
+    // ANDing the terms narrows server-side without assuming they appear in the
+    // same order as the filename. Deliberately a single page: this backs an
+    // interactive search, so a bounded result set matters more than exhausting
+    // every match.
+    const nameQuery = terms
+      .map((term) => `name contains '${this.escapeDriveQueryValue(term)}'`)
+      .join(" and ");
+
+    const excludedTypes = UNATTACHABLE_GOOGLE_MIME_TYPES.map(
+      (mimeType) => `mimeType != '${mimeType}'`,
+    ).join(" and ");
+
+    const response = await this.client.files.list({
+      q: `${nameQuery} and ${excludedTypes} and trashed = false`,
+      fields:
+        "files(id, name, mimeType, size, parents, webViewLink, createdTime, modifiedTime)",
+      pageSize: Math.min(options?.limit ?? 100, 100),
+      orderBy: "modifiedTime desc",
+    });
+
+    return (response.data.files || []).map((file) => this.convertToFile(file));
+  }
+
   async downloadFile(
     fileId: string,
   ): Promise<{ content: Buffer; file: DriveFile } | null> {
     const file = await this.getFile(fileId);
     if (!file) return null;
+
+    const exportTarget = GOOGLE_NATIVE_EXPORTS[file.mimeType];
+    if (exportTarget) {
+      // Docs, Sheets and Slides hold no downloadable bytes: alt=media returns
+      // "fileNotDownloadable" for them, and Drive only hands them over through
+      // an explicit export into a real file format.
+      const exported = await this.client.files.export(
+        { fileId, mimeType: exportTarget.mimeType },
+        { responseType: "arraybuffer" },
+      );
+
+      return {
+        file: {
+          ...file,
+          mimeType: exportTarget.mimeType,
+          // Google-native names carry no extension, so recipients would get an
+          // unopenable file without one.
+          name: file.name.toLowerCase().endsWith(`.${exportTarget.extension}`)
+            ? file.name
+            : `${file.name}.${exportTarget.extension}`,
+        },
+        content: Buffer.from(exported.data as ArrayBuffer),
+      };
+    }
 
     const response = await this.client.files.get(
       { fileId, alt: "media" },

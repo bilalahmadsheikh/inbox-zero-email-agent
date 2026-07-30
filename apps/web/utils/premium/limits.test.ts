@@ -14,6 +14,15 @@ vi.mock("@/env", () => ({
 
 vi.mock("@/utils/prisma");
 
+// The premium/billing system is hard-disabled by default (see ./enabled), so
+// none of these checks reject anyone today. This file mocks the switch on to
+// keep the tier logic covered for whenever billing is turned back on; that the
+// default state lets a testing account straight through is asserted in
+// ./enabled.test.ts.
+vi.mock("./enabled", () => ({
+  PREMIUM_ENABLED: true,
+}));
+
 import { assertHasAiAccess } from "./limits";
 
 describe("assertHasAiAccess", () => {

@@ -19,6 +19,12 @@ import { checkHasAccess } from "@/utils/premium/server";
 import type { SelectedAttachment } from "@/utils/attachments/source-schema";
 
 const MAX_ATTACHMENTS = 3;
+// Outbound size ceiling. MIME base64 inflates payloads by about a third and
+// both providers reject oversized messages, so cap well under their limits --
+// and bound how much a single request can buffer into memory, since every
+// attachment is held as a Buffer before the message is built.
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_ATTACHMENT_BYTES = 12 * 1024 * 1024;
 const MAX_MODEL_CANDIDATES = 12;
 const MAX_INDEX_TARGETS = 12;
 const PDF_MIME_TYPE = "application/pdf";
@@ -222,6 +228,7 @@ export async function resolveDraftAttachments({
   );
   const providers = new Map<string, DriveProvider>();
   const resolvedAttachments: MailAttachment[] = [];
+  let totalBytes = 0;
 
   for (const selectedAttachment of selectedAttachments) {
     const driveConnection = connectionMap.get(
@@ -237,9 +244,39 @@ export async function resolveDraftAttachments({
     if (!provider) continue;
 
     try {
-      const downloaded = await provider.downloadFile(selectedAttachment.fileId);
-      if (!downloaded || downloaded.file.mimeType !== PDF_MIME_TYPE) continue;
+      // Check the advertised size before downloading: the whole file is held in
+      // memory once downloaded, so an oversized file has to be rejected before
+      // it is fetched, not after.
+      const metadata = await provider.getFile(selectedAttachment.fileId);
+      if (metadata?.size && metadata.size > MAX_ATTACHMENT_BYTES) {
+        logger.warn("Skipping oversized draft attachment", {
+          driveConnectionId: selectedAttachment.driveConnectionId,
+          fileId: selectedAttachment.fileId,
+          size: metadata.size,
+        });
+        continue;
+      }
 
+      const downloaded = await provider.downloadFile(selectedAttachment.fileId);
+      if (!downloaded) continue;
+
+      // Providers don't always report a size (Google-native exports have none
+      // until converted), so enforce the caps against what actually arrived.
+      const byteLength = downloaded.content.byteLength;
+      if (
+        byteLength > MAX_ATTACHMENT_BYTES ||
+        totalBytes + byteLength > MAX_TOTAL_ATTACHMENT_BYTES
+      ) {
+        logger.warn("Skipping draft attachment over the size budget", {
+          driveConnectionId: selectedAttachment.driveConnectionId,
+          fileId: selectedAttachment.fileId,
+          byteLength,
+          totalBytes,
+        });
+        continue;
+      }
+
+      totalBytes += byteLength;
       resolvedAttachments.push({
         filename: downloaded.file.name,
         content: downloaded.content,
@@ -255,6 +292,74 @@ export async function resolveDraftAttachments({
   }
 
   return resolvedAttachments;
+}
+
+// Shared so the chat tools and the confirmation action describe an unattachable
+// file identically. Each caller appends its own next step, since "nothing was
+// sent" and "nothing was drafted" need different follow-ups.
+export function describeUnresolvedAttachments({
+  requestedCount,
+  resolvedCount,
+}: {
+  requestedCount: number;
+  resolvedCount: number;
+}) {
+  const missingCount = requestedCount - resolvedCount;
+  return `${missingCount} of ${requestedCount} cloud files could not be attached. The file may have been moved, deleted, larger than the ${Math.floor(
+    MAX_ATTACHMENT_BYTES / (1024 * 1024),
+  )} MB attachment limit, or a format that cannot be attached directly.`;
+}
+
+// Resolves the cloud files chosen in chat into real attachments, refusing the
+// whole set if any file fails: a partial attach would send an email the user
+// believes carries a document that isn't there.
+export async function resolveCloudAttachmentsForOutgoingEmail({
+  emailAccountId,
+  selectedAttachments,
+  logger,
+}: {
+  emailAccountId: string;
+  selectedAttachments: SelectedAttachment[];
+  logger: Logger;
+}): Promise<{ attachments: MailAttachment[] } | { error: string }> {
+  if (!selectedAttachments.length) return { attachments: [] };
+
+  const account = await prisma.emailAccount.findUnique({
+    where: { id: emailAccountId },
+    select: { userId: true },
+  });
+  if (!account) return { error: "Email account not found" };
+
+  // Entitlement is checked here rather than left to resolveDraftAttachments,
+  // which returns an empty list on denial. That would reach the caller as a
+  // vague "the file could not be attached" instead of naming the real reason.
+  // Premium is bypassed while PREMIUM_ENABLED is off (utils/premium/enabled.ts),
+  // so today this never triggers -- it exists so re-enabling billing surfaces an
+  // accurate message rather than looking like a broken attachment.
+  if (!(await hasDraftAttachmentAccess(account.userId))) {
+    return {
+      error:
+        "Attaching cloud files is not available on this account's plan, so nothing was attached.",
+    };
+  }
+
+  const attachments = await resolveDraftAttachments({
+    emailAccountId,
+    userId: account.userId,
+    selectedAttachments,
+    logger,
+  });
+
+  if (attachments.length !== selectedAttachments.length) {
+    return {
+      error: describeUnresolvedAttachments({
+        requestedCount: selectedAttachments.length,
+        resolvedCount: attachments.length,
+      }),
+    };
+  }
+
+  return { attachments };
 }
 
 async function syncAttachmentSource({
@@ -634,6 +739,7 @@ preview: ${candidate.preview || "No preview available"}
             fileId: candidate.document.fileId,
             filename: candidate.document.name,
             mimeType: candidate.document.mimeType,
+            path: candidate.path,
             reason: selection.reason,
           } satisfies SelectedAttachment,
         ];

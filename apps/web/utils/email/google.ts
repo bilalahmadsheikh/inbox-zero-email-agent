@@ -670,6 +670,7 @@ export class GmailProvider implements EmailProvider {
     subject: string;
     messageHtml: string;
     replyToMessageId?: string;
+    attachments?: MailAttachment[];
   }): Promise<{ id: string }> {
     this.logger.info("Creating Gmail draft", {
       replyToMessageId: params.replyToMessageId,
@@ -702,6 +703,7 @@ export class GmailProvider implements EmailProvider {
         references: parentReferences,
       }),
       headers: { "X-Mailer": "Inbox Zero Web" },
+      attachments: params.attachments,
     });
 
     const result = await withGmailRetry(() =>
@@ -856,11 +858,7 @@ export class GmailProvider implements EmailProvider {
     replyTo?: string;
     subject: string;
     messageHtml: string;
-    attachments?: Array<{
-      filename: string;
-      content: string;
-      contentType: string;
-    }>;
+    attachments?: MailAttachment[];
   }) {
     const result = await sendEmailWithHtml(this.client, body);
     return {

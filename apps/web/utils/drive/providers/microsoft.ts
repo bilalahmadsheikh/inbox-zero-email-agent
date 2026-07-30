@@ -232,6 +232,28 @@ export class OneDriveProvider implements DriveProvider {
       .map((item) => this.convertToFile(item));
   }
 
+  async searchFilesByName(
+    query: string,
+    options?: { limit?: number },
+  ): Promise<DriveFile[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    this.logger.trace("Searching files by name");
+
+    // Graph's search covers file content as well as names and returns folders
+    // too, so filter to files here and leave name-match strictness to the
+    // caller. Single page on purpose: this backs an interactive search.
+    const response = await this.client
+      .api(`/me/drive/root/search(q='${trimmed.replace(/'/gu, "''")}')`)
+      .top(Math.min(options?.limit ?? 100, 200))
+      .get();
+
+    return ((response.value || []) as DriveItem[])
+      .filter((item) => !!item.file?.mimeType)
+      .map((item) => this.convertToFile(item));
+  }
+
   async downloadFile(
     fileId: string,
   ): Promise<{ content: Buffer; file: DriveFile } | null> {

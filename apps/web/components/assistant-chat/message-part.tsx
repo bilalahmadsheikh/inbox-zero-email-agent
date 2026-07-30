@@ -260,6 +260,27 @@ export function MessagePart({
     }
   }
 
+  if (part.type === "tool-searchDriveFiles") {
+    return renderToolStatus({
+      part,
+      loadingText: "Searching cloud files...",
+      renderSuccess: ({ toolCallId, output }) => {
+        const files = getOutputField<Array<unknown>>(output, "files");
+        const count = Array.isArray(files) ? files.length : null;
+        return (
+          <BasicToolInfo
+            key={toolCallId}
+            text={
+              count === 0
+                ? "No matching cloud files found"
+                : `Found ${count ?? "matching"} cloud file${count === 1 ? "" : "s"}`
+            }
+          />
+        );
+      },
+    });
+  }
+
   if (part.type === "tool-readEmail") {
     const { toolCallId, state } = part;
     if (state === "input-available") {

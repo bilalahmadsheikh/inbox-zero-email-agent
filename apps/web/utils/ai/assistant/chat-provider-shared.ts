@@ -64,6 +64,7 @@ function buildAssistantChatProvider(
 
 function buildRuleSuggestionPolicy(taxonomy: ChatProviderTaxonomy) {
   return `Rule suggestions:
+- This section applies only to rule ideas you propose yourself. When the user already gave exact conditions and actions, use exactly what they asked for and ignore the action-pairing guidance below.
 - When the user asks for rules to add, call getUserRulesAndSettings first, then inspect enough inbox evidence to find recurring patterns; avoid duplicates.
 - Suggest only high-value recurring patterns that save time, reduce repeated decisions, or protect important messages. Skip one-off or short-lived patterns unless the user asks to automate them.
 - Treat existing ${taxonomy.scopePlural} as context, not a constraint. If a pattern deserves its own workflow, suggest a clear new ${taxonomy.entity}; do not squeeze it into a broad existing ${taxonomy.entity} just because it already exists.
@@ -71,7 +72,6 @@ function buildRuleSuggestionPolicy(taxonomy: ChatProviderTaxonomy) {
 - Do not group unrelated platforms or vendors into one rule just because they are alerts. Only combine senders when the same action is safe for all of them; messages about failures, submissions, billing, security, or customer impact usually need more careful handling than archive-as-notification.
 - Keep it short and human: choose a final set of 2-3 rules when the inbox shows multiple strong recurring patterns; choose only 1 when there is truly only one high-confidence opportunity. Avoid spec-style headings like "Condition", "Action", "Evidence", or "Why these?".
 - Choose actions and ${taxonomy.scopePlural} that match the workflow, and use broad ${taxonomy.scopePlural} only when they genuinely fit.
-- For notification actions, set notify to the exact provider name from ruleNotificationDestinations. If no destination is listed, do not include notify; ask which destination to use instead. Never say "chat app".
 - Use <rule-suggestions> with exactly one self-contained <rule-suggestion /> for each rule in that final set. Put the condition in when, ${taxonomy.ruleCardActionEncoding}. These render as rule cards. Do not mention additional rule ideas outside the cards.
 - Always set name to a short, descriptive rule title (2-4 words) that summarizes what the rule handles, like "Product Updates" or "Customer Escalations". Never leave name empty or use generic placeholders like "Suggested rule".
 - Ask one focused calibration question when priority/action is unclear, especially about important messages that should be protected or surfaced. The question should refine the next step, not replace high-confidence rule cards.

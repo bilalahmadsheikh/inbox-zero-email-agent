@@ -31,6 +31,7 @@ import {
   replyToEmail,
   sendEmailWithPlainText,
   sendEmailWithHtml,
+  addAttachmentsToDraft,
 } from "@/utils/outlook/mail";
 import {
   archiveThread,
@@ -552,6 +553,7 @@ export class OutlookProvider implements EmailProvider {
     subject: string;
     messageHtml: string;
     replyToMessageId?: string;
+    attachments?: MailAttachment[];
   }): Promise<{ id: string }> {
     this.logger.info("Creating draft", {
       replyToMessageId: params.replyToMessageId,
@@ -593,6 +595,15 @@ export class OutlookProvider implements EmailProvider {
         this.logger,
       );
 
+      if (params.attachments?.length) {
+        await addAttachmentsToDraft({
+          client: this.client,
+          draftId: draft.id,
+          attachments: params.attachments,
+          logger: this.logger,
+        });
+      }
+
       this.logger.info("Created threaded draft", { draftId: draft.id });
       return { id: draft.id };
     }
@@ -610,6 +621,15 @@ export class OutlookProvider implements EmailProvider {
           }),
       this.logger,
     );
+
+    if (params.attachments?.length) {
+      await addAttachmentsToDraft({
+        client: this.client,
+        draftId: draft.id,
+        attachments: params.attachments,
+        logger: this.logger,
+      });
+    }
 
     this.logger.info("Created standalone draft", { draftId: draft.id });
     return { id: draft.id };
@@ -735,11 +755,7 @@ export class OutlookProvider implements EmailProvider {
     replyTo?: string;
     subject: string;
     messageHtml: string;
-    attachments?: Array<{
-      filename: string;
-      content: string;
-      contentType: string;
-    }>;
+    attachments?: MailAttachment[];
   }) {
     const result = await sendEmailWithHtml(this.client, body, this.logger);
     return {

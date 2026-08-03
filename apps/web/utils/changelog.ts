@@ -9,6 +9,13 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "4.9",
+    date: "2026-08-04",
+    notes: [
+      'Asking to cancel an email the assistant has just prepared now gets a straight answer. It used to go looking through your scheduled emails, find none, and report "nothing is queued" — which was true and beside the point, because an email waiting on the confirmation card was never queued in the first place. It now tells you plainly that the email was never sent and will not send unless you approve it, rather than sending you off to a list that could never contain it.',
+    ],
+  },
+  {
     version: "4.8",
     date: "2026-08-04",
     notes: [

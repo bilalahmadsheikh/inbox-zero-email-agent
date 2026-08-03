@@ -50,7 +50,7 @@ docker compose -f docker-compose.dev.yml --profile microsoft-emulator up -d
 
 Then set the matching provider variables in `apps/web/.env`.
 
-## Built with
+## Built with following
 
 - Next.js
 - Tailwind CSS

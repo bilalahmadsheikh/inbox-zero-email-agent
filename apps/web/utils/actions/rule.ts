@@ -48,14 +48,13 @@ import {
   getRuleConfig,
   getSystemRuleActionTypes,
   getCategoryAction,
-  getActionTypesForCategoryAction,
 } from "@/utils/rule/consts";
 import { actionClient, actionClientUser } from "@/utils/actions/safe-action";
 import { assertRuleIsNotOrgManaged } from "@/utils/organizations/rules";
 import { CONVERSATION_STATUS_TYPES } from "@/utils/reply-tracker/conversation-status-config";
+import { getActionsFromCategoryAction } from "@/utils/rule/system-rule-actions";
 import { env } from "@/env";
 import { prefixPath } from "@/utils/path";
-import { ONE_WEEK_MINUTES } from "@/utils/date";
 import { createEmailProvider } from "@/utils/email/provider";
 import { resolveLabelNameAndId } from "@/utils/label/resolve-label";
 import type { Logger } from "@/utils/logger";
@@ -1013,112 +1012,6 @@ async function resolveActionLabels<
       return action;
     }),
   );
-}
-
-async function getActionsFromCategoryAction({
-  emailAccountId,
-  ruleName,
-  categoryAction,
-  label,
-  draftReply,
-  hasDigest,
-  provider,
-  logger,
-  systemType,
-}: {
-  emailAccountId: string;
-  ruleName: string;
-  categoryAction: CategoryAction;
-  label: string;
-  hasDigest: boolean;
-  draftReply: boolean;
-  provider: string;
-  logger: Logger;
-  systemType?: SystemType;
-}): Promise<RuleActionCreateData[]> {
-  const emailProvider = await createEmailProvider({
-    emailAccountId,
-    provider,
-    logger,
-  });
-
-  function normalizeCategory(action: CategoryAction) {
-    switch (action) {
-      case "label_archive_delayed":
-        return { base: "label_archive" as const, isDelayed: true };
-      case "move_folder_delayed":
-        return { base: "move_folder" as const, isDelayed: true };
-      default:
-        return {
-          base: action as "label" | "label_archive" | "move_folder",
-          isDelayed: false,
-        };
-    }
-  }
-
-  const { base: baseCategoryAction, isDelayed } =
-    normalizeCategory(categoryAction);
-
-  const actionTypes = getActionTypesForCategoryAction({
-    categoryAction: baseCategoryAction,
-    systemType,
-    draftReply,
-    hasDigest,
-  });
-
-  const actions: RuleActionCreateData[] = [];
-
-  for (const actionType of actionTypes) {
-    switch (actionType.type) {
-      case ActionType.LABEL: {
-        const { label: labelName, labelId } = await resolveLabelNameAndId({
-          emailProvider,
-          label,
-          labelId: null,
-        });
-
-        logger.info("Resolved label ID during onboarding", {
-          requestedLabel: label,
-          resolvedLabelName: labelName,
-          resolvedLabelId: labelId,
-          ruleName,
-        });
-
-        actions.push({ type: ActionType.LABEL, label: labelName, labelId });
-        break;
-      }
-      case ActionType.MOVE_FOLDER: {
-        const folderId =
-          await emailProvider.getOrCreateFolderIdByName(ruleName);
-
-        logger.info("Resolved folder ID during onboarding", {
-          folderName: ruleName,
-          resolvedFolderId: folderId,
-          categoryAction,
-        });
-
-        actions.push({
-          type: ActionType.MOVE_FOLDER,
-          folderId,
-          folderName: ruleName,
-          delayInMinutes: isDelayed ? ONE_WEEK_MINUTES : undefined,
-        });
-        break;
-      }
-      case ActionType.ARCHIVE: {
-        actions.push({
-          type: ActionType.ARCHIVE,
-          delayInMinutes: isDelayed ? ONE_WEEK_MINUTES : undefined,
-        });
-        break;
-      }
-      default: {
-        actions.push({ type: actionType.type });
-      }
-    }
-  }
-
-  return actions;
 }
 
 export const importRulesAction = actionClient

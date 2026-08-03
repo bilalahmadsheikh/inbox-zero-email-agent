@@ -36,6 +36,7 @@ import {
   isAddressLikeEmailPattern,
   splitEmailPatterns,
 } from "@/utils/rule/email-from-pattern";
+import { isNoReplyAddress } from "@/utils/email/no-reply";
 import type { EmailProvider } from "@/utils/email/types";
 import type { ModelType } from "@/utils/llms/model";
 import {
@@ -53,17 +54,6 @@ import {
 const MODULE = "match-rules";
 
 const TO_REPLY_RECEIVED_THRESHOLD = 10;
-const NO_REPLY_PREFIXES = [
-  "noreply@",
-  "no-reply@",
-  "notifications@",
-  "notif@",
-  "info@",
-  "newsletter@",
-  "updates@",
-  "account@",
-];
-
 type MatchingRulesResult = {
   matches: {
     rule: RuleWithActions;
@@ -773,9 +763,7 @@ async function filterConversationStatusRulesWithMetadata<
     );
   }
 
-  if (
-    NO_REPLY_PREFIXES.some((prefix) => extractedSenderEmail.startsWith(prefix))
-  ) {
+  if (isNoReplyAddress(extractedSenderEmail)) {
     return {
       rules: filteredOutConversationStatusRules(),
       filteredRuleNames: filteredConversationRuleNames,

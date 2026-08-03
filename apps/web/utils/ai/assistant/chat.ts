@@ -29,6 +29,7 @@ import {
   getRecipientContextTool,
   getSenderCategorizationStatusTool,
   getSenderCategoryOverviewTool,
+  getGroupRecipientsTool,
   listScheduledEmailsTool,
   manageInboxTool,
   manageSenderCategoryTool,
@@ -277,6 +278,7 @@ export async function aiProcessAssistantChat({
     getAssistantCapabilities: getAssistantCapabilitiesTool(toolOptions),
     getAccountOverview: getAccountOverviewTool(toolOptions),
     getSenderCategoryOverview: getSenderCategoryOverviewTool(toolOptions),
+    getGroupRecipients: getGroupRecipientsTool(toolOptions),
     startSenderCategorization: startSenderCategorizationTool(toolOptions),
     getSenderCategorizationStatus:
       getSenderCategorizationStatusTool(toolOptions),

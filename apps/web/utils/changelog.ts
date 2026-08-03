@@ -9,6 +9,15 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "4.7",
+    date: "2026-08-04",
+    notes: [
+      'You can now email a group by describing it in chat. Asking to "email everyone in Marketing introducing myself" now works: the assistant finds those addresses itself instead of asking you to paste a list. It searches both meanings of the name — the sender categories behind Bulk Archive, and the label your rules apply — and merges them, so it finds the right people whichever you had in mind.',
+      "Addresses that cannot receive mail are left out automatically. Marketing and Newsletter senders are mostly no-reply addresses, where anything you send is silently discarded, so those are excluded and reported separately rather than quietly padding the recipient list. Up to 50 recipients are resolved at a time, and the assistant tells you when a group is larger than that instead of implying it reached everyone.",
+      "The assistant no longer offers to email a group and then refuses once you accept. It previously described a category as though it were a recipient, and could only ever see five senders per category without knowing the list was cut short. It now knows that limit, and knows which tool retrieves the full list.",
+    ],
+  },
+  {
     version: "4.6",
     date: "2026-08-04",
     notes: [

@@ -21,6 +21,10 @@ import {
   MIN_SCHEDULE_AHEAD_MS,
 } from "@/utils/actions/mail.validation";
 import type { EmailProvider } from "@/utils/email/types";
+import {
+  GROUP_RECIPIENT_LIMIT,
+  resolveGroupRecipients,
+} from "@/utils/ai/assistant/group-recipients";
 import type { ParsedMessage } from "@/utils/types";
 import { getEmailForLLM } from "@/utils/get-email-from-message";
 import { getFormattedSenderAddress } from "@/utils/email/get-formatted-sender-address";
@@ -470,7 +474,7 @@ export const getSenderCategoryOverviewTool = ({
 }) =>
   tool({
     description:
-      "Inspect sender categories for the current account. Returns exact category names, sender counts, sample senders, uncategorized sender count, and current categorization progress. Use this before any category-based cleanup, and prefer it over searchInbox when the user asks to clean up by category. If the user only wants the threads already shown or a small explicit set of emails, stay with searchInbox and manageInbox instead.",
+      "Inspect sender categories for the current account. Returns exact category names, sender counts, a SAMPLE of up to 5 senders per category, uncategorized sender count, and current categorization progress. The sample is not the full membership: to get addresses to send to, call getGroupRecipients instead and never treat these samples as the complete list. Use this before any category-based cleanup, and prefer it over searchInbox when the user asks to clean up by category. If the user only wants the threads already shown or a small explicit set of emails, stay with searchInbox and manageInbox instead.",
     inputSchema: z.object({}),
     execute: async () => {
       trackToolCall({ tool: "get_sender_category_overview", email, logger });
@@ -488,6 +492,56 @@ export const getSenderCategoryOverviewTool = ({
 
 export type GetSenderCategoryOverviewTool = InferUITool<
   ReturnType<typeof getSenderCategoryOverviewTool>
+>;
+
+export const getGroupRecipientsTool = ({
+  email,
+  emailAccountId,
+  provider,
+  logger,
+}: {
+  email: string;
+  emailAccountId: string;
+  provider: EmailProvider;
+  logger: Logger;
+}) =>
+  tool({
+    description: `Resolve a group of people the user described by name ("everyone in Marketing", "the Newsletter senders") into actual email addresses. Call this before sendEmail or draftEmail whenever the recipients are described as a category or label rather than given as addresses; those tools accept resolved addresses only and will reject a group name. Searches both the sender categorisation and the mailbox label of that name, merges and deduplicates them. Send-only addresses (noreply@, no-reply@, info@ and similar) are excluded by default and reported separately in excludedNoReply, because mail to them is silently discarded; set includeNoReply only if the user explicitly asks for them. Returns at most ${GROUP_RECIPIENT_LIMIT} recipients with truncated:true when more exist — never imply you are reaching everyone when truncated is true. If recipients comes back empty, say so and do not substitute addresses from anywhere else. Read-only: resolving a group sends nothing.`,
+    inputSchema: z.object({
+      group: z
+        .string()
+        .trim()
+        .min(1)
+        .describe(
+          "The category or label name the user named, e.g. 'Marketing'.",
+        ),
+      includeNoReply: z
+        .boolean()
+        .optional()
+        .describe(
+          "Include send-only addresses. Only set true when the user explicitly asks for them.",
+        ),
+    }),
+    execute: async ({ group, includeNoReply }) => {
+      trackToolCall({ tool: "get_group_recipients", email, logger });
+
+      try {
+        return await resolveGroupRecipients({
+          emailAccountId,
+          provider,
+          group,
+          includeNoReply,
+          logger,
+        });
+      } catch (error) {
+        logger.error("Failed to resolve group recipients", { group, error });
+        return { error: "Failed to resolve that group into recipients" };
+      }
+    },
+  });
+
+export type GetGroupRecipientsTool = InferUITool<
+  ReturnType<typeof getGroupRecipientsTool>
 >;
 
 export const startSenderCategorizationTool = ({
@@ -1414,7 +1468,7 @@ export const sendEmailTool = ({
 }) =>
   tool({
     description:
-      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely. If the user asks for a draft to review and send themselves, use draftEmail instead. If the user asks to send an email that was already saved with draftEmail in this conversation, pass that draft's id as supersedesDraftId so the leftover draft is removed after the send instead of surviving as a duplicate. For a brand-new email (not a reply) to a recipient you don't already have context on, call getRecipientContext first so the tone matches the real relationship.",
+      "Prepare a new email to send, either immediately or scheduled for a later time via sendAt. This does NOT send immediately - it returns a confirmation payload for the user to approve. On approval, emails without sendAt go out right away; emails with sendAt are delivered automatically at that time. For immediate sends, omit sendAt completely. If the user asks for a draft to review and send themselves, use draftEmail instead. If the user asks to send an email that was already saved with draftEmail in this conversation, pass that draft's id as supersedesDraftId so the leftover draft is removed after the send instead of surviving as a duplicate. For a brand-new email (not a reply) to a recipient you don't already have context on, call getRecipientContext first so the tone matches the real relationship. Recipients must be real email addresses; a category or label name like 'Marketing' is not a recipient. When the user describes the recipients as a group, call getGroupRecipients first and send to the addresses it returns.",
     inputSchema: sendEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "send_email", email, logger });
@@ -1502,7 +1556,7 @@ export const draftEmailTool = ({
 }) =>
   tool({
     description:
-      "Create an email draft saved to the user's Drafts folder without sending anything. Use whenever the user asks to draft, write up, or prepare an email for them to review and send themselves - including when they have not decided whether to send now or later. The draft is created immediately; there is no confirmation step and nothing is sent. Use sendEmail instead only when the user clearly wants the email sent, immediately or scheduled. When revising a draft made earlier in this conversation, pass its draftId as replacesDraftId so the old version is removed. If the user later asks to send a drafted email from chat, call sendEmail with supersedesDraftId set to the draftId returned here so the draft is cleaned up rather than left as a duplicate. For a brand-new email (not a reply, no replyToMessageId) to a recipient you don't already have context on, call getRecipientContext first so the tone matches the real relationship.",
+      "Create an email draft saved to the user's Drafts folder without sending anything. Use whenever the user asks to draft, write up, or prepare an email for them to review and send themselves - including when they have not decided whether to send now or later. The draft is created immediately; there is no confirmation step and nothing is sent. Use sendEmail instead only when the user clearly wants the email sent, immediately or scheduled. When revising a draft made earlier in this conversation, pass its draftId as replacesDraftId so the old version is removed. If the user later asks to send a drafted email from chat, call sendEmail with supersedesDraftId set to the draftId returned here so the draft is cleaned up rather than left as a duplicate. For a brand-new email (not a reply, no replyToMessageId) to a recipient you don't already have context on, call getRecipientContext first so the tone matches the real relationship. Recipients must be real email addresses; a category or label name like 'Marketing' is not a recipient. When the user describes the recipients as a group, call getGroupRecipients first and send to the addresses it returns.",
     inputSchema: draftEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "draft_email", email, logger });

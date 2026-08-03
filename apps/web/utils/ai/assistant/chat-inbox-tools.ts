@@ -25,6 +25,7 @@ import {
   GROUP_RECIPIENT_LIMIT,
   resolveGroupRecipients,
 } from "@/utils/ai/assistant/group-recipients";
+import { assignSendersToCategory } from "@/utils/categorize/senders/assign-category";
 import type { ParsedMessage } from "@/utils/types";
 import { getEmailForLLM } from "@/utils/get-email-from-message";
 import { getFormattedSenderAddress } from "@/utils/email/get-formatted-sender-address";
@@ -544,6 +545,59 @@ export type GetGroupRecipientsTool = InferUITool<
   ReturnType<typeof getGroupRecipientsTool>
 >;
 
+export const categorizeSendersTool = ({
+  email,
+  emailAccountId,
+  logger,
+}: {
+  email: string;
+  emailAccountId: string;
+  logger: Logger;
+}) =>
+  tool({
+    description:
+      "Put one or more senders into a sender category, e.g. 'categorise alice@example.com as Family'. This is the tool for any request to categorise, group, tag or file a SENDER — sender categories describe people and companies, and are separate from rules, which act on individual emails. Never create or edit a rule to satisfy a request to categorise a sender. Senders who have never emailed the account can still be assigned. Set createIfMissing only when the user's wording clearly names a new group to create; leave it false otherwise and the tool returns the existing category names so you can ask which they meant, rather than inventing a category from a typo. Applies immediately and is reversible, so no confirmation is needed, but always report which senders were assigned, to which category, and whether that category was newly created.",
+    inputSchema: z.object({
+      senders: z
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(50)
+        .describe("Email addresses of the senders to categorise."),
+      categoryName: z
+        .string()
+        .trim()
+        .min(1)
+        .max(30)
+        .describe("The category to put them in, e.g. 'Family'."),
+      createIfMissing: z
+        .boolean()
+        .optional()
+        .describe(
+          "Create the category when it does not exist. Only when the user clearly means to create a new group.",
+        ),
+    }),
+    execute: async ({ senders, categoryName, createIfMissing }) => {
+      trackToolCall({ tool: "categorize_senders", email, logger });
+
+      try {
+        return await assignSendersToCategory({
+          emailAccountId,
+          senders,
+          categoryName,
+          createIfMissing,
+          logger,
+        });
+      } catch (error) {
+        logger.error("Failed to categorize senders", { categoryName, error });
+        return { error: "Failed to categorise those senders" };
+      }
+    },
+  });
+
+export type CategorizeSendersTool = InferUITool<
+  ReturnType<typeof categorizeSendersTool>
+>;
+
 export const startSenderCategorizationTool = ({
   email,
   emailAccountId,
@@ -644,7 +698,7 @@ export const manageSenderCategoryTool = ({
 }) =>
   tool({
     description:
-      'Archive all mail from senders currently assigned to one sender category. Use this only after getSenderCategoryOverview confirmed the exact category ID or exact category name the user wants. Prefer categoryId when available. Supports the special category name "Uncategorized". If the requested category name does not exactly exist, do not guess; list the available category names and ask a brief clarification question instead. Do not use this for thread-level cleanup or arbitrary search results; use manageInbox instead.',
+      'Archive all mail from senders currently assigned to one sender category. This only archives mail; it cannot put a sender into a category — use categorizeSenders for that. Use this only after getSenderCategoryOverview confirmed the exact category ID or exact category name the user wants. Prefer categoryId when available. Supports the special category name "Uncategorized". If the requested category name does not exactly exist, do not guess; list the available category names and ask a brief clarification question instead. Do not use this for thread-level cleanup or arbitrary search results; use manageInbox instead.',
     inputSchema: manageSenderCategoryInputSchema,
     execute: async ({ categoryId, categoryName }) => {
       trackToolCall({ tool: "manage_sender_category", email, logger });

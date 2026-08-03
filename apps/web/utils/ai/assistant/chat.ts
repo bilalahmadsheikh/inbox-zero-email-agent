@@ -30,6 +30,7 @@ import {
   getSenderCategorizationStatusTool,
   getSenderCategoryOverviewTool,
   getGroupRecipientsTool,
+  categorizeSendersTool,
   listScheduledEmailsTool,
   manageInboxTool,
   manageSenderCategoryTool,
@@ -283,6 +284,7 @@ export async function aiProcessAssistantChat({
     getSenderCategorizationStatus:
       getSenderCategorizationStatusTool(toolOptions),
     manageSenderCategory: manageSenderCategoryTool(toolOptions),
+    categorizeSenders: categorizeSendersTool(toolOptions),
     searchInbox: searchInboxTool(toolOptions),
     readEmail: readEmailTool(toolOptions),
     manageInbox: manageInboxTool(toolOptions),

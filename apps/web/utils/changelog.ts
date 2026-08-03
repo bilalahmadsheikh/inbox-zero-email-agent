@@ -13,6 +13,9 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-08-04",
     notes: [
       'Asking to cancel an email the assistant has just prepared now gets a straight answer. It used to go looking through your scheduled emails, find none, and report "nothing is queued" — which was true and beside the point, because an email waiting on the confirmation card was never queued in the first place. It now tells you plainly that the email was never sent and will not send unless you approve it, rather than sending you off to a list that could never contain it.',
+      'You can now categorise senders from chat: "categorise alice@example.com and bob@example.com as Family" just works. Previously the assistant had no way to do this at all, so it answered about rules instead — telling you there was no Family rule to update, when you had not asked about rules. Sender categories and rules are different things, and it now uses the right one. People who have never emailed you can be categorised too, so you can set a group up in advance.',
+      "If you name a category that does not exist, it shows you the ones you have and asks which you meant, instead of silently creating a new category from a typo. It only creates one when you clearly mean to.",
+      "The assistant also stops asking permission for its own internal bookkeeping. It used to say it needed to refresh the rules before it could continue and wait for you to agree; that was a step it could always have taken by itself, and it now does.",
     ],
   },
   {

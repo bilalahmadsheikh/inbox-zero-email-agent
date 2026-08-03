@@ -40,12 +40,15 @@ describe("updateLearnedPatternsTool", () => {
       ],
     });
 
-    expect(result).toEqual({
+    // The contract is that nothing changed and the guidance stays hidden from
+    // the user; the exact wording is model-facing copy and free to change.
+    expect(result).toMatchObject({
       success: false,
-      error:
-        "No rule was changed. Call getUserRulesAndSettings immediately before updating this rule.",
       toolErrorVisibility: "hidden",
     });
+    expect((result as { error: string }).error).toContain(
+      "getUserRulesAndSettings",
+    );
     expect(prisma.rule.findUnique).not.toHaveBeenCalled();
   });
 

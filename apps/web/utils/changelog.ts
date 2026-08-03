@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "4.6",
+    date: "2026-08-04",
+    notes: [
+      "Rules apply again. Since 27 July every rule that actually matched an email failed at the moment it tried to act, so nothing was labelled, filed or drafted on any account. The cause was a new per-rule option for reading attachments: the setting was added to rules, but the record kept of each completed action was never given a matching place to store it, and writing that record is what performs the action. The record was rejected, and the action died with it.",
+      'This was invisible from the outside, and worse, it looked like the opposite problem. Emails that matched nothing filed their "nothing to do" note perfectly well, while every genuine match vanished without leaving any record at all. The history therefore showed weeks of mail apparently matching no rules, when in fact the matches were the only thing failing.',
+    ],
+  },
+  {
     version: "4.5",
     date: "2026-08-04",
     notes: [

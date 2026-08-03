@@ -548,6 +548,10 @@ async function executeMatchedRule(
                 immediateActions?.map((item) => {
                   const {
                     delayInMinutes: _delayInMinutes,
+                    // Only the rule's own Action carries readAttachments; it is
+                    // read when drafting and has no column on ExecutedAction,
+                    // so passing it through makes the whole create fail.
+                    readAttachments: _readAttachments,
                     ...executedActionFields
                   } = sanitizeActionFields(item);
                   return {

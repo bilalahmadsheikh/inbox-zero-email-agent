@@ -897,6 +897,53 @@ describe("runRules conversation meta rule", () => {
   });
 });
 
+describe("runRules executed action payload", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("does not write readAttachments, which ExecutedAction has no column for", async () => {
+    const rule = createRule("label-rule", null, [
+      getAction({
+        id: "label-action",
+        type: ActionType.LABEL,
+        label: "Notification",
+        ruleId: "label-rule",
+      }),
+    ]);
+
+    vi.mocked(findMatchingRules).mockResolvedValue({
+      matches: [{ rule }],
+      reasoning: "Matched",
+    } as any);
+
+    // sanitizeActionFields adds readAttachments for every action; it belongs to
+    // the rule's Action, not to the executed record.
+    vi.mocked(getActionItemsWithAiArgs).mockResolvedValue([
+      {
+        type: ActionType.LABEL,
+        label: "Notification",
+        readAttachments: false,
+      },
+    ] as any);
+
+    prisma.executedRule.findFirst.mockResolvedValue(null);
+    (prisma.executedRule.create as any).mockResolvedValue({
+      id: "executed-1",
+      actionItems: [],
+    });
+
+    await runRulesWithDefaults({ rules: [rule], isTest: false });
+
+    const createArgs = (prisma.executedRule.create as any).mock.calls[0][0];
+    const actionData = createArgs.data.actionItems.createMany.data;
+
+    expect(actionData).toHaveLength(1);
+    expect(actionData[0]).not.toHaveProperty("readAttachments");
+    expect(actionData[0].type).toBe(ActionType.LABEL);
+  });
+});
+
 describe("runRules conversation rule fallback", () => {
   beforeEach(() => {
     vi.clearAllMocks();

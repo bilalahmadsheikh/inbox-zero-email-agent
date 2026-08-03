@@ -17,6 +17,7 @@
 - Run `pnpm install` before running tests or build if not already done
 - Before writing or updating tests, review `.claude/skills/testing/SKILL.md`.
 - After changing anything that a test run depends on—including application code, test code, fixtures, test configuration, dependencies, generated types, or a version bump—run the relevant tests at least once. Confirm both that the command passed and that its reported test/file count is non-zero and matches the expected scope; a zero-test or unexpectedly reduced count is not a successful validation.
+- Database migrations no longer run as part of the web build. When a change adds or alters a Prisma migration, `pnpm -F inbox-zero-ai db:migrate:deploy` must run and complete *before* the new version serves traffic; deploying first leaves the app expecting schema the database does not have. Releases with no migration need nothing extra. Flag this explicitly whenever a batch containing a migration is about to reach a deploying branch (`production`).
 - For core bug-fix tasks, default to TDD when practical (red/green/refactor); AI prompt improvements should generally be backed by evals too, and TDD is often useful there as well.
 - When adding a new workspace package, add its `package.json` COPY line to `docker/Dockerfile.prod` and `docker/Dockerfile.local`.
 

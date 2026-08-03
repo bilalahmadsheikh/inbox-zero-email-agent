@@ -8,13 +8,14 @@
 // otherwise; this repairs accounts left in that state.
 //
 // Dry run (default, writes nothing):
-//   npx tsx --require ./scripts/lib/allow-server-only.cjs scripts/backfill-conversation-rules.ts
+//   npx tsx --require ./scripts/lib/script-runtime.cjs scripts/backfill-conversation-rules.ts
 // Apply:
 //   ... scripts/backfill-conversation-rules.ts --apply
 // Single account:
 //   ... scripts/backfill-conversation-rules.ts --apply --email=someone@example.com
 
 import "dotenv/config";
+import { after } from "next/server";
 import prisma from "@/utils/prisma";
 import { createScopedLogger } from "@/utils/logger";
 import { CONVERSATION_STATUS_TYPES } from "@/utils/reply-tracker/conversation-status-config";
@@ -149,4 +150,11 @@ main()
     console.error(error);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    // Rule creation queues its history record through after(); the script
+    // runtime runs those immediately, so let them settle before disconnecting.
+    await (
+      after as typeof after & { pending?: () => Promise<unknown[]> }
+    ).pending?.();
+    await prisma.$disconnect();
+  });

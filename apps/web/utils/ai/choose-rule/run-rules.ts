@@ -207,6 +207,32 @@ export async function runRules({
     } else {
       // Track why conversation rule was skipped (e.g., determined FYI but rule disabled)
       skippedConversationReason = reason;
+
+      // The meta rule won selection and then withdrew, so without a second pass
+      // the email is dropped even when a category rule fits it. Re-select with
+      // the meta rule removed so Notification/Newsletter/Receipt can take it.
+      if (!matchesWithFlags.length) {
+        const fallback = await findMatchingRules({
+          rules: regularRules.filter((rule) => !isConversationRule(rule.id)),
+          message,
+          emailAccount,
+          provider,
+          modelType,
+          logger,
+        });
+
+        for (const match of fallback.matches) {
+          matchesWithFlags.push({ ...match, isConversationRule: false });
+        }
+
+        logger.info("Re-selected rules after conversation rule withdrew", {
+          module: MODULE,
+          skippedConversationReason: reason,
+          fallbackRuleNames: fallback.matches
+            .map((match) => match.rule.name)
+            .join(", "),
+        });
+      }
     }
   }
 

@@ -897,6 +897,95 @@ describe("runRules conversation meta rule", () => {
   });
 });
 
+describe("runRules conversation rule fallback", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("re-selects a category rule when the conversation rule withdraws", async () => {
+    const notificationRule = createRule(
+      "notification-rule",
+      SystemType.NOTIFICATION,
+      [
+        getAction({
+          id: "label-notification",
+          type: ActionType.LABEL,
+          label: "Notification",
+          ruleId: "notification-rule",
+        }),
+      ],
+    );
+    const metaRule = createRule(CONVERSATION_TRACKING_META_RULE_ID, null, []);
+
+    // First pass: the AI picks only the conversation meta rule.
+    // Second pass (fallback): the category rule that actually fits.
+    vi.mocked(findMatchingRules)
+      .mockResolvedValueOnce({
+        matches: [{ rule: metaRule }],
+        reasoning: "Looks like a conversation",
+      } as any)
+      .mockResolvedValueOnce({
+        matches: [{ rule: notificationRule }],
+        reasoning: "Automated notification",
+      } as any);
+
+    // The conversation rule withdraws: not actually a conversation.
+    vi.mocked(determineConversationStatus).mockResolvedValue({
+      rule: null,
+      reason: "Conversation status determined as FYI, but no rule enabled",
+    } as any);
+
+    vi.mocked(getActionItemsWithAiArgs).mockImplementation(
+      async ({ selectedRule }) =>
+        selectedRule.actions.map((a) => ({ ...a, type: a.type as ActionType })),
+    );
+
+    const result = await runRulesWithDefaults({
+      rules: [notificationRule, toReplyRule],
+      isTest: true,
+    });
+
+    expect(vi.mocked(findMatchingRules)).toHaveBeenCalledTimes(2);
+    // The second call must not offer the meta rule again, or it can win twice.
+    const fallbackRules = vi.mocked(findMatchingRules).mock.calls[1][0].rules;
+    expect(
+      fallbackRules.some((r) => r.id === CONVERSATION_TRACKING_META_RULE_ID),
+    ).toBe(false);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].rule?.id).toBe("notification-rule");
+    expect(result[0].status).not.toBe(ExecutedRuleStatus.SKIPPED);
+  });
+
+  it("does not re-select when a regular rule already matched alongside", async () => {
+    const notificationRule = createRule(
+      "notification-rule",
+      SystemType.NOTIFICATION,
+      [],
+    );
+    const metaRule = createRule(CONVERSATION_TRACKING_META_RULE_ID, null, []);
+
+    vi.mocked(findMatchingRules).mockResolvedValue({
+      matches: [{ rule: notificationRule }, { rule: metaRule }],
+      reasoning: "Both",
+    } as any);
+
+    vi.mocked(determineConversationStatus).mockResolvedValue({
+      rule: null,
+      reason: "Not a conversation",
+    } as any);
+
+    vi.mocked(getActionItemsWithAiArgs).mockResolvedValue([]);
+
+    await runRulesWithDefaults({
+      rules: [notificationRule, toReplyRule],
+      isTest: true,
+    });
+
+    expect(vi.mocked(findMatchingRules)).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("limitDraftEmailActions", () => {
   it("returns original matches when there are no draft actions", () => {
     const matches = [

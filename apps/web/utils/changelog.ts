@@ -9,6 +9,15 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "4.5",
+    date: "2026-08-04",
+    notes: [
+      "Fixed the bug that stopped every rule from running. Since late July, no email on any account has been labelled, filed or drafted for — each one was examined and then quietly set aside. The cause: the assistant first decides whether an email is part of a conversation, and when it later concluded it wasn't (or that the matching conversation label was switched off), the email was dropped instead of being handed to the ordinary category rules. Newsletters, receipts and notifications were all being discarded this way, which is also why Reply Zero stayed empty. An email that is not a conversation now falls through to your normal rules as it should.",
+      "Reply Zero's four states — To Reply, Awaiting Reply, FYI and Actioned — are now always set up together. Previously the last three were created only if you had configured To Reply, and were deleted if you hadn't. Since the assistant sorts every conversation into one of the four regardless, a missing one meant that mail had nowhere to go. Four accounts were affected.",
+      'Bulk Archive no longer says "Archived" when a sender had nothing in your inbox to archive. It now says "Nothing in inbox", so a sender that was skipped is no longer indistinguishable from one that was cleared.',
+    ],
+  },
+  {
     version: "4.4",
     date: "2026-08-03",
     notes: [

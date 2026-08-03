@@ -687,11 +687,18 @@ function ArchiveSenderStatus({
         </span>
       );
     case "completed":
+      // No threads means nothing was in the inbox to archive. Saying "Archived"
+      // there reads as a completed action that never happened.
+      if (!status.threadsTotal) {
+        return (
+          <span className="text-sm text-muted-foreground">
+            Nothing in inbox
+          </span>
+        );
+      }
       return (
         <span className="text-sm text-green-600">
-          {status.threadsTotal
-            ? `Archived ${status.threadsTotal}!`
-            : "Archived"}
+          {`Archived ${status.threadsTotal}!`}
         </span>
       );
     case "failed":

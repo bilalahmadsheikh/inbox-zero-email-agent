@@ -52,6 +52,7 @@ import {
 } from "@/utils/rule/consts";
 import { actionClient, actionClientUser } from "@/utils/actions/safe-action";
 import { assertRuleIsNotOrgManaged } from "@/utils/organizations/rules";
+import { CONVERSATION_STATUS_TYPES } from "@/utils/reply-tracker/conversation-status-config";
 import { env } from "@/env";
 import { prefixPath } from "@/utils/path";
 import { ONE_WEEK_MINUTES } from "@/utils/date";
@@ -475,7 +476,6 @@ export const createRulesOnboardingAction = actionClient
 
       // Process system rules
       const systemRules = [
-        SystemType.TO_REPLY,
         SystemType.NEWSLETTER,
         SystemType.MARKETING,
         SystemType.CALENDAR,
@@ -493,19 +493,17 @@ export const createRulesOnboardingAction = actionClient
         }
       }
 
-      const conversationRules = [
-        SystemType.FYI,
-        SystemType.AWAITING_REPLY,
-        SystemType.ACTIONED,
-      ];
-
-      for (const type of conversationRules) {
-        const config = systemCategoryMap.get(SystemType.TO_REPLY);
-        if (config && isSet(config.action)) {
-          createSystemRuleForOnboarding(type);
-        } else {
-          deleteRule(type, emailAccountId);
-        }
+      // Reply Zero sorts every conversation into exactly one of these four
+      // states, chosen by the AI from a fixed set with no knowledge of which
+      // rules exist. A missing state therefore leaves that mail with nowhere to
+      // go, so all four are always created and never deleted here. Only the
+      // action stays user-configurable.
+      for (const type of CONVERSATION_STATUS_TYPES) {
+        const config = systemCategoryMap.get(type);
+        createSystemRuleForOnboarding(
+          type,
+          config && isSet(config.action) ? config.action : undefined,
+        );
       }
 
       // Create rules for custom categories

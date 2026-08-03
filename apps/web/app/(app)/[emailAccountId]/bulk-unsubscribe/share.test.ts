@@ -12,7 +12,7 @@ describe("buildShareText", () => {
     expect(
       buildShareText({ senderCount: 12, link: "https://www.getinboxzero.com" }),
     ).toBe(
-      "I just unsubscribed from 12 email lists with Inbox Zero. https://www.getinboxzero.com",
+      "I just unsubscribed from 12 email lists with Zynbox. https://www.getinboxzero.com",
     );
   });
 
@@ -20,7 +20,7 @@ describe("buildShareText", () => {
     expect(
       buildShareText({ senderCount: 1, link: "https://www.getinboxzero.com" }),
     ).toBe(
-      "I just unsubscribed from 1 email list with Inbox Zero. https://www.getinboxzero.com",
+      "I just unsubscribed from 1 email list with Zynbox. https://www.getinboxzero.com",
     );
   });
 
@@ -32,7 +32,7 @@ describe("buildShareText", () => {
         yearlyEmails: 2400,
       }),
     ).toBe(
-      "I just unsubscribed from 12 email lists with Inbox Zero — that's ~2,400 fewer emails a year. https://www.getinboxzero.com",
+      "I just unsubscribed from 12 email lists with Zynbox — that's ~2,400 fewer emails a year. https://www.getinboxzero.com",
     );
   });
 
@@ -44,7 +44,7 @@ describe("buildShareText", () => {
         yearlyEmails: 0,
       }),
     ).toBe(
-      "I just unsubscribed from 1 email list with Inbox Zero — that's ~0 fewer emails a year. https://www.getinboxzero.com",
+      "I just unsubscribed from 1 email list with Zynbox — that's ~0 fewer emails a year. https://www.getinboxzero.com",
     );
   });
 });

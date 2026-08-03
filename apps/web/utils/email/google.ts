@@ -1492,9 +1492,17 @@ export class GmailProvider implements EmailProvider {
     await unwatchGmail(this.client);
   }
 
-  // Gmail: The first message id in a thread is the threadId
+  // Gmail: the first message id in a thread is the threadId, so a differing id
+  // means the message sits later in a Gmail thread. That alone is not a reply:
+  // Gmail also groups unrelated messages that merely share a subject (repeated
+  // "Security alert", CI failure, or invitation emails), and treating those as
+  // conversation replies skips every rule with runOnThreads=false. Require a
+  // real reply header so only genuine conversation replies count.
   isReplyInThread(message: ParsedMessage): boolean {
-    return !!(message.id && message.id !== message.threadId);
+    const isLaterInThread = !!(message.id && message.id !== message.threadId);
+    if (!isLaterInThread) return false;
+
+    return !!(message.headers?.["in-reply-to"] || message.headers?.references);
   }
 
   isSentMessage(message: ParsedMessage): boolean {

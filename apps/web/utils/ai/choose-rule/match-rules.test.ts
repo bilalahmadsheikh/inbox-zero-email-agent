@@ -1068,7 +1068,11 @@ describe("findMatchingRule", () => {
     );
   });
 
-  it("does not match a group rule when learned patterns are disabled", async () => {
+  // The learnedPatternsEnabled toggle gates automatic *learning* of new
+  // patterns only. Gating pattern *consumption* on it once silently stopped
+  // every already-learned rule from matching, so these two guard that saved
+  // patterns keep working with the toggle off.
+  it("matches a saved group rule even when learned pattern auto-learning is disabled", async () => {
     const rule = getRule({ groupId: "group1" });
 
     prisma.group.findMany.mockResolvedValue([
@@ -1096,13 +1100,13 @@ describe("findMatchingRule", () => {
       logger,
     });
 
-    // The learned pattern is skipped entirely, so the rule falls through to
-    // AI evaluation instead of being short-circuited by the group match.
-    expect(result.matches).toHaveLength(0);
-    expect(prisma.group.findMany).not.toHaveBeenCalled();
+    expect(result.matches[0]?.rule.id).toBe(rule.id);
+    expect(result.matches[0]?.matchReasons?.[0]?.type).toBe(
+      ConditionType.LEARNED_PATTERN,
+    );
   });
 
-  it("does not apply a learned exclusion pattern when learned patterns are disabled", async () => {
+  it("applies a saved exclusion pattern even when learned pattern auto-learning is disabled", async () => {
     const rule = getRule({ groupId: "group1", from: "*@example.com" });
 
     prisma.group.findMany.mockResolvedValue([
@@ -1134,12 +1138,8 @@ describe("findMatchingRule", () => {
       logger,
     });
 
-    // With the exclusion pattern inert, the rule's static `from` condition
-    // matches normally instead of being excluded.
-    expect(result.matches[0]?.rule.id).toBe(rule.id);
-    expect(result.matches[0]?.matchReasons).toEqual([
-      { type: ConditionType.STATIC },
-    ]);
+    // The saved exclusion still wins over the rule's static `from` condition.
+    expect(result.matches).toHaveLength(0);
   });
 
   it("should NOT match when group doesn't match and no other conditions", async () => {

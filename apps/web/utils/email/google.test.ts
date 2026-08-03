@@ -333,6 +333,70 @@ describe("GmailProvider.getLabels", () => {
   });
 });
 
+describe("GmailProvider.isReplyInThread", () => {
+  it("returns false for the first message in a thread", () => {
+    const provider = new GmailProvider({} as any);
+
+    expect(
+      provider.isReplyInThread(
+        createParsedMessage({
+          id: "thread-1",
+          threadId: "thread-1",
+          internalDate: "1000",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("returns true for a genuine reply later in the thread", () => {
+    const provider = new GmailProvider({} as any);
+
+    expect(
+      provider.isReplyInThread(
+        createParsedMessage({
+          id: "message-2",
+          threadId: "thread-1",
+          internalDate: "2000",
+          headers: { "in-reply-to": "<original@example.com>" },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  // Gmail groups unrelated messages that only share a subject (repeated
+  // "Security alert" or CI failure mail). Treating those as replies skipped
+  // every runOnThreads=false rule, so they were never labeled or filed.
+  it("returns false when Gmail grouped an unrelated message by subject alone", () => {
+    const provider = new GmailProvider({} as any);
+
+    expect(
+      provider.isReplyInThread(
+        createParsedMessage({
+          id: "message-2",
+          threadId: "thread-1",
+          internalDate: "2000",
+          subject: "Security alert",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("treats a References header as a reply when In-Reply-To is absent", () => {
+    const provider = new GmailProvider({} as any);
+
+    expect(
+      provider.isReplyInThread(
+        createParsedMessage({
+          id: "message-2",
+          threadId: "thread-1",
+          internalDate: "2000",
+          headers: { references: "<original@example.com>" },
+        }),
+      ),
+    ).toBe(true);
+  });
+});
+
 function createThread(messages: ParsedMessage[]): EmailThread {
   return {
     id: "thread-1",

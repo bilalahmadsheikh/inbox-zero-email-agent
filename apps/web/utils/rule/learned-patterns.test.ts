@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { saveLearnedPattern, saveLearnedPatterns } from "./learned-patterns";
 import prisma from "@/utils/__mocks__/prisma";
-import { GroupItemType, GroupItemSource } from "@/generated/prisma/enums";
+import {
+  GroupItemType,
+  GroupItemSource,
+  SystemType,
+} from "@/generated/prisma/enums";
 import { isDuplicateError } from "@/utils/prisma-helpers";
 import { createTestLogger } from "@/__tests__/helpers";
 
@@ -26,6 +30,25 @@ describe("saveLearnedPattern", () => {
       logger: createTestLogger(),
     });
 
+    expect(prisma.groupItem.upsert).not.toHaveBeenCalled();
+  });
+
+  it("refuses to save a pattern on a conversation status rule", async () => {
+    vi.mocked(prisma.rule.findUnique).mockResolvedValue({
+      id: "rule-id",
+      name: "To Reply",
+      groupId: null,
+      systemType: SystemType.TO_REPLY,
+    } as any);
+
+    await saveLearnedPattern({
+      emailAccountId: "email-account-id",
+      from: "test@example.com",
+      ruleId: "rule-id",
+      logger: createTestLogger(),
+    });
+
+    expect(prisma.group.create).not.toHaveBeenCalled();
     expect(prisma.groupItem.upsert).not.toHaveBeenCalled();
   });
 
@@ -236,5 +259,24 @@ describe("saveLearnedPatterns", () => {
 
     expect(result).toEqual({ success: true });
     expect(prisma.groupItem.upsert).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses to create a group on a conversation status rule", async () => {
+    vi.mocked(prisma.rule.findUnique).mockResolvedValue({
+      id: "rule-id",
+      groupId: null,
+      systemType: SystemType.TO_REPLY,
+    } as any);
+
+    const result = await saveLearnedPatterns({
+      emailAccountId: "email-account-id",
+      ruleName: "To Reply",
+      patterns: [{ type: GroupItemType.FROM, value: "test@example.com" }],
+      logger: createTestLogger(),
+    });
+
+    expect(result?.error).toBeTruthy();
+    expect(prisma.group.create).not.toHaveBeenCalled();
+    expect(prisma.groupItem.upsert).not.toHaveBeenCalled();
   });
 });

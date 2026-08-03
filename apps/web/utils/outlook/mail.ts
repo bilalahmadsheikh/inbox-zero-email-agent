@@ -270,7 +270,7 @@ export async function forwardEmail(
     internalDate: originalMessage.receivedDateTime || new Date().toISOString(),
     subject: originalMessage.subject || "",
     date: originalMessage.receivedDateTime || new Date().toISOString(),
-    conversationIndex: originalMessage.conversationId || "",
+    conversationIndex: originalMessage.conversationIndex || "",
   };
 
   const forwardDraft: Message = await withOutlookRetry(

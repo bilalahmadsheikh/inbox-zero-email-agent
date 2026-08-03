@@ -50,7 +50,13 @@ console.error(
 );
 
 for (const violation of violations) {
-  console.error(`${path.relative(root, violation.file)}:${violation.line}`);
+  // Forward slashes on every platform so the reported path is consistent and
+  // clickable regardless of where the check runs.
+  const relativePath = path
+    .relative(root, violation.file)
+    .split(path.sep)
+    .join("/");
+  console.error(`${relativePath}:${violation.line}`);
   console.error(`  ${violation.match}`);
   console.error(`  ${violation.message}\n`);
 }

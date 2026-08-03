@@ -2,6 +2,14 @@ import prisma from "@/utils/prisma";
 import type { Logger } from "@/utils/logger";
 import { GroupItemType, type GroupItemSource } from "@/generated/prisma/enums";
 import { isDuplicateError } from "@/utils/prisma-helpers";
+import { isConversationStatusType } from "@/utils/reply-tracker/conversation-status-config";
+
+// Conversation status rules (To Reply, Awaiting Reply, FYI, Actioned) are never
+// matched directly; they run through the synthetic "Conversations" meta rule.
+// A group on one of them would be consumed by that meta rule, so a single
+// exclusion pattern could disable Reply Zero for a sender entirely.
+const CONVERSATION_RULE_PATTERNS_ERROR =
+  "Learned patterns aren't supported for conversation status rules";
 
 /**
  * Whether automatic learned-pattern creation/consumption is enabled for this
@@ -47,11 +55,19 @@ export async function saveLearnedPattern({
 }) {
   const rule = await prisma.rule.findUnique({
     where: { id: ruleId, emailAccountId },
-    select: { id: true, name: true, groupId: true },
+    select: { id: true, name: true, groupId: true, systemType: true },
   });
 
   if (!rule) {
     logger.error("Rule not found", { ruleId });
+    return;
+  }
+
+  if (isConversationStatusType(rule.systemType)) {
+    logger.warn(CONVERSATION_RULE_PATTERNS_ERROR, {
+      ruleId,
+      systemType: rule.systemType,
+    });
     return;
   }
 
@@ -117,12 +133,20 @@ export async function saveLearnedPatterns({
         emailAccountId,
       },
     },
-    select: { id: true, groupId: true },
+    select: { id: true, groupId: true, systemType: true },
   });
 
   if (!rule) {
     logger.error("Rule not found", { emailAccountId, ruleName });
     return { error: "Rule not found" };
+  }
+
+  if (isConversationStatusType(rule.systemType)) {
+    logger.warn(CONVERSATION_RULE_PATTERNS_ERROR, {
+      ruleName,
+      systemType: rule.systemType,
+    });
+    return { error: CONVERSATION_RULE_PATTERNS_ERROR };
   }
 
   let groupId: string;

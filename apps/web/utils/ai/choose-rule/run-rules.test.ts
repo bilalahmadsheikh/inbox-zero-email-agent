@@ -856,6 +856,47 @@ describe("runRules selection metadata", () => {
   });
 });
 
+describe("runRules conversation meta rule", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("does not inherit conditions from the conversation rule it is built from", async () => {
+    const toReplyWithConditions: RuleWithActions = {
+      ...createRule("to-reply-rule", SystemType.TO_REPLY),
+      groupId: "learned-pattern-group",
+      from: "@example.com",
+      subject: "Invoice",
+    };
+
+    vi.mocked(findMatchingRules).mockResolvedValue({
+      matches: [],
+      reasoning: "No rules matched",
+    } as any);
+
+    await runRulesWithDefaults({
+      rules: [toReplyWithConditions],
+      isTest: true,
+    });
+
+    const rulesPassedToMatching =
+      vi.mocked(findMatchingRules).mock.calls[0][0].rules;
+    const metaRule = rulesPassedToMatching.find(
+      (rule) => rule.id === CONVERSATION_TRACKING_META_RULE_ID,
+    );
+
+    expect(metaRule).toBeDefined();
+    expect(metaRule).toMatchObject({
+      groupId: null,
+      from: null,
+      to: null,
+      subject: null,
+      body: null,
+      systemType: null,
+    });
+  });
+});
+
 describe("limitDraftEmailActions", () => {
   it("returns original matches when there are no draft actions", () => {
     const matches = [

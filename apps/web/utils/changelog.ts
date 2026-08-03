@@ -9,6 +9,41 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "4.4",
+    date: "2026-08-03",
+    notes: [
+      "Repaired the automated checks that run before every release. Ten test files were failing or silently not running at all — four of them loaded nothing whatsoever, so the areas they cover (the assistant's inbox search results, the rule editor, chat tool formatting, and the assistant memory safety checks) had no protection against regressions and nothing said so.",
+      "The sharing message shown after unsubscribing was still checked against the old Inbox Zero name, so it failed on every run after the rename to Zynbox. The message itself was always correct.",
+      "Tests that do genuine work were being cut off after five seconds on slower machines and reported as failures. Worse, a cut-off test kept running in the background and its activity was counted against the next test, failing that one too and pointing the blame at unrelated code. The limit is now twenty seconds, still short enough to catch a genuinely stuck test.",
+    ],
+  },
+  {
+    version: "4.3",
+    date: "2026-08-01",
+    notes: [
+      "Reply Zero can no longer be switched off for a sender by a pattern belonging to a different rule. The rule that decides whether an email is a conversation is assembled behind the scenes from your To Reply, Awaiting Reply, FYI and Actioned rules, and it was picking up that rule's learned sender patterns and sender filters along the way. A single 'never this sender' pattern could therefore have stopped an email being recognised as a conversation at all — no To Reply label, no reply draft — with nothing on screen to explain why. The conversation rule is now built from scratch and reads only its own instructions.",
+      "The assistant no longer attaches learned sender patterns to conversation rules. Asking it to add or exclude a sender on To Reply, Awaiting Reply, FYI or Actioned now says those rules don't take patterns, matching the rule editor, which has always greyed the option out for them.",
+      "Fixed a wrong field in Outlook message forwarding. The conversation position of the original email was being filled in with its conversation identifier instead. Nothing read that value yet, so forwarding worked, but anything that started checking it would have judged every Outlook email to be a reply deep in a conversation, and skipped every rule set to ignore conversation replies.",
+      "Fixed unit tests not running at all after test files were excluded from the production type-check. The test runner had been taking its import shortcuts from that same configuration, so every test file failed to load.",
+    ],
+  },
+  {
+    version: "4.2",
+    date: "2026-07-31",
+    notes: [
+      'Fixed rules being skipped on mail Gmail had grouped by subject. Gmail files repeated notifications that share a subject — "Security alert", a failing CI job, invitation reminders — into one conversation, and everything after the first was treated as a reply in an ongoing conversation. Rules set to skip conversation replies (Notification, Newsletter, Marketing, Receipt, Calendar, Cold Email all are by default) were therefore skipped on that mail, so it went unlabeled and unfiled. On a newly connected account this could never recover on its own, because those rules only resume once they have already matched somewhere in the same conversation.',
+      "A message now counts as a conversation reply only when it actually replies to an earlier one, rather than merely sharing a subject with it. Genuine back-and-forth conversations are unaffected and still skip those rules as before.",
+    ],
+  },
+  {
+    version: "4.1",
+    date: "2026-07-30",
+    notes: [
+      "Fixed the bug that stopped rules from running on incoming mail. Since 27 July, no new email on any account had been matched to a rule — nothing was labeled or filed, Reply Zero stayed empty, and no reply drafts were written. The cause: the Learned Patterns toggle (added 26 July, off by default) didn't only stop the assistant from learning new sender patterns, it also stopped it from using the patterns it had already learned. Most matches relied on those saved patterns, so having it off silently switched rule matching off entirely.",
+      "The toggle now does only what it says: it controls whether the assistant learns new sender patterns on its own. Patterns already saved — learned earlier or added by hand — always apply, whether it is on or off. Priority labels were never affected, which is why mail still received Urgent/Important/FYI tags while everything else went quiet.",
+    ],
+  },
+  {
     version: "4.0",
     date: "2026-07-30",
     notes: [

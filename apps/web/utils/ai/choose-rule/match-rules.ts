@@ -52,12 +52,6 @@ import {
 
 const MODULE = "match-rules";
 
-// Locally widened rather than extending the shared `EmailAccountWithAI` type,
-// which is used by ~15 unrelated AI prompt call sites.
-type MatchRulesEmailAccount = EmailAccountWithAI & {
-  learnedPatternsEnabled: boolean;
-};
-
 const TO_REPLY_RECEIVED_THRESHOLD = 10;
 const NO_REPLY_PREFIXES = [
   "noreply@",
@@ -90,7 +84,7 @@ export async function findMatchingRules({
 }: {
   rules: RuleWithActions[];
   message: ParsedMessage;
-  emailAccount: MatchRulesEmailAccount;
+  emailAccount: EmailAccountWithAI;
   provider: EmailProvider;
   modelType: ModelType;
   logger: Logger;
@@ -182,7 +176,6 @@ async function findPotentialMatchingRules({
   isThread,
   provider,
   emailAccountId,
-  learnedPatternsEnabled,
   logger,
 }: {
   rules: RuleWithActions[];
@@ -190,7 +183,6 @@ async function findPotentialMatchingRules({
   isThread: boolean;
   provider: EmailProvider;
   emailAccountId: string;
-  learnedPatternsEnabled: boolean;
   logger: Logger;
 }): Promise<MatchingRuleResult> {
   const matches: {
@@ -242,7 +234,11 @@ async function findPotentialMatchingRules({
 
     // Learned patterns (groups)
     // Note: Groups are independent of the AND/OR operator (which only applies to AI/Static conditions)
-    if (learnedPatternsEnabled && rule.groupId) {
+    // Saved patterns are always consumed here. The learnedPatternsEnabled
+    // toggle gates only automatic *learning* of new patterns (see
+    // shouldAnalyzeSenderPattern and utils/rule/learned-patterns), so turning
+    // it off never silently stops existing rules from matching.
+    if (rule.groupId) {
       const groups = await learnedPatternsLoader.getGroups(rule.emailAccountId);
       if (groups?.length) {
         const { matchingItem, group, excludedItem, ruleExcluded } =
@@ -529,7 +525,7 @@ function createRuleSelectionMetadata({
 async function findMatchingRulesWithReasons(
   rules: RuleWithActions[],
   message: ParsedMessage,
-  emailAccount: MatchRulesEmailAccount,
+  emailAccount: EmailAccountWithAI,
   provider: EmailProvider,
   modelType: ModelType,
   logger: Logger,
@@ -543,7 +539,6 @@ async function findMatchingRulesWithReasons(
       isThread,
       provider,
       emailAccountId: emailAccount.id,
-      learnedPatternsEnabled: emailAccount.learnedPatternsEnabled,
       logger,
     });
 

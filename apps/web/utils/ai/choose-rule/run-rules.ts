@@ -4,6 +4,7 @@ import {
   ActionType,
   ExecutedRuleStatus,
   GroupItemSource,
+  LogicalOperator,
   SystemType,
 } from "@/generated/prisma/enums";
 import type { Prisma, Rule, TriageTier } from "@/generated/prisma/client";
@@ -311,12 +312,15 @@ function prepareRulesWithMetaRule(rules: RuleWithActions[]): {
     (r) => !isConversationStatusType(r.systemType),
   );
 
-  // If any conversation status rules are enabled, create a meta-rule
+  // If any conversation status rules are enabled, create a meta-rule.
+  // Built field by field rather than spread from a template rule: the meta rule
+  // is a synthetic AI-only rule, so inheriting a real rule's conditions
+  // (groupId, static from/to/subject/body) would let another rule's learned
+  // patterns or static filters silently decide whether Reply Zero runs at all.
   if (conversationRules.some((r) => r.enabled)) {
     const template = conversationRules[0];
 
-    const metaRule = {
-      ...template,
+    const metaRule: RuleWithActions = {
       id: CONVERSATION_TRACKING_META_RULE_ID,
       name: "Conversations",
       instructions: CONVERSATION_TRACKING_INSTRUCTIONS,
@@ -324,6 +328,20 @@ function prepareRulesWithMetaRule(rules: RuleWithActions[]): {
       runOnThreads: true,
       systemType: null,
       actions: [],
+      emailAccountId: template.emailAccountId,
+      createdAt: template.createdAt,
+      updatedAt: template.updatedAt,
+      conditionalOperator: LogicalOperator.AND,
+      groupId: null,
+      from: null,
+      to: null,
+      subject: null,
+      body: null,
+      categoryFilterType: null,
+      organizationRuleId: null,
+      organizationRuleMemberEnabled: null,
+      promptText: null,
+      automate: true,
     };
 
     regularRules.push(metaRule);

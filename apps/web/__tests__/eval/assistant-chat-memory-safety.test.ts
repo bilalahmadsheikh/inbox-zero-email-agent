@@ -81,12 +81,21 @@ vi.mock("@/utils/redis", () => ({
 
 vi.mock("@/utils/prisma");
 
-vi.mock("@/utils/drive/document-extraction", () => ({
-  extractTextFromDocument: vi.fn().mockResolvedValue({
-    text: latestMemorySafetyAttachmentFixture.content,
-    truncated: false,
-  }),
-}));
+vi.mock("@/utils/drive/document-extraction", async () => {
+  // Imported inside the factory: vi.mock is hoisted above the import block, so
+  // referencing the fixture binding directly reads it before initialization.
+  const { latestMemorySafetyAttachmentFixture: fixture } =
+    await vi.importActual<
+      typeof import("@/__tests__/eval/assistant-chat-memory-safety.scenarios")
+    >("@/__tests__/eval/assistant-chat-memory-safety.scenarios");
+
+  return {
+    extractTextFromDocument: vi.fn().mockResolvedValue({
+      text: fixture.content,
+      truncated: false,
+    }),
+  };
+});
 
 vi.mock("@/env", async () => {
   const { buildAssistantChatEvalEnv } = await vi.importActual<

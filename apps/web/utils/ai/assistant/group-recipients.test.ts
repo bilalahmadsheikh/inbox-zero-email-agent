@@ -116,14 +116,14 @@ describe("resolveGroupRecipients", () => {
       provider: getProvider({
         label: { id: "label-1", name: "Receipt" },
         threads: [
-          { messages: [{ headers: { from: "Billing <billing@acme.com>" } }] },
+          { messages: [{ headers: { from: "Sam Reyes <sam@acme.com>" } }] },
         ],
       }),
       group: "Receipt",
       logger,
     });
 
-    expect(result.recipients.map((r) => r.email)).toEqual(["billing@acme.com"]);
+    expect(result.recipients.map((r) => r.email)).toEqual(["sam@acme.com"]);
     expect(result.matchedCategory).toBeNull();
   });
 

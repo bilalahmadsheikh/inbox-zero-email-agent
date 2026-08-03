@@ -2,7 +2,7 @@ import prisma from "@/utils/prisma";
 import type { EmailProvider } from "@/utils/email/types";
 import type { Logger } from "@/utils/logger";
 import { extractEmailAddress, extractNameFromEmail } from "@/utils/email";
-import { isNoReplyAddress } from "@/utils/email/no-reply";
+import { isLikelySendOnlyAddress } from "@/utils/email/no-reply";
 
 export const GROUP_RECIPIENT_LIMIT = 50;
 
@@ -55,10 +55,10 @@ export async function resolveGroupRecipients({
   }
 
   const deduped = [...byAddress.values()];
-  const noReply = deduped.filter((r) => isNoReplyAddress(r.email));
+  const noReply = deduped.filter((r) => isLikelySendOnlyAddress(r.email));
   const reachable = includeNoReply
     ? deduped
-    : deduped.filter((r) => !isNoReplyAddress(r.email));
+    : deduped.filter((r) => !isLikelySendOnlyAddress(r.email));
 
   return {
     group,

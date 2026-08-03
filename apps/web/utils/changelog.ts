@@ -9,6 +9,15 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "4.8",
+    date: "2026-08-04",
+    notes: [
+      "Far fewer unreachable addresses now slip into a group you are emailing. The previous check only caught obvious names like noreply@ and info@, so senders such as twitch@sfmarketing.twitch.tv, orders@orders.daraz.pk and PL@email.premierleague.com were offered as real recipients even though none of them read replies. Addresses sent from a bulk-mail subdomain, and a much wider set of bulk sender names, are now recognised too.",
+      "The assistant now always tells you how many addresses it is sending to and how many it left out as send-only, instead of quietly reporting a filtered list as though it were everyone.",
+      "How mail is filed is deliberately unchanged: the wider check applies only to choosing who to email. Filing still uses the narrower, more cautious test, so no email changes which label it lands under.",
+    ],
+  },
+  {
     version: "4.7",
     date: "2026-08-04",
     notes: [

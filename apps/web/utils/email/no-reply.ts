@@ -63,9 +63,15 @@ const BULK_SENDER_SUBDOMAINS = [
   "em",
 ];
 
+/**
+ * Deliberately does NOT lower-case: this decides whether conversation rules
+ * apply to an email, and it is matched against the address exactly as the
+ * caller extracted it, matching the behaviour before this check moved here.
+ * Changing that would silently re-file mail. Callers that want a
+ * case-insensitive test normalise first, as isLikelySendOnlyAddress does.
+ */
 export function isNoReplyAddress(address: string): boolean {
-  const normalized = normalize(address);
-  return NO_REPLY_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+  return NO_REPLY_PREFIXES.some((prefix) => address.startsWith(prefix));
 }
 
 /**

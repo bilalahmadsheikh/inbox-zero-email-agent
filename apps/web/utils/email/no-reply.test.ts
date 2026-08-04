@@ -46,4 +46,18 @@ describe("isNoReplyAddress", () => {
     expect(isNoReplyAddress("hello@airconsole.com")).toBe(false);
     expect(isNoReplyAddress("PL@email.premierleague.com")).toBe(false);
   });
+
+  it("matches case-sensitively, as it did before moving to this module", () => {
+    // Callers pass the address as extracted, which is not lower-cased. Adding
+    // normalisation here would re-file mail that rules previously treated as
+    // ordinary conversation.
+    expect(isNoReplyAddress("NoReply@example.com")).toBe(false);
+    expect(isNoReplyAddress("noreply@example.com")).toBe(true);
+  });
+
+  it("is still case-insensitive when choosing recipients", () => {
+    // The wider check normalises first, so the two callers keep their own
+    // thresholds without one leaking into the other.
+    expect(isLikelySendOnlyAddress("NoReply@example.com")).toBe(true);
+  });
 });

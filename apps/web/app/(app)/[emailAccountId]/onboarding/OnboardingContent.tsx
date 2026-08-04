@@ -15,7 +15,7 @@ import { StepDraft } from "@/app/(app)/[emailAccountId]/onboarding/StepDraft";
 import { StepCustomRules } from "@/app/(app)/[emailAccountId]/onboarding/StepCustomRules";
 import { StepInboxProcessed } from "@/app/(app)/[emailAccountId]/onboarding/StepInboxProcessed";
 import {
-  ASSISTANT_ONBOARDING_COOKIE,
+  getAssistantOnboardingCookie,
   markOnboardingAsCompleted,
 } from "@/utils/cookies";
 import { completedOnboardingAction } from "@/utils/actions/onboarding";
@@ -192,7 +192,7 @@ export function OnboardingContent({ step }: OnboardingContentProps) {
         totalSteps,
         destination: isPremium ? "setup" : "welcome-upgrade",
       });
-      markOnboardingAsCompleted(ASSISTANT_ONBOARDING_COOKIE);
+      markOnboardingAsCompleted(getAssistantOnboardingCookie(emailAccountId));
       let result: Awaited<ReturnType<typeof completeOnboarding>>;
       try {
         result = await completeOnboarding();
@@ -273,7 +273,7 @@ export function OnboardingContent({ step }: OnboardingContentProps) {
       })),
     );
 
-    markOnboardingAsCompleted(ASSISTANT_ONBOARDING_COOKIE);
+    markOnboardingAsCompleted(getAssistantOnboardingCookie(emailAccountId));
 
     try {
       const result = await completeOnboarding();

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import prisma from "@/utils/prisma";
 import { PermissionsCheck } from "@/app/(app)/[emailAccountId]/PermissionsCheck";
 import { EmailProvider } from "@/providers/EmailProvider";
-import { ASSISTANT_ONBOARDING_COOKIE } from "@/utils/cookies";
+import { getAssistantOnboardingCookie } from "@/utils/cookies";
 import { checkUserOwnsEmailAccount } from "@/utils/email-account";
 import { AIChatButton } from "@/app/(app)/[emailAccountId]/assistant/AIChatButton";
 import { AllRulesDisabledBanner } from "@/app/(app)/[emailAccountId]/assistant/AllRulesDisabledBanner";
@@ -28,18 +28,23 @@ export default async function AutomationPage({
   const { emailAccountId } = await params;
   await checkUserOwnsEmailAccount({ emailAccountId });
 
-  // onboarding redirect
-  const cookieStore = await cookies();
-  const viewedOnboarding =
-    cookieStore.get(ASSISTANT_ONBOARDING_COOKIE)?.value === "true";
+  // Onboarding redirect. The rule check comes first and is per email account:
+  // whether this mailbox is configured is a different question from whether
+  // the person has seen onboarding before, and only the former should decide
+  // if setup is needed. The cookie is the account's own dismissal, so someone
+  // who deliberately runs with no rules is not sent back here every visit.
+  const hasRule = await prisma.rule.findFirst({
+    where: { emailAccountId },
+    select: { id: true },
+  });
 
-  if (!viewedOnboarding) {
-    const hasRule = await prisma.rule.findFirst({
-      where: { emailAccountId },
-      select: { id: true },
-    });
+  if (!hasRule) {
+    const cookieStore = await cookies();
+    const dismissedOnboarding =
+      cookieStore.get(getAssistantOnboardingCookie(emailAccountId))?.value ===
+      "true";
 
-    if (!hasRule) {
+    if (!dismissedOnboarding) {
       redirect(getOnboardingStepHref(emailAccountId, STEP_KEYS.LABELS));
     }
   }

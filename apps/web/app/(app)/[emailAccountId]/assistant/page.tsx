@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import prisma from "@/utils/prisma";
 import { PermissionsCheck } from "@/app/(app)/[emailAccountId]/PermissionsCheck";
 import { EmailProvider } from "@/providers/EmailProvider";
-import { ASSISTANT_ONBOARDING_COOKIE } from "@/utils/cookies";
+import { getAssistantOnboardingCookie } from "@/utils/cookies";
 import { prefixPath } from "@/utils/path";
 import { Chat } from "@/components/assistant-chat/chat";
 import { checkUserOwnsEmailAccount } from "@/utils/email-account";
@@ -19,18 +19,21 @@ export default async function AssistantPage({
   const { emailAccountId } = await params;
   await checkUserOwnsEmailAccount({ emailAccountId });
 
-  // onboarding redirect
-  const cookieStore = await cookies();
-  const viewedOnboarding =
-    cookieStore.get(ASSISTANT_ONBOARDING_COOKIE)?.value === "true";
+  // Per email account, and checked before the cookie: see the note in
+  // automation/page.tsx. A mailbox with no rules needs setup regardless of
+  // whether this person has onboarded a different account before.
+  const hasRule = await prisma.rule.findFirst({
+    where: { emailAccountId },
+    select: { id: true },
+  });
 
-  if (!viewedOnboarding) {
-    const hasRule = await prisma.rule.findFirst({
-      where: { emailAccountId },
-      select: { id: true },
-    });
+  if (!hasRule) {
+    const cookieStore = await cookies();
+    const dismissedOnboarding =
+      cookieStore.get(getAssistantOnboardingCookie(emailAccountId))?.value ===
+      "true";
 
-    if (!hasRule) {
+    if (!dismissedOnboarding) {
       redirect(prefixPath(emailAccountId, "/assistant?onboarding=true"));
     }
   }

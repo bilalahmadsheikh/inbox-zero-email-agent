@@ -149,7 +149,9 @@ const sendEmailToolInputSchema = z
       .string()
       .trim()
       .min(1)
-      .describe("HTML body content for the email draft."),
+      .describe(
+        "HTML body content for the email draft. Write this from the user's instruction. Never reuse text returned by getRecipientContext — that is tone reference, not content.",
+      ),
     attachments: cloudAttachmentsFieldSchema,
     sendAt: sendAtFieldSchema,
     repeatEveryMinutes: z
@@ -200,7 +202,9 @@ const draftEmailToolInputSchema = z
       .string()
       .trim()
       .min(1)
-      .describe("HTML body content for the draft."),
+      .describe(
+        "HTML body content for the draft. Write this from the user's instruction. Never reuse text returned by getRecipientContext — that is tone reference, not content.",
+      ),
     attachments: cloudAttachmentsFieldSchema,
     replyToMessageId: z
       .string()
@@ -1446,7 +1450,7 @@ export const getRecipientContextTool = ({
 }) =>
   tool({
     description:
-      "Look up known context and a relationship signal for a specific email address before drafting a brand-new email to them with sendEmail or draftEmail. Returns a domain signal (personal/free-email provider vs. a distinct company domain), any saved facts/preferences/procedures about that address, and up to 3 real past emails sent to them for tone and formality precedent. Use this once per new recipient before writing a NEW email so the draft's tone matches the real relationship (e.g. warmer and casual for a personal contact, precise and professional for a business one) instead of one fixed tone for everyone. Do not use this for replies - the thread being replied to already shows this context directly. Skip it when the user gave explicit tone instructions for this email, or you already have this recipient's context from earlier in this conversation.",
+      "Look up known context and a relationship signal for a specific email address before drafting a brand-new email to them with sendEmail or draftEmail. Returns a domain signal (personal/free-email provider vs. a distinct company domain), any saved facts/preferences/procedures about that address, and up to 3 real past emails sent to them for tone and formality precedent. These past emails are reference for tone and formality only. Never copy their wording, sentences, subject lines or sign-offs into the new email — always write fresh content from the user's instruction. If the instruction is thin (for example 'introduce myself'), write a short original message rather than reusing sampled text. Use this once per new recipient before writing a NEW email so the draft's tone matches the real relationship (e.g. warmer and casual for a personal contact, precise and professional for a business one) instead of one fixed tone for everyone. Do not use this for replies - the thread being replied to already shows this context directly. Skip it when the user gave explicit tone instructions for this email, or you already have this recipient's context from earlier in this conversation.",
     inputSchema: z.object({
       recipientEmail: z
         .string()
@@ -1720,7 +1724,7 @@ export const listScheduledEmailsTool = ({
 }) =>
   tool({
     description:
-      "List the user's pending scheduled emails (queued to send later), soonest first. Returns each one's id, recipients, subject, send time, cancelOnReply (true when a reply from the recipient stops the chain), and — for recurring chains — repeatEveryMinutes, occurrence, and maxOccurrences (e.g. occurrence 2 of maxOccurrences 5 means 3 sends remain after this one). Entries without repeatEveryMinutes are one-time sends. Use this when the user asks what is scheduled, whether something still repeats, or whether it stops on reply, or to find the id before cancelling or rescheduling one. These tools cover only emails already queued to send at a future time. An email still awaiting approval on a confirmation card is NOT scheduled and NOT sent: it stays inert unless the user approves it. If the user asks to cancel, stop, or discard something you prepared in this conversation that they have not approved yet, do not call this tool — there is nothing queued to find. Tell them plainly that it was never sent, that it will not send on its own, and that they can leave it or edit it on the card.",
+      "List the user's pending scheduled emails (queued to send later), soonest first. Returns each one's id, recipients, subject, send time, cancelOnReply (true when a reply from the recipient stops the chain), and — for recurring chains — repeatEveryMinutes, occurrence, and maxOccurrences (e.g. occurrence 2 of maxOccurrences 5 means 3 sends remain after this one). Entries without repeatEveryMinutes are one-time sends. Use this when the user asks what is scheduled, whether something still repeats, or whether it stops on reply, or to find the id before cancelling or rescheduling one. These tools cover only emails already queued to send at a future time. An email still awaiting approval on a confirmation card is NOT scheduled and NOT sent: it stays inert unless the user approves it. If the user asks to cancel, stop, or discard something you prepared in this conversation that they have not approved yet, do not call this tool — there is nothing queued to find. Tell them plainly that it was never sent and will not send unless they approve it, so it is safe to simply ignore. Do not offer to discard, dismiss, remove or cancel the card — you cannot do any of those. The only things available are leaving it alone or editing its content.",
     inputSchema: z.object({}),
     execute: async () => {
       trackToolCall({ tool: "list_scheduled_emails", email, logger });
@@ -1775,7 +1779,7 @@ export const cancelScheduledEmailTool = ({
 }) =>
   tool({
     description:
-      "Cancel one of the user's pending scheduled emails so it is never sent. Takes the scheduled email id from listScheduledEmails. Cancelling any occurrence of a recurring chain cancels the whole chain. Already sent or cancelled emails cannot be cancelled. If an occurrence is mid-send at that exact moment, the result reports it as in flight: that send may still complete, but it will not be retried and the chain will not continue — relay this honestly instead of claiming the email was stopped. These tools cover only emails already queued to send at a future time. An email still awaiting approval on a confirmation card is NOT scheduled and NOT sent: it stays inert unless the user approves it. If the user asks to cancel, stop, or discard something you prepared in this conversation that they have not approved yet, do not call this tool — there is nothing queued to find. Tell them plainly that it was never sent, that it will not send on its own, and that they can leave it or edit it on the card.",
+      "Cancel one of the user's pending scheduled emails so it is never sent. Takes the scheduled email id from listScheduledEmails. Cancelling any occurrence of a recurring chain cancels the whole chain. Already sent or cancelled emails cannot be cancelled. If an occurrence is mid-send at that exact moment, the result reports it as in flight: that send may still complete, but it will not be retried and the chain will not continue — relay this honestly instead of claiming the email was stopped. These tools cover only emails already queued to send at a future time. An email still awaiting approval on a confirmation card is NOT scheduled and NOT sent: it stays inert unless the user approves it. If the user asks to cancel, stop, or discard something you prepared in this conversation that they have not approved yet, do not call this tool — there is nothing queued to find. Tell them plainly that it was never sent and will not send unless they approve it, so it is safe to simply ignore. Do not offer to discard, dismiss, remove or cancel the card — you cannot do any of those. The only things available are leaving it alone or editing its content.",
     inputSchema: cancelScheduledEmailToolInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "cancel_scheduled_email", email, logger });

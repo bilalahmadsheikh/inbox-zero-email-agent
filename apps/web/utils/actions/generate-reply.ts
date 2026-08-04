@@ -3,8 +3,11 @@
 import {
   generateReplySchema,
   generateReplyDraftSchema,
+  generateNewEmailSchema,
 } from "@/utils/actions/generate-reply.validation";
 import { aiGenerateNudge } from "@/utils/ai/reply/generate-nudge";
+import { aiGenerateNewEmail } from "@/utils/ai/compose/generate-new-email";
+import { extractDomainFromEmail, isPublicEmailDomain } from "@/utils/email";
 import { getReply, saveReply } from "@/utils/redis/reply";
 import { actionClient } from "@/utils/actions/safe-action";
 import { getEmailAccountWithAi } from "@/utils/user/get";
@@ -127,3 +130,38 @@ export const generateReplyDraftAction = actionClient
       return { text: draft, isHtml: true };
     },
   );
+
+export const generateNewEmailAction = actionClient
+  .metadata({ name: "generateNewEmail" })
+  .inputSchema(generateNewEmailSchema)
+  .action(
+    async ({
+      ctx: { emailAccountId },
+      parsedInput: { instruction, to, subject },
+    }) => {
+      const emailAccount = await getEmailAccountWithAi({ emailAccountId });
+      if (!emailAccount) throw new SafeError("User not found");
+
+      const { text } = await aiGenerateNewEmail({
+        emailAccount,
+        instruction,
+        to,
+        subject,
+        relationship: getRelationshipSignal(to),
+      });
+
+      return { text };
+    },
+  );
+
+// Same signal the assistant uses for tone: a free-provider address reads as a
+// personal contact, a company domain as a business one. Cheap, and enough to
+// stop every email opening the same way.
+function getRelationshipSignal(to?: string | null) {
+  if (!to) return null;
+
+  const domain = extractDomainFromEmail(to);
+  if (!domain) return null;
+
+  return isPublicEmailDomain(domain) ? "personal" : "business";
+}

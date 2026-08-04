@@ -29,3 +29,14 @@ export const generateReplyDraftSchema = z.object({
 });
 
 export type GenerateReplyDraftSchema = z.infer<typeof generateReplyDraftSchema>;
+
+// Compose-box generation for a brand-new email. No thread exists, so the
+// recipient and any chosen subject are the only grounding beyond the user's
+// instruction and their writing style.
+export const generateNewEmailSchema = z.object({
+  instruction: z.string().trim().min(1).max(2000),
+  to: z.string().trim().max(300).optional(),
+  subject: z.string().trim().max(300).optional(),
+});
+
+export type GenerateNewEmailSchema = z.infer<typeof generateNewEmailSchema>;

@@ -11,6 +11,7 @@ import {
   CheckCircleIcon,
   ClockIcon,
   PaperclipIcon,
+  SparklesIcon,
   TrashIcon,
   XIcon,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import { extractNameFromEmail } from "@/utils/email";
 import type { Attachment } from "@/utils/types/mail";
 import { Tiptap, type TiptapHandle } from "@/components/editor/Tiptap";
 import { scheduleSendAction, sendEmailAction } from "@/utils/actions/mail";
+import { generateNewEmailAction } from "@/utils/actions/generate-reply";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -146,6 +148,44 @@ export const ComposeEmailForm = ({
     },
     [],
   );
+
+  const [instruction, setInstruction] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const generateDraft = useCallback(async () => {
+    const trimmed = instruction.trim();
+    if (!trimmed) return;
+
+    setIsGenerating(true);
+    try {
+      const result = await generateNewEmailAction(emailAccountId, {
+        instruction: trimmed,
+        to: watch("to") || undefined,
+        subject: watch("subject") || undefined,
+      });
+
+      if (result?.serverError || !result?.data?.text) {
+        toastError({
+          description:
+            result?.serverError ?? "Could not write that draft. Try again.",
+        });
+        return;
+      }
+
+      // Appended rather than replacing, so anything already typed survives.
+      editorRef.current?.appendContent(result.data.text);
+      setValue(
+        "messageHtml",
+        `${watch("messageHtml") || ""}${result.data.text}`,
+      );
+      setInstruction("");
+    } catch (error) {
+      console.error(error);
+      toastError({ description: "Could not write that draft. Try again." });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [instruction, emailAccountId, watch, setValue]);
 
   const removeAttachment = useCallback((index: number) => {
     setAttachments((previous) => previous.filter((_, i) => i !== index));
@@ -485,6 +525,41 @@ export const ComposeEmailForm = ({
             className="border border-input bg-background focus:border-slate-200 focus:ring-0 focus:ring-slate-200"
           />
         </>
+      )}
+
+      {/* Replies have their own Generate box in the thread view, where the
+          conversation supplies the context. Only new emails need this. */}
+      {!replyingToEmail && (
+        <div className="flex items-center gap-2">
+          <Input
+            type="text"
+            name="aiInstruction"
+            value={instruction}
+            onChange={(event) => setInstruction(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !isGenerating) {
+                event.preventDefault();
+                generateDraft();
+              }
+            }}
+            disabled={isGenerating}
+            placeholder="Tell the AI what to write, then Generate…"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isGenerating || !instruction.trim()}
+            onClick={generateDraft}
+          >
+            {isGenerating ? (
+              <ButtonLoader />
+            ) : (
+              <SparklesIcon className="mr-2 size-4" />
+            )}
+            Generate
+          </Button>
+        </div>
       )}
 
       <Tiptap

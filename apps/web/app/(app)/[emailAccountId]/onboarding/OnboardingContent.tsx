@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { StepWho } from "@/app/(app)/[emailAccountId]/onboarding/StepWho";
@@ -30,6 +30,9 @@ import { StepCompanySize } from "@/app/(app)/[emailAccountId]/onboarding/StepCom
 import { StepHowYouHeard } from "@/app/(app)/[emailAccountId]/onboarding/StepHowYouHeard";
 import { StepInviteTeam } from "@/app/(app)/[emailAccountId]/onboarding/StepInviteTeam";
 import { toastError } from "@/components/Toast";
+import { categoryConfig } from "@/utils/category-config";
+import { createRulesOnboardingAction } from "@/utils/actions/rule";
+import { SkipOnboardingButton } from "@/app/(app)/[emailAccountId]/onboarding/SkipOnboardingButton";
 import { usePremium } from "@/hooks/usePremium";
 import { useOrganizationMembership } from "@/hooks/useOrganizationMembership";
 import { useRules } from "@/hooks/useRules";
@@ -51,6 +54,7 @@ interface OnboardingContentProps {
 
 export function OnboardingContent({ step }: OnboardingContentProps) {
   const { emailAccountId, provider, isLoading } = useAccount();
+  const [isFinishing, setIsFinishing] = useState(false);
   const { isPremium } = usePremium();
   const { data: membership, isLoading: isMembershipLoading } =
     useOrganizationMembership();
@@ -253,6 +257,46 @@ export function OnboardingContent({ step }: OnboardingContentProps) {
     getOnboardingStepPath,
   ]);
 
+  // Applies exactly what the labels step would submit on Continue, then jumps
+  // to the end. Without the rule creation this would look like "accept all"
+  // while actually configuring nothing.
+  const onAcceptDefaultsAndFinish = useCallback(async () => {
+    setIsFinishing(true);
+
+    createRulesOnboardingAction(
+      emailAccountId,
+      categoryConfig(provider).map((category) => ({
+        name: category.key,
+        description: "",
+        action: category.action,
+        key: category.key,
+      })),
+    );
+
+    markOnboardingAsCompleted(ASSISTANT_ONBOARDING_COOKIE);
+
+    try {
+      const result = await completeOnboarding();
+      if (result?.serverError || result?.validationErrors) {
+        toastError({
+          description: "There was an error finishing onboarding",
+        });
+        setIsFinishing(false);
+        return;
+      }
+    } catch (error) {
+      captureException(error, {
+        extra: { context: "onboarding", step: "acceptDefaults" },
+      });
+      setIsFinishing(false);
+      return;
+    }
+
+    router.push(
+      isPremium ? prefixPath(emailAccountId, "/setup") : "/welcome-upgrade",
+    );
+  }, [emailAccountId, provider, completeOnboarding, isPremium, router]);
+
   const onSkipInviteTeam = useCallback(() => {
     if (!currentStepKey) return;
 
@@ -308,6 +352,12 @@ export function OnboardingContent({ step }: OnboardingContentProps) {
           bulk-unsubscribe step's stats query has data by the time it runs */}
       <EmailStatsPreloader />
       {renderStep ? renderStep() : null}
+      {renderStep ? (
+        <SkipOnboardingButton
+          onClick={onAcceptDefaultsAndFinish}
+          isLoading={isFinishing}
+        />
+      ) : null}
     </>
   );
 }

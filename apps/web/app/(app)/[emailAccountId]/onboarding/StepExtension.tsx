@@ -57,7 +57,7 @@ export function StepExtension({ onNext }: { onNext: () => Promise<void> }) {
         </div>
       </OnboardingWrapper>
 
-      <div className="fixed top-0 right-0 w-1/2 bg-white h-screen items-center justify-center hidden xl:flex">
+      <div className="fixed top-0 right-0 w-1/2 bg-card h-screen items-center justify-center hidden xl:flex">
         <OnboardingImagePreview
           src="/images/onboarding/extension.png"
           alt={`${BRAND_NAME} Tabs Extension`}

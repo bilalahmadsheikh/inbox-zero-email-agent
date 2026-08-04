@@ -161,7 +161,7 @@ export function StepInviteTeam({
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               className="w-full"
               onClick={() => {
                 posthog.capture("onboarding_invite_team_skipped", {

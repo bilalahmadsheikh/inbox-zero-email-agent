@@ -22,6 +22,8 @@ export const changelog: ChangelogEntry[] = [
       "Compose now has Cc and Bcc. They stay tucked away behind a small link until you need them, and open automatically when you are replying to a message that already had someone copied in.",
       "You can attach files from your computer when composing, with a paperclip button and a removable chip for each file. Files over 10MB are rejected as you pick them, rather than failing at the moment you press send.",
       "Attaching a file and then choosing Send later now tells you the two cannot be combined. Scheduled mail is held until its send time and cannot carry attachments, and previously the files were quietly dropped and the email went out without them.",
+      'Setup text is readable again. Every heading in setup — "How do you want your inbox organized?", "Should we draft replies for you?", "Invite your team" — was near-white on a near-white background and effectively invisible, because the setup screens were painted in light colours while the rest of the app follows your chosen theme. The Skip button on the invite step had the same problem and only appeared once your mouse was over it.',
+      'Setup can be skipped in one step. A "Use defaults & skip setup" button now applies the standard labels — the same ones Continue would have set up — and takes you straight into the app, instead of requiring you to click through every screen.',
     ],
   },
   {

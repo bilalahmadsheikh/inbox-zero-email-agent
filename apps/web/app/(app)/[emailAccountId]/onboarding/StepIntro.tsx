@@ -78,13 +78,13 @@ function Benefit({
           <MutedText className="mt-1 leading-6">{description}</MutedText>
         </div>
       </div>
-      <div className="col-span-3 text-sm text-muted-foreground rounded-tl-2xl pl-4 pt-4 bg-slate-50 border-t border-l border-slate-200 overflow-hidden">
+      <div className="col-span-3 text-sm text-muted-foreground rounded-tl-2xl pl-4 pt-4 bg-background border-t border-l border-border overflow-hidden">
         <Image
           src={image}
           alt="Benefit"
           width={700}
           height={700}
-          className="w-full h-full object-left-top object-cover rounded-tl-xl border-t border-l border-slate-200"
+          className="w-full h-full object-left-top object-cover rounded-tl-xl border-t border-l border-border"
         />
       </div>
     </CardBasic>

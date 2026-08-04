@@ -23,7 +23,7 @@ import {
   setHours,
   setMinutes,
 } from "date-fns";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import useSWR from "swr";
 import { z } from "zod";
@@ -47,10 +47,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { ContactsResponse } from "@/app/api/google/contacts/route";
 import type { SendEmailBody } from "@/utils/gmail/mail";
 import { CommandShortcut } from "@/components/ui/command";
@@ -111,6 +112,21 @@ export const ComposeEmailForm = ({
   const [isScheduling, setIsScheduling] = useState(false);
   const [customPickerOpen, setCustomPickerOpen] = useState(false);
   const [customSendAt, setCustomSendAt] = useState("");
+  const customSendAtRef = useRef<HTMLInputElement>(null);
+
+  // "Custom time" should land on a calendar, not an empty dd/mm/yyyy field the
+  // user still has to click a small icon to open.
+  useEffect(() => {
+    if (!customPickerOpen) return;
+
+    const timer = setTimeout(() => {
+      const input = customSendAtRef.current;
+      input?.focus();
+      input?.showPicker?.();
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [customPickerOpen]);
   const [showCcBcc, setShowCcBcc] = useState(
     Boolean(replyingToEmail?.cc || replyingToEmail?.bcc),
   );
@@ -671,8 +687,10 @@ export const ComposeEmailForm = ({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onSelect={(event) => {
-                  event.preventDefault();
+                onSelect={() => {
+                  // Let the menu close first; the picker is its own dialog, so
+                  // keeping the menu open only made it close on the next
+                  // pointer move and take the picker with it.
                   setCustomPickerOpen(true);
                 }}
               >
@@ -681,22 +699,20 @@ export const ComposeEmailForm = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Popover open={customPickerOpen} onOpenChange={setCustomPickerOpen}>
-            <PopoverTrigger asChild>
-              <span />
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto p-3">
+          <Dialog open={customPickerOpen} onOpenChange={setCustomPickerOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Send at</DialogTitle>
+              </DialogHeader>
               <div className="flex items-end gap-2">
-                <div className="space-y-1">
-                  <span className="block text-sm font-medium">Send at</span>
-                  <input
-                    type="datetime-local"
-                    className="block rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-                    value={customSendAt}
-                    min={format(new Date(), "yyyy-MM-dd'T'HH:mm")}
-                    onChange={(event) => setCustomSendAt(event.target.value)}
-                  />
-                </div>
+                <input
+                  ref={customSendAtRef}
+                  type="datetime-local"
+                  className="block flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                  value={customSendAt}
+                  min={format(new Date(), "yyyy-MM-dd'T'HH:mm")}
+                  onChange={(event) => setCustomSendAt(event.target.value)}
+                />
                 <Button
                   type="button"
                   disabled={!customSendAt || isScheduling}
@@ -705,8 +721,8 @@ export const ComposeEmailForm = ({
                   Schedule
                 </Button>
               </div>
-            </PopoverContent>
-          </Popover>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {onDiscard && (

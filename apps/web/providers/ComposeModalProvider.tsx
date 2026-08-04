@@ -27,7 +27,10 @@ export function ComposeModalProvider(props: { children: React.ReactNode }) {
     <ComposeModalContext.Provider value={{ onOpen: openModal }}>
       {props.children}
       <Dialog open={isModalOpen} onOpenChange={closeModal}>
-        <DialogContent>
+        {/* A half-written email is easy to lose and impossible to recover, so
+            closing takes a deliberate action: the X or Escape, not a stray
+            click on the page behind. */}
+        <DialogContent onInteractOutside={(event) => event.preventDefault()}>
           <DialogHeader>
             <DialogTitle>New Message</DialogTitle>
           </DialogHeader>

@@ -88,6 +88,12 @@ export const useNavigation = () => {
   const manageItems: NavItem[] = useMemo(
     () => [
       {
+        name: "Inbox",
+        href: prefixPath(currentEmailAccountId, "/mail"),
+        icon: InboxIcon,
+        description: "Your mail with the rule that handled each email, and why",
+      },
+      {
         name: "Chat",
         href: prefixPath(currentEmailAccountId, "/assistant"),
         icon: MessageSquareIcon,

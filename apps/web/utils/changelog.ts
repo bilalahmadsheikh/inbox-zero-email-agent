@@ -9,6 +9,15 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.0",
+    date: "2026-08-04",
+    notes: [
+      "New Inbox view in the sidebar, showing your mail alongside what Zynbox did to each email. Every message carries the rule that handled it, and hovering shows the reason it was chosen — or a marker saying nothing matched. Until now the only way to check whether a rule had fired was to open Gmail and look for a label, which told you the outcome but never the reasoning.",
+      "Your labels appear down the side while you are in the Inbox, so you can jump to everything filed as Marketing, Newsletter or To Reply in one click.",
+      "This is not a replacement for Gmail and is not meant to become one. It is your mail plus the one column Gmail cannot show you: what the automation decided, and why.",
+    ],
+  },
+  {
     version: "4.9",
     date: "2026-08-04",
     notes: [

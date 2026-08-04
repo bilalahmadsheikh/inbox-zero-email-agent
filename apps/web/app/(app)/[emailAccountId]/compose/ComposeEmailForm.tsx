@@ -7,7 +7,13 @@ import {
   ComboboxOption,
   ComboboxOptions,
 } from "@headlessui/react";
-import { CheckCircleIcon, ClockIcon, TrashIcon, XIcon } from "lucide-react";
+import {
+  CheckCircleIcon,
+  ClockIcon,
+  PaperclipIcon,
+  TrashIcon,
+  XIcon,
+} from "lucide-react";
 import {
   addDays,
   addHours,
@@ -28,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { ButtonLoader } from "@/components/Loading";
 import { env } from "@/env";
 import { extractNameFromEmail } from "@/utils/email";
+import type { Attachment } from "@/utils/types/mail";
 import { Tiptap, type TiptapHandle } from "@/components/editor/Tiptap";
 import { scheduleSendAction, sendEmailAction } from "@/utils/actions/mail";
 import {
@@ -61,6 +68,11 @@ export type ReplyingToEmail = {
   quotedContentHtml?: string | undefined; // The part being quoted/replied to
   date?: string; // The date of the original email
 };
+
+// Matches the per-file ceiling used elsewhere for outgoing mail. Base64
+// inflates the payload by roughly a third, so this is the pre-encoding size.
+const MAX_ATTACHMENT_MB = 10;
+const MAX_ATTACHMENT_BYTES = MAX_ATTACHMENT_MB * 1024 * 1024;
 
 export const ComposeEmailForm = ({
   replyingToEmail,
@@ -97,21 +109,74 @@ export const ComposeEmailForm = ({
   const [isScheduling, setIsScheduling] = useState(false);
   const [customPickerOpen, setCustomPickerOpen] = useState(false);
   const [customSendAt, setCustomSendAt] = useState("");
+  const [showCcBcc, setShowCcBcc] = useState(
+    Boolean(replyingToEmail?.cc || replyingToEmail?.bcc),
+  );
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const onFilesSelected = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.target.files ?? []);
+      // Let the same file be picked again after being removed.
+      event.target.value = "";
+      if (!files.length) return;
+
+      const oversized = files.filter(
+        (file) => file.size > MAX_ATTACHMENT_BYTES,
+      );
+      if (oversized.length) {
+        toastError({
+          description: `${oversized.map((file) => file.name).join(", ")} exceeds the ${MAX_ATTACHMENT_MB}MB limit.`,
+        });
+      }
+
+      const withinLimit = files.filter(
+        (file) => file.size <= MAX_ATTACHMENT_BYTES,
+      );
+      if (!withinLimit.length) return;
+
+      try {
+        const encoded = await Promise.all(withinLimit.map(fileToAttachment));
+        setAttachments((previous) => [...previous, ...encoded]);
+      } catch (error) {
+        console.error(error);
+        toastError({ description: "Could not read one of those files." });
+      }
+    },
+    [],
+  );
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((previous) => previous.filter((_, i) => i !== index));
+  }, []);
 
   const enrichData = useCallback(
     (data: SendEmailBody) => ({
       ...data,
       replyToEmail: getReplyToEmailPayload(data.replyToEmail),
+      attachments,
       messageHtml: showFullContent
         ? data.messageHtml || ""
         : `${data.messageHtml || ""}<br>${replyingToEmail?.quotedContentHtml || ""}`,
     }),
-    [showFullContent, replyingToEmail],
+    [showFullContent, replyingToEmail, attachments],
   );
 
   const scheduleSend = useCallback(
     (sendAt: Date) =>
       handleSubmit(async (data) => {
+        // Scheduled sends hold their content in the database until send time,
+        // so scheduleSendBody omits attachments. Say so rather than dropping
+        // the files silently, which is what used to happen.
+        if (attachments.length) {
+          toastError({
+            description:
+              "Attachments can't be scheduled. Send now, or remove them to schedule.",
+          });
+          return;
+        }
+
         setIsScheduling(true);
         try {
           const { attachments: _attachments, ...email } = enrichData(data);
@@ -142,7 +207,7 @@ export const ComposeEmailForm = ({
         }
         refetch?.();
       })(),
-    [handleSubmit, enrichData, emailAccountId, onSuccess, refetch],
+    [handleSubmit, enrichData, emailAccountId, onSuccess, refetch, attachments],
   );
 
   const onSubmit: SubmitHandler<SendEmailBody> = useCallback(
@@ -382,6 +447,35 @@ export const ComposeEmailForm = ({
             />
           )}
 
+          {showCcBcc ? (
+            <>
+              <Input
+                type="text"
+                name="cc"
+                registerProps={register("cc")}
+                error={errors.cc}
+                placeholder="Cc"
+                className="border border-input bg-background focus:border-slate-200 focus:ring-0 focus:ring-slate-200"
+              />
+              <Input
+                type="text"
+                name="bcc"
+                registerProps={register("bcc")}
+                error={errors.bcc}
+                placeholder="Bcc"
+                className="border border-input bg-background focus:border-slate-200 focus:ring-0 focus:ring-slate-200"
+              />
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowCcBcc(true)}
+              className="self-start text-muted-foreground text-sm hover:text-foreground"
+            >
+              Cc / Bcc
+            </button>
+          )}
+
           <Input
             type="text"
             name="subject"
@@ -405,12 +499,54 @@ export const ComposeEmailForm = ({
         }
       />
 
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {attachments.map((attachment, index) => (
+            <span
+              key={`${attachment.filename}-${index}`}
+              className="flex items-center gap-1 rounded border border-border bg-muted/40 py-1 pr-1 pl-2 text-sm"
+            >
+              <PaperclipIcon className="size-3 shrink-0 text-muted-foreground" />
+              <span className="max-w-48 truncate">{attachment.filename}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-5"
+                onClick={() => removeAttachment(index)}
+                aria-label={`Remove ${attachment.filename}`}
+              >
+                <XIcon className="size-3" />
+              </Button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button type="submit" disabled={isSubmitting || isScheduling}>
             {isSubmitting && <ButtonLoader />}
             Send
             <CommandShortcut className="ml-2">{symbol}+Enter</CommandShortcut>
+          </Button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={onFilesSelected}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={isSubmitting || isScheduling}
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Attach files"
+          >
+            <PaperclipIcon className="size-4" />
           </Button>
 
           <DropdownMenu>
@@ -531,5 +667,21 @@ function getReplyToEmailPayload(
     ...(replyingToEmail?.messageId
       ? { messageId: replyingToEmail.messageId }
       : {}),
+  };
+}
+
+async function fileToAttachment(file: File): Promise<Attachment> {
+  const buffer = await file.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  // Chunked so a large file cannot blow the argument limit of fromCharCode.
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+
+  return {
+    filename: file.name,
+    content: btoa(binary),
+    contentType: file.type || "application/octet-stream",
   };
 }

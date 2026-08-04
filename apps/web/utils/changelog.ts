@@ -19,6 +19,9 @@ export const changelog: ChangelogEntry[] = [
       "The email list no longer needs the page zoomed out to be usable. Its width was set from fixed screen-size steps that assumed the list had the whole window, so next to the reading pane the content spilled sideways instead of fitting. It now follows the width of its own panel.",
       "Roughly twice as many emails fit on screen: the subject and preview text now share a line instead of stacking, so each email takes two rows rather than three.",
       "Long label lists no longer fill the sidebar. Only the first few are shown, with a control to reveal the rest — and the label you are currently viewing always stays visible, even if it sits further down.",
+      "Compose now has Cc and Bcc. They stay tucked away behind a small link until you need them, and open automatically when you are replying to a message that already had someone copied in.",
+      "You can attach files from your computer when composing, with a paperclip button and a removable chip for each file. Files over 10MB are rejected as you pick them, rather than failing at the moment you press send.",
+      "Attaching a file and then choosing Send later now tells you the two cannot be combined. Scheduled mail is held until its send time and cannot carry attachments, and previously the files were quietly dropped and the email went out without them.",
     ],
   },
   {

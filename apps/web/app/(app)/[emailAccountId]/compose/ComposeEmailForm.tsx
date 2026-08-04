@@ -534,16 +534,21 @@ export const ComposeEmailForm = ({
           <Input
             type="text"
             name="aiInstruction"
-            value={instruction}
-            onChange={(event) => setInstruction(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !isGenerating) {
-                event.preventDefault();
-                generateDraft();
-              }
-            }}
             disabled={isGenerating}
             placeholder="Tell the AI what to write, then Generate…"
+            // Input builds its props from an allow-list that has no value or
+            // onChange, so a controlled field has to come through here.
+            registerProps={{
+              value: instruction,
+              onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+                setInstruction(event.target.value),
+              onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+                if (event.key === "Enter" && !isGenerating) {
+                  event.preventDefault();
+                  generateDraft();
+                }
+              },
+            }}
           />
           <Button
             type="button"

@@ -333,16 +333,23 @@ function ReplyPanel({
           <div className="mb-2 flex items-center gap-2">
             <Input
               type="text"
-              value={instruction}
-              onChange={(event) => setInstruction(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !isGeneratingReply) {
-                  event.preventDefault();
-                  generateDraft(instruction.trim() || undefined);
-                }
-              }}
+              name="replyInstruction"
               disabled={isGeneratingReply}
               placeholder="Tell the AI how to write this reply, then Generate…"
+              // Input has no value/onChange in its prop allow-list, so passing
+              // them directly left this uncontrolled: what you typed showed on
+              // screen but never reached state, and Generate ran without it.
+              registerProps={{
+                value: instruction,
+                onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+                  setInstruction(event.target.value),
+                onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (event.key === "Enter" && !isGeneratingReply) {
+                    event.preventDefault();
+                    generateDraft(instruction.trim() || undefined);
+                  }
+                },
+              }}
             />
             <Button
               variant="outline"

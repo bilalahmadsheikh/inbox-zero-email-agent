@@ -15,6 +15,10 @@ export const changelog: ChangelogEntry[] = [
       "New Inbox view in the sidebar, showing your mail alongside what Zynbox did to each email. Every message carries the rule that handled it, and hovering shows the reason it was chosen — or a marker saying nothing matched. Until now the only way to check whether a rule had fired was to open Gmail and look for a label, which told you the outcome but never the reasoning.",
       "Your labels appear down the side while you are in the Inbox, so you can jump to everything filed as Marketing, Newsletter or To Reply in one click.",
       "This is not a replacement for Gmail and is not meant to become one. It is your mail plus the one column Gmail cannot show you: what the automation decided, and why.",
+      "The beta notice at the top is now a single dismissible line. It was previously a full-page banner borrowed from the marketing site — around a quarter of the screen for one sentence, with an animated background, text coloured for a light theme so it was barely legible on dark, and no way to close it because the dismiss button was never wired up.",
+      "The email list no longer needs the page zoomed out to be usable. Its width was set from fixed screen-size steps that assumed the list had the whole window, so next to the reading pane the content spilled sideways instead of fitting. It now follows the width of its own panel.",
+      "Roughly twice as many emails fit on screen: the subject and preview text now share a line instead of stacking, so each email takes two rows rather than three.",
+      "Long label lists no longer fill the sidebar. Only the first few are shown, with a control to reveal the rest — and the label you are currently viewing always stays visible, even if it sits further down.",
     ],
   },
   {

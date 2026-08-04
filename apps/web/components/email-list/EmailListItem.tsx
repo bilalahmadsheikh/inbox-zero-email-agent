@@ -177,12 +177,16 @@ export const EmailListItem = forwardRef(
             </div>
 
             {splitView && (
-              <div className="mt-1.5 min-w-0 overflow-hidden text-sm leading-6">
-                <div className="min-w-0 overflow-hidden truncate font-medium text-foreground">
-                  {lastMessage.headers.subject}
-                </div>
-                <div className="mr-6 mt-0.5 min-w-0 overflow-hidden truncate pl-1 font-normal leading-5 text-muted-foreground">
-                  {decodedSnippet}
+              <div className="mt-1 min-w-0 overflow-hidden text-sm leading-6">
+                {/* Subject and snippet share a line so a row is two lines
+                    rather than three, roughly doubling how many emails fit. */}
+                <div className="flex min-w-0 items-baseline gap-2 overflow-hidden">
+                  <span className="min-w-0 max-w-[60%] truncate font-medium text-foreground">
+                    {lastMessage.headers.subject}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-normal text-muted-foreground">
+                    {decodedSnippet}
+                  </span>
                 </div>
                 {cta && (
                   <Button variant="outline" size="xs" className="mt-2" asChild>

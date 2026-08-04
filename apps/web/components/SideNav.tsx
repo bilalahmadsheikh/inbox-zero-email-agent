@@ -370,9 +370,14 @@ export function SideNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
 }
 
+// Enough to cover the labels reached daily without the list filling the
+// sidebar; accounts commonly carry a long tail of one-off and nested labels.
+const COLLAPSED_LABEL_COUNT = 8;
+
 function MailNav({ path }: { path: string }) {
   const { onOpen } = useComposeModal();
   const [showHiddenLabels, setShowHiddenLabels] = useState(false);
+  const [showAllLabels, setShowAllLabels] = useState(false);
   const { visibleLabels, hiddenLabels, isLoading } = useSplitLabels();
   const { provider } = useAccount();
   const terminology = getEmailTerminology(provider);
@@ -390,6 +395,18 @@ function MailNav({ path }: { path: string }) {
       active: currentLabelId === label.id,
     }));
   }, [visibleLabels, path]);
+
+  // Keep the active label visible even when it sits past the cut-off, so
+  // collapsing never hides the label you are currently looking at.
+  const shownLabelNavItems = useMemo(() => {
+    if (showAllLabels) return labelNavItems;
+
+    const shown = labelNavItems.slice(0, COLLAPSED_LABEL_COUNT);
+    const active = labelNavItems.find((item) => item.active);
+    if (active && !shown.includes(active)) shown.push(active);
+
+    return shown;
+  }, [labelNavItems, showAllLabels]);
 
   // Transform hidden labels into NavItems
   const hiddenLabelNavItems = useMemo(() => {
@@ -437,7 +454,27 @@ function MailNav({ path }: { path: string }) {
         </SidebarGroupLabel>
         <LoadingContent loading={isLoading}>
           {visibleLabels.length > 0 ? (
-            <SideNavMenu items={labelNavItems} activeHref={path} />
+            <>
+              <SideNavMenu items={shownLabelNavItems} activeHref={path} />
+              {labelNavItems.length > COLLAPSED_LABEL_COUNT && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllLabels(!showAllLabels)}
+                  className="flex w-full items-center px-3 py-2 text-muted-foreground text-sm hover:bg-accent hover:text-accent-foreground"
+                >
+                  {showAllLabels ? (
+                    <ChevronDownIcon className="mr-1 size-4" />
+                  ) : (
+                    <ChevronRightIcon className="mr-1 size-4" />
+                  )}
+                  <span>
+                    {showAllLabels
+                      ? "Show fewer"
+                      : `Show all ${labelNavItems.length}`}
+                  </span>
+                </button>
+              )}
+            </>
           ) : (
             <div className="px-3 py-2 text-xs text-muted-foreground">
               No {terminology.label.plural}

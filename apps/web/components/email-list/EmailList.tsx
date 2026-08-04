@@ -88,7 +88,11 @@ export function List({
         <div className="border-b border-gray-200">
           <GroupHeading
             leftContent={
-              <div className="overflow-x-auto py-2 md:max-w-lg lg:max-w-xl xl:max-w-3xl 2xl:max-w-4xl">
+              // Width follows the resizable panel, not the viewport: the old
+              // breakpoint tiers assumed the list owned the full window, so
+              // beside a preview pane the content overflowed sideways until the
+              // page was zoomed out.
+              <div className="w-full min-w-0 overflow-x-auto py-2">
                 <Tabs selected={selectedTab} tabs={tabs} breakpoint="xs" />
               </div>
             }

@@ -49,7 +49,7 @@ Write original content from the user's instruction. Never reuse boilerplate or t
 When the instruction is brief, write a short genuine message rather than padding it out; a few sincere sentences beat a long generic one.
 Match this writing style: ${writingStyle}
 Vary the greeting to suit the relationship rather than reusing one opener. A close contact gets something warm and direct; a business contact gets a professional opener.
-Return HTML using only simple paragraph tags.`;
+Return plain text. Separate paragraphs with a blank line; the composer turns them into HTML.`;
 
   const relationshipLine = relationship
     ? `The recipient looks like a ${relationship} contact, so pitch the tone accordingly.`
@@ -74,9 +74,16 @@ ${getTodayForLLM()}`;
   );
 
   const generateText = createGenerateText({
-    userEmail: emailAccount.email,
     label: "Generate new email",
+    emailAccount,
     modelOptions,
+    // The instruction comes from the user's own input, but the recipient
+    // address does not, so the prompt is still hardened.
+    promptHardening: {
+      trust: "untrusted",
+      level: "full",
+      outputConstraint: "plain-text",
+    },
   });
 
   const result = await generateText({

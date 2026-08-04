@@ -172,12 +172,13 @@ export const ComposeEmailForm = ({
         return;
       }
 
+      // The model returns plain text (the hardening layer only allows a
+      // plain-text constraint), so paragraphs become HTML here.
+      const html = textToParagraphs(result.data.text);
+
       // Appended rather than replacing, so anything already typed survives.
-      editorRef.current?.appendContent(result.data.text);
-      setValue(
-        "messageHtml",
-        `${watch("messageHtml") || ""}${result.data.text}`,
-      );
+      editorRef.current?.appendContent(html);
+      setValue("messageHtml", `${watch("messageHtml") || ""}${html}`);
       setInstruction("");
     } catch (error) {
       console.error(error);
@@ -764,4 +765,22 @@ async function fileToAttachment(file: File): Promise<Attachment> {
     content: btoa(binary),
     contentType: file.type || "application/octet-stream",
   };
+}
+
+function textToParagraphs(text: string) {
+  return text
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map(
+      (paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`,
+    )
+    .join("");
+}
+
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }

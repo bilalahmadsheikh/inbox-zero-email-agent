@@ -53,6 +53,16 @@
 - Env vars: add to `.env.example`, `env.ts`, and `turbo.json`. Prefix client-side with `NEXT_PUBLIC_`.
 - Never use dynamic Prisma transactions (`prisma.$transaction(async (tx) => ...)`).
 
+## Database Connections
+
+Postgres connection slots are the scarcest resource in this app, not CPU or query time. The pool is capped at `DATABASE_POOL_MAX ?? 5` per instance, and serverless instances are frozen after responding, so the pool's idle timer never fires and connections are held until Postgres refuses new ones with `P2037` ("remaining connection slots are reserved..."). Existing mitigations live in `utils/prisma.ts` (`attachDatabasePool`, `statement_timeout`) and `utils/prisma-connection-retry.ts` (`retryConnectionSlotExhaustion`, which must stay LAST in the `$extends` chain).
+
+Consequences when writing code:
+
+- Adding a query to a frequently-visited page (a server component on `/automation`, `/assistant`, `/mail`) turns one query into one-per-page-view across all users. Gate it behind a cheaper check, or cache it, rather than running it unconditionally.
+- Never let a redirect target a route that can re-run the same check. A server component that queries and then redirects to itself becomes an unbounded query loop from a single browser tab, which can starve slots for every user on that instance. Redirect to a different route, or make the target read the state that stops the loop.
+- The retry extension amplifies pressure rather than relieving it: a failing query retries three times with backoff, holding the attempt open longer. Treat `P2037` in logs as a signal that something is issuing too many queries, not as a transient to be tuned away.
+
 ## Change Philosophy
 - Prefer the simplest, most readable change; only keep backwards compatibility when explicitly requested.
 - Do not optimize for migration paths: refactor call sites directly, including larger coordinated changes when clarity improves.

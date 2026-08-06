@@ -2,6 +2,7 @@ import { publishArchive, publishDelete } from "@inboxzero/tinybird";
 import { createScopedLogger } from "@/utils/logger";
 import prisma from "@/utils/prisma";
 import { runWithBoundedConcurrency } from "@/utils/async";
+import { summarizeFailureReasons } from "@/utils/failure-reasons";
 
 const logger = createScopedLogger("bulk-action-tracking");
 
@@ -33,6 +34,7 @@ export async function publishBulkActionToTinybird(options: {
         logger.error("Failed to publish some events to Tinybird", {
           failureCount: failures.length,
           totalCount: results.length,
+          reasons: summarizeFailureReasons(failures),
         });
       }
     },

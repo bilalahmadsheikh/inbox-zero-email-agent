@@ -218,6 +218,47 @@ describe("chat folder tools", () => {
     });
   });
 
+  it("reports why threads failed, not just how many", async () => {
+    const getOrCreateFolderIdByName = vi.fn();
+    const moveThreadToFolder = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("cannot modify draft sarah@acme.com"))
+      .mockRejectedValueOnce(new Error("cannot modify draft bob@acme.com"));
+
+    vi.mocked(createEmailProvider).mockResolvedValue(
+      createMockEmailProvider({
+        getFolders: vi.fn().mockResolvedValue([
+          {
+            id: "folder-ops",
+            displayName: "Operations",
+            childFolderCount: 0,
+            childFolders: [],
+          },
+        ] satisfies OutlookFolder[]),
+        getOrCreateFolderIdByName,
+        moveThreadToFolder,
+      }),
+    );
+
+    const toolInstance = moveThreadsToFolderTool(toolOptions);
+
+    const result = (await (toolInstance.execute as any)({
+      threadIds: ["thread-1", "thread-2", "thread-3"],
+      folderName: "Operations",
+    })) as {
+      failedCount: number;
+      failureReasons?: { reason: string; count: number }[];
+    };
+
+    expect(result.failedCount).toBe(2);
+    // Grouped, and the addresses the provider echoed back are stripped before
+    // this reaches the model or the stored conversation.
+    expect(result.failureReasons).toEqual([
+      { reason: "cannot modify draft [address]", count: 2 },
+    ]);
+  });
+
   it("accepts slash path aliases for nested folders after exact name matching", async () => {
     const getOrCreateFolderIdByName = vi.fn();
     const moveThreadToFolder = vi.fn().mockResolvedValue(undefined);

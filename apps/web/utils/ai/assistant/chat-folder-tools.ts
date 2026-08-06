@@ -5,6 +5,7 @@ import type { Logger } from "@/utils/logger";
 import { FOLDER_SEPARATOR, type OutlookFolder } from "@/utils/outlook/folders";
 import { posthogCaptureEvent } from "@/utils/posthog";
 import { runWithBoundedConcurrency } from "@/utils/async";
+import { summarizeFailureReasons } from "@/utils/failure-reasons";
 
 const MAX_ATTACHMENT_SCAN_PAGES = 20;
 const ATTACHMENT_SCAN_PAGE_SIZE = 50;
@@ -191,6 +192,12 @@ export const moveThreadsToFolderTool = ({
           )
           .filter((threadId): threadId is string => Boolean(threadId));
 
+        // Plain allSettled here, so wrap to match what summarizeFailureReasons
+        // takes from the bounded-concurrency helper.
+        const failureReasons = summarizeFailureReasons(
+          results.map((result) => ({ result })),
+        );
+
         return {
           success: failedThreadIds.length === 0,
           folderName,
@@ -198,6 +205,7 @@ export const moveThreadsToFolderTool = ({
           successCount: uniqueThreadIds.length - failedThreadIds.length,
           failedCount: failedThreadIds.length,
           failedThreadIds,
+          ...(failureReasons.length ? { failureReasons } : {}),
         };
       } catch (error) {
         logger.error("Failed to move threads to folder", { error });
@@ -318,6 +326,7 @@ export const moveAttachmentEmailsToFolderTool = ({
         const failedCount = settled.filter(
           ({ result }) => result.status === "rejected",
         ).length;
+        const failureReasons = summarizeFailureReasons(settled);
 
         return {
           success: failedCount === 0 && !scanError,
@@ -328,6 +337,9 @@ export const moveAttachmentEmailsToFolderTool = ({
           matchedCount: threadIds.length,
           movedCount: threadIds.length - failedCount,
           failedCount,
+          // Distinct causes, not one entry per failure: this is fed back to the
+          // model and stored with the conversation.
+          ...(failureReasons.length ? { failureReasons } : {}),
           truncated,
           ...(scanError ? { scanError } : {}),
         };

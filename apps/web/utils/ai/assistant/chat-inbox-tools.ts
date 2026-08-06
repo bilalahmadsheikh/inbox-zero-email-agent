@@ -30,6 +30,10 @@ import type { ParsedMessage } from "@/utils/types";
 import { getEmailForLLM } from "@/utils/get-email-from-message";
 import { getFormattedSenderAddress } from "@/utils/email/get-formatted-sender-address";
 import { runWithBoundedConcurrency } from "@/utils/async";
+import {
+  formatFailureReasons,
+  summarizeFailureReasons,
+} from "@/utils/failure-reasons";
 import { resolveLabelNameAndId } from "@/utils/label/resolve-label";
 import {
   buildOutlookSearchFallbackQuery,
@@ -2900,7 +2904,41 @@ async function applyLabelToThread({
   ).length;
 
   if (failedCount > 0) {
-    throw new Error(`Failed to label ${failedCount} messages in thread`);
+    // Carries the provider's causes rather than a bare count: without them the
+    // caller can only report "failed", which is what made a thread that was
+    // largely labelled indistinguishable from one that was not touched.
+    const reasons = formatFailureReasons(summarizeFailureReasons(results));
+    throw new PartialThreadLabelError({
+      labelled: messages.length - failedCount,
+      failed: failedCount,
+      reasons,
+    });
+  }
+}
+
+export class PartialThreadLabelError extends Error {
+  readonly labelled: number;
+  readonly failed: number;
+  readonly reasons: string | null;
+
+  constructor({
+    labelled,
+    failed,
+    reasons,
+  }: {
+    labelled: number;
+    failed: number;
+    reasons: string | null;
+  }) {
+    super(
+      `Labelled ${labelled} of ${labelled + failed} messages in thread${
+        reasons ? `: ${reasons}` : ""
+      }`,
+    );
+    this.name = "PartialThreadLabelError";
+    this.labelled = labelled;
+    this.failed = failed;
+    this.reasons = reasons;
   }
 }
 

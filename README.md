@@ -59,7 +59,7 @@ Then set the matching provider variables in `apps/web/.env`.
 - Upstash
 - Turborepo
 
-## Brand
+## Branded
 
 Product name: **The Inbox Intern**
 

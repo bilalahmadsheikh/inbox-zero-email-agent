@@ -61,7 +61,7 @@ Then set the matching provider variables in `apps/web/.env`.
 
 ## Branded
 
-Product name: **The Inbox Intern**
+Product name: **ZYNBOX**
 
 Powered by: **Devaicon**
 

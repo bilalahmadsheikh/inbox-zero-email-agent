@@ -63,6 +63,14 @@ Consequences when writing code:
 - Never let a redirect target a route that can re-run the same check. A server component that queries and then redirects to itself becomes an unbounded query loop from a single browser tab, which can starve slots for every user on that instance. Redirect to a different route, or make the target read the state that stops the loop.
 - The retry extension amplifies pressure rather than relieving it: a failing query retries three times with backoff, holding the attempt open longer. Treat `P2037` in logs as a signal that something is issuing too many queries, not as a transient to be tuned away.
 
+## Text That Becomes Markup
+
+Anything that turns user or model text into HTML must go through `escapeHtml` / `convertNewlinesToBr` / `textToHtmlParagraphs` in `utils/string.ts`. Never write a local escape helper: a second implementation is always weaker than the shared one (a hand-rolled version missed quotes and left stray `\r` from Windows line endings), and this sits on the path where generated text becomes the body of a real outgoing email.
+
+## Recording What Was Learned
+
+When something is discovered that anyone touching this project would need to know — a constraint that is not obvious from the code, a failure mode that cost real time, a rule that prevents repeating a bug — write it down here in the same change, not afterwards. Prefer this file for anything that constrains how code is written; use a code comment when it only makes sense at one call site. Knowledge that lives only in a conversation or a commit message is lost by the next person who needs it, including future sessions on this repo.
+
 ## Change Philosophy
 - Prefer the simplest, most readable change; only keep backwards compatibility when explicitly requested.
 - Do not optimize for migration paths: refactor call sites directly, including larger coordinated changes when clarity improves.

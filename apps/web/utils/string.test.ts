@@ -4,6 +4,7 @@ import {
   truncate,
   generalizeSubject,
   convertNewlinesToBr,
+  textToHtmlParagraphs,
   escapeHtml,
   trimToNonEmptyString,
 } from "./string";
@@ -249,5 +250,45 @@ describe("string utils", () => {
       expect(result).not.toContain("<script>");
       expect(result).toContain("&lt;script&gt;");
     });
+  });
+});
+
+describe("textToHtmlParagraphs", () => {
+  it("splits on blank lines and keeps single newlines as breaks", () => {
+    expect(
+      textToHtmlParagraphs("Hi Dara,\n\nHope you are well.\nSpeak soon."),
+    ).toBe("<p>Hi Dara,</p><p>Hope you are well.<br>Speak soon.</p>");
+  });
+
+  it("escapes markup so model output cannot become HTML in a sent email", () => {
+    const html = textToHtmlParagraphs('<script>alert("x")</script>');
+
+    expect(html).not.toContain("<script");
+    expect(html.startsWith("<p>")).toBe(true);
+  });
+
+  it("escapes ampersands", () => {
+    expect(textToHtmlParagraphs("Tom & Jerry")).not.toContain(" & ");
+  });
+
+  it("handles Windows line endings", () => {
+    expect(textToHtmlParagraphs("One\r\n\r\nTwo\r\nThree")).toBe(
+      "<p>One</p><p>Two<br>Three</p>",
+    );
+  });
+
+  it("collapses runs of blank lines rather than emitting empty paragraphs", () => {
+    expect(textToHtmlParagraphs("One\n\n\n\nTwo")).toBe("<p>One</p><p>Two</p>");
+  });
+
+  it("returns nothing for empty or whitespace-only text", () => {
+    expect(textToHtmlParagraphs("")).toBe("");
+    expect(textToHtmlParagraphs("   \n\n  \t ")).toBe("");
+  });
+
+  it("trims surrounding whitespace on each paragraph", () => {
+    expect(textToHtmlParagraphs("  padded  \n\n  also  ")).toBe(
+      "<p>padded</p><p>also</p>",
+    );
   });
 });

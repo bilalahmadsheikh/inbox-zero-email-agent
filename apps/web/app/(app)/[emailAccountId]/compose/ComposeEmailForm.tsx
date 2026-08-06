@@ -35,7 +35,13 @@ import { Button } from "@/components/ui/button";
 import { ButtonLoader } from "@/components/Loading";
 import { env } from "@/env";
 import { extractNameFromEmail } from "@/utils/email";
+import { textToHtmlParagraphs } from "@/utils/string";
 import type { Attachment } from "@/utils/types/mail";
+import {
+  MAX_ATTACHMENT_MB,
+  fileToAttachment,
+  isWithinAttachmentLimit,
+} from "@/utils/attachments/local-file";
 import { Tiptap, type TiptapHandle } from "@/components/editor/Tiptap";
 import { scheduleSendAction, sendEmailAction } from "@/utils/actions/mail";
 import { generateNewEmailAction } from "@/utils/actions/generate-reply";
@@ -71,11 +77,6 @@ export type ReplyingToEmail = {
   quotedContentHtml?: string | undefined; // The part being quoted/replied to
   date?: string; // The date of the original email
 };
-
-// Matches the per-file ceiling used elsewhere for outgoing mail. Base64
-// inflates the payload by roughly a third, so this is the pre-encoding size.
-const MAX_ATTACHMENT_MB = 10;
-const MAX_ATTACHMENT_BYTES = MAX_ATTACHMENT_MB * 1024 * 1024;
 
 export const ComposeEmailForm = ({
   replyingToEmail,
@@ -141,7 +142,7 @@ export const ComposeEmailForm = ({
       if (!files.length) return;
 
       const oversized = files.filter(
-        (file) => file.size > MAX_ATTACHMENT_BYTES,
+        (file) => !isWithinAttachmentLimit(file.size),
       );
       if (oversized.length) {
         toastError({
@@ -149,8 +150,8 @@ export const ComposeEmailForm = ({
         });
       }
 
-      const withinLimit = files.filter(
-        (file) => file.size <= MAX_ATTACHMENT_BYTES,
+      const withinLimit = files.filter((file) =>
+        isWithinAttachmentLimit(file.size),
       );
       if (!withinLimit.length) return;
 
@@ -190,7 +191,7 @@ export const ComposeEmailForm = ({
 
       // The model returns plain text (the hardening layer only allows a
       // plain-text constraint), so paragraphs become HTML here.
-      const html = textToParagraphs(result.data.text);
+      const html = textToHtmlParagraphs(result.data.text);
 
       // Appended rather than replacing, so anything already typed survives.
       editorRef.current?.appendContent(html);
@@ -765,38 +766,4 @@ function getReplyToEmailPayload(
       ? { messageId: replyingToEmail.messageId }
       : {}),
   };
-}
-
-async function fileToAttachment(file: File): Promise<Attachment> {
-  const buffer = await file.arrayBuffer();
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  // Chunked so a large file cannot blow the argument limit of fromCharCode.
-  for (let i = 0; i < bytes.length; i += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  }
-
-  return {
-    filename: file.name,
-    content: btoa(binary),
-    contentType: file.type || "application/octet-stream",
-  };
-}
-
-function textToParagraphs(text: string) {
-  return text
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-    .map(
-      (paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`,
-    )
-    .join("");
-}
-
-function escapeHtml(text: string) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }

@@ -74,3 +74,20 @@ export function slugify(text: string): string {
 export function convertNewlinesToBr(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/\n/g, "<br>");
 }
+
+/**
+ * Turns plain text into escaped HTML paragraphs.
+ *
+ * For model-generated email bodies: generators are constrained to plain-text
+ * output, so the text becomes markup exactly once, here, rather than each
+ * caller rolling its own escaping and getting it subtly wrong.
+ */
+export function textToHtmlParagraphs(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => `<p>${convertNewlinesToBr(escapeHtml(paragraph))}</p>`)
+    .join("");
+}

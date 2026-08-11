@@ -30,6 +30,7 @@ import type { ParsedMessage } from "@/utils/types";
 import { getEmailForLLM } from "@/utils/get-email-from-message";
 import { getFormattedSenderAddress } from "@/utils/email/get-formatted-sender-address";
 import { runWithBoundedConcurrency } from "@/utils/async";
+import { verifySenderWideIntent } from "@/utils/ai/assistant/verify-sender-wide-intent";
 import {
   formatFailureReasons,
   summarizeFailureReasons,
@@ -305,6 +306,9 @@ type InboxToolOptions = {
   emailAccountId: string;
   provider: string;
   logger: Logger;
+  // The user's own messages this conversation. Destructive sender-wide
+  // actions verify intent against these rather than trusting the tool call.
+  conversationUserMessageTexts?: string[] | null;
 };
 
 type ProviderToolFactory = (options: InboxToolOptions) => unknown;
@@ -1270,6 +1274,7 @@ const buildManageInboxTool = ({
   taxonomy: ManageInboxTaxonomyConfig;
 }) => {
   const { email, emailAccountId, provider, logger } = options;
+  const conversationUserMessageTexts = options.conversationUserMessageTexts;
 
   return tool({
     description:
@@ -1323,6 +1328,31 @@ const buildManageInboxTool = ({
             return {
               error:
                 'No sender-level action was taken. "fromEmails" is required for bulk_archive_senders, bulk_trash_senders, and unsubscribe_senders. If you only meant the emails already shown, use archive_threads or trash_threads with threadIds instead.',
+            };
+          }
+
+          // Descriptions have told the model not to widen a thread-level
+          // request into sender-wide cleanup since April and it still
+          // happens, so intent is judged from the user's own messages rather
+          // than trusted from the call. Fails toward the narrower action: a
+          // wrong "no" leaves mail unarchived, a wrong "yes" archives a
+          // sender's entire history.
+          const requestsSenderWide = conversationUserMessageTexts?.length
+            ? await verifySenderWideIntent({
+                userMessageTexts: conversationUserMessageTexts,
+                emailAccountId,
+                logger,
+              })
+            : false;
+
+          if (!requestsSenderWide) {
+            logger.warn("Blocked sender-wide cleanup: not requested", {
+              action: originalAction,
+              sendersCount: normalizedFromEmails.length,
+            });
+
+            return {
+              error: `No action was taken. ${originalAction} affects every email these senders have ever sent, and this conversation only asked about specific emails. Use archive_threads or trash_threads with the threadIds under discussion, or ask the user to confirm they want all mail from these senders removed.`,
             };
           }
 

@@ -43,6 +43,7 @@ export const LlmUseCase = {
   ReplyNudge: "reply-nudge",
   Summarise: "summarise",
   VerifyRecurrenceRequest: "verify-recurrence-request",
+  VerifySenderWideIntent: "verify-sender-wide-intent",
   VerifyScheduledSendIntent: "verify-scheduled-send-intent",
   WritingStyleAnalysis: "writing-style-analysis",
 } as const;
@@ -90,6 +91,7 @@ export const LLM_USE_CASE_MODEL_TYPES = {
   [LlmUseCase.ReplyNudge]: "chat",
   [LlmUseCase.Summarise]: "default",
   [LlmUseCase.VerifyRecurrenceRequest]: "economy",
+  [LlmUseCase.VerifySenderWideIntent]: "economy",
   [LlmUseCase.VerifyScheduledSendIntent]: "economy",
   [LlmUseCase.WritingStyleAnalysis]: "default",
 } as const satisfies Record<LlmUseCase, ModelType>;

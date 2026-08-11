@@ -147,6 +147,7 @@ describe("LLM use cases", () => {
       [LlmUseCase.Summarise]: "default",
       [LlmUseCase.VerifyRecurrenceRequest]: "economy",
       [LlmUseCase.VerifyScheduledSendIntent]: "economy",
+      [LlmUseCase.VerifySenderWideIntent]: "economy",
       [LlmUseCase.WritingStyleAnalysis]: "default",
     });
   });

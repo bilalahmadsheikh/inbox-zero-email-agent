@@ -35,11 +35,21 @@ vi.mock("@/utils/reply-tracker/sender-reply-examples", () => ({
   collectSenderReplyExamples: vi.fn(),
 }));
 
-const { mockVerifyRecurrenceRequest, mockVerifyScheduledSendIntent } =
-  vi.hoisted(() => ({
-    mockVerifyRecurrenceRequest: vi.fn(),
-    mockVerifyScheduledSendIntent: vi.fn(),
-  }));
+const {
+  mockVerifyRecurrenceRequest,
+  mockVerifyScheduledSendIntent,
+  mockVerifySenderWideIntent,
+} = vi.hoisted(() => ({
+  mockVerifyRecurrenceRequest: vi.fn(),
+  mockVerifySenderWideIntent: vi.fn(),
+  mockVerifyScheduledSendIntent: vi.fn(),
+}));
+
+vi.mock("@/utils/ai/assistant/verify-sender-wide-intent", () => ({
+  verifySenderWideIntent: (
+    ...args: Parameters<typeof mockVerifySenderWideIntent>
+  ) => mockVerifySenderWideIntent(...args),
+}));
 
 vi.mock("@/utils/ai/assistant/verify-recurrence-request", () => ({
   verifyRecurrenceRequest: (
@@ -1416,11 +1426,16 @@ describe("chat inbox tools", () => {
       bulkArchiveFromSenders,
     } as any);
 
+    mockVerifySenderWideIntent.mockResolvedValue(true);
+
     const toolInstance = manageInboxTool({
       email: TEST_EMAIL,
       emailAccountId: "email-account-1",
       provider: "google",
       logger,
+      conversationUserMessageTexts: [
+        "archive everything these two senders have ever sent me",
+      ],
     });
 
     const result = await (toolInstance.execute as any)({
@@ -1438,6 +1453,56 @@ describe("chat inbox tools", () => {
       sendersCount: 2,
     });
     expect(createEmailProvider).not.toHaveBeenCalled();
+    expect(bulkArchiveFromSenders).not.toHaveBeenCalled();
+  });
+
+  it("refuses sender-wide cleanup the conversation never asked for", async () => {
+    const bulkArchiveFromSenders = vi.fn();
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      bulkArchiveFromSenders,
+    } as any);
+    mockVerifySenderWideIntent.mockResolvedValue(false);
+
+    const toolInstance = manageInboxTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+      conversationUserMessageTexts: ["archive the rest of these"],
+    });
+
+    const result = await (toolInstance.execute as any)({
+      action: "bulk_archive_senders",
+      fromEmails: ["promo@shop.example"],
+    });
+
+    expect(result.error).toBeTruthy();
+    expect(result.requiresConfirmation).toBeUndefined();
+    expect(createEmailProvider).not.toHaveBeenCalled();
+    expect(bulkArchiveFromSenders).not.toHaveBeenCalled();
+  });
+
+  it("refuses sender-wide cleanup when no user messages are available to verify", async () => {
+    const bulkArchiveFromSenders = vi.fn();
+    vi.mocked(createEmailProvider).mockResolvedValue({
+      bulkArchiveFromSenders,
+    } as any);
+    mockVerifySenderWideIntent.mockResolvedValue(true);
+
+    const toolInstance = manageInboxTool({
+      email: TEST_EMAIL,
+      emailAccountId: "email-account-1",
+      provider: "google",
+      logger,
+    });
+
+    const result = await (toolInstance.execute as any)({
+      action: "bulk_archive_senders",
+      fromEmails: ["promo@shop.example"],
+    });
+
+    expect(result.error).toBeTruthy();
+    expect(mockVerifySenderWideIntent).not.toHaveBeenCalled();
     expect(bulkArchiveFromSenders).not.toHaveBeenCalled();
   });
 

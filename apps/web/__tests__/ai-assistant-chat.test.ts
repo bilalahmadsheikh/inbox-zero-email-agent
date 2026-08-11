@@ -75,6 +75,10 @@ vi.mock("@/utils/email/provider", () => ({
   createEmailProvider: mockCreateEmailProvider,
 }));
 
+vi.mock("@/utils/ai/assistant/verify-sender-wide-intent", () => ({
+  verifySenderWideIntent: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@/utils/posthog", () => ({
   posthogCaptureEvent: mockPosthogCaptureEvent,
 }));

@@ -75,6 +75,15 @@ When something is discovered that anyone touching this project would need to kno
 - Prefer the simplest, most readable change; only keep backwards compatibility when explicitly requested.
 - Do not optimize for migration paths: refactor call sites directly, including larger coordinated changes when clarity improves.
 
+## Cost
+
+`COSTS.md` records every deliberate cost increase in the app — extra model
+calls, retries, background passes, queries on hot paths — with the failure each
+one prevents. Add an entry there when you merge a change that spends more per
+request, per user, or per background run than the straightforward version would.
+Read it before removing something that looks redundant; several of the entries
+exist because the cheaper version was already tried and failed.
+
 ## LLM Features
 - Stay AI-first: fix general failure modes, not exact eval wording, and avoid brittle keyword or regex rules unless the product needs a hard guard.
 - Do not add keyword/phrase blacklists to prompts, evals, or tests just to catch a model's current bad wording. This product works across languages, so English-specific text checks are especially brittle. For LLM behavior, assert the semantic failure mode with a judge/eval criterion or structured contract instead. Example: test "does not ask unnecessary clarification or invent payment status," not "does not contain 'could you clarify' or 'specific payment'."

@@ -2463,7 +2463,7 @@ describe("aiProcessAssistantChat", () => {
     expect(searchResult.messages).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ messageId: "message-1" }),
-        expect.objectContaining({ category: "to_reply" }),
+        expect.objectContaining({ conversationStatus: "to_reply" }),
       ]),
     );
 

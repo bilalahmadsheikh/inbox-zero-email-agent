@@ -807,7 +807,7 @@ const gmailSearchInboxTool = ({
 }: InboxToolOptions) =>
   tool({
     description:
-      "Search inbox messages and return concise message metadata. Limit must be between 1 and 50 messages per call. If hasMore=true, more matches remain; for bulk or all-matching requests, keep calling searchInbox with nextPageToken until hasMore=false before reporting completion. totalReturned is only the number of messages returned by this call, so do not present it or a single search page as an exact mailbox, folder, or label count. If the tool returns an error or provider search feedback instead of messages, treat the lookup as inconclusive rather than evidence that the email is absent.",
+      "Search inbox messages and return concise message metadata. Limit must be between 1 and 50 messages per call. If hasMore=true, more matches remain; for bulk or all-matching requests, keep calling searchInbox with nextPageToken until hasMore=false before reporting completion. totalReturned is only the number of messages returned by this call, so do not present it or a single search page as an exact mailbox, folder, or label count. If the tool returns an error or provider search feedback instead of messages, treat the lookup as inconclusive rather than evidence that the email is absent. Each message carries conversationStatus, which reports Reply Zero status only: not_a_conversation means the email has none of the four conversation labels, NOT that no rule matched it. Mail labelled Notification, Newsletter or Receipt is not_a_conversation but was still processed. Never describe an email as uncategorized or unprocessed from this field; to find out whether a rule ran, call getRuleExecutionForMessage.",
     inputSchema: gmailSearchInboxInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "search_inbox", email, logger });
@@ -851,7 +851,7 @@ const outlookSearchInboxTool = ({
 }: InboxToolOptions) =>
   tool({
     description:
-      "Search inbox messages and return concise message metadata. Limit must be between 1 and 50 messages per call. If hasMore=true, more matches remain; for bulk or all-matching requests, keep calling searchInbox with nextPageToken until hasMore=false before reporting completion, even when the current page has zero messages. Outlook filtered searches can return an empty page before later matching pages. totalReturned is only the number of messages returned by this call, so do not present it or a single search page as an exact mailbox, folder, or category count. If the tool returns an error or provider search feedback instead of messages, treat the lookup as inconclusive rather than evidence that the email is absent.",
+      "Search inbox messages and return concise message metadata. Limit must be between 1 and 50 messages per call. If hasMore=true, more matches remain; for bulk or all-matching requests, keep calling searchInbox with nextPageToken until hasMore=false before reporting completion, even when the current page has zero messages. Outlook filtered searches can return an empty page before later matching pages. totalReturned is only the number of messages returned by this call, so do not present it or a single search page as an exact mailbox, folder, or category count. If the tool returns an error or provider search feedback instead of messages, treat the lookup as inconclusive rather than evidence that the email is absent. Each message carries conversationStatus, which reports Reply Zero status only: not_a_conversation means the email has none of the four conversation categories, NOT that no rule matched it. Mail in the Notification, Newsletter or Receipt category is not_a_conversation but was still processed. Never describe an email as uncategorized or unprocessed from this field; to find out whether a rule ran, call getRuleExecutionForMessage.",
     inputSchema: outlookSearchInboxInputSchema,
     execute: async (input) => {
       trackToolCall({ tool: "search_inbox", email, logger });
@@ -2459,7 +2459,7 @@ function mapMessageForSearchResult(
   const labelNames = labelIds.map(
     (labelId) => labelsById.get(labelId.toLowerCase()) || labelId,
   );
-  const category = inferConversationCategory(labelNames);
+  const conversationStatus = inferConversationStatus(labelNames);
   const isUnread = labelIds.some(
     (labelId) => labelId.toLowerCase() === "unread",
   );
@@ -2474,20 +2474,25 @@ function mapMessageForSearchResult(
     snippet: message.snippet,
     date: message.date,
     [taxonomyNamesKey]: labelNames,
-    category,
+    conversationStatus,
     isUnread,
     hasAttachments: Boolean(message.attachments?.length),
   };
 }
 
-type ConversationCategory =
+// Reply Zero status only. "not_a_conversation" means exactly that: the email
+// carries none of the four conversation labels. It does NOT mean no rule
+// matched — mail labelled Notification, Newsletter or Receipt lands here too.
+// Whether a rule ran is a different question, answered by
+// getRuleExecutionForMessage.
+type ConversationStatus =
   | "to_reply"
   | "awaiting_reply"
   | "fyi"
   | "actioned"
-  | "uncategorized";
+  | "not_a_conversation";
 
-function inferConversationCategory(labelNames: string[]): ConversationCategory {
+function inferConversationStatus(labelNames: string[]): ConversationStatus {
   const normalized = new Set(
     labelNames.map((labelName) => labelName.trim().toLowerCase()),
   );
@@ -2499,12 +2504,12 @@ function inferConversationCategory(labelNames: string[]): ConversationCategory {
   if (normalized.has(getRuleLabel(SystemType.FYI).toLowerCase())) return "fyi";
   if (normalized.has(getRuleLabel(SystemType.ACTIONED).toLowerCase()))
     return "actioned";
-  return "uncategorized";
+  return "not_a_conversation";
 }
 
 function summarizeSearchResults(
   items: Array<{
-    category: ConversationCategory;
+    conversationStatus: ConversationStatus;
     isUnread: boolean;
   }>,
 ) {
@@ -2512,18 +2517,18 @@ function summarizeSearchResults(
     (acc, item) => {
       acc.total += 1;
       if (item.isUnread) acc.unread += 1;
-      acc.byCategory[item.category] += 1;
+      acc.byConversationStatus[item.conversationStatus] += 1;
       return acc;
     },
     {
       total: 0,
       unread: 0,
-      byCategory: {
+      byConversationStatus: {
         to_reply: 0,
         awaiting_reply: 0,
         fyi: 0,
         actioned: 0,
-        uncategorized: 0,
+        not_a_conversation: 0,
       },
     },
   );

@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.1",
+    date: "2026-08-11",
+    notes: [
+      'The assistant no longer calls your handled email "uncategorised". Asked to catch you up, it would report that everything was uncategorised even when your rules had already labelled it — then, if you questioned that, correctly say the mail had been categorised after all, and put the contradiction down to the inbox and the rule history being out of step. Neither the first answer nor the explanation was right: it was reading a field that reported only whether an email was part of a conversation, while being named as though it reported whether anything had handled it. Mail labelled Notification, Newsletter or Receipt was counted as uncategorised purely because it was not a conversation. That field now says what it means, and the assistant is told which tool to use when you actually want to know whether a rule ran.',
+      "Fixed two flaws in how AI-written email bodies are turned into a sendable message: quotation marks were not being escaped, and Windows-style line breaks left stray invisible characters in the text. Both came from a second, weaker copy of a conversion the app already did properly elsewhere; there is now one shared version, covered by tests.",
+    ],
+  },
+  {
     version: "5.0",
     date: "2026-08-04",
     notes: [

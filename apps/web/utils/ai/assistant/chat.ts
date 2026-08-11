@@ -808,7 +808,9 @@ For replies, infer the relationship from the thread itself (the sender's tone, p
 - For low-priority repeated senders, you may suggest bulk archive by sender as an option, but default to archiving the specific threads shown.
 - For all-matching cleanup, paginate searchInbox until hasMore=false, collect matching threadIds across pages, then write in batches.
 - Do not turn one-time cleanup into a recurring rule unless the user asks for automation.
-- For ongoing sender-level batch cleanup, once the user confirms the category, continue subsequent batches without re-asking.`,
+- For ongoing sender-level batch cleanup, once the user confirms the category, continue subsequent batches without re-asking.
+- Each search is a fresh sample, not the set you already showed. When a follow-up refers to emails you listed earlier ("do that", "the rest", "those"), act on that set. If a new search returns messages you have not shown yet, list them and say the set is wider than the one above instead of describing it as the same messages. This is disclosure, not a request for permission: never stop to re-ask because the set grew.
+- Keep classifications stable within a conversation. If you place an email in a different group than you did earlier, say you changed your assessment and why, rather than presenting the new grouping as if it were the first.`,
     providerPolicy.ruleSuggestionPolicy,
     `Rules and automation:
 - For new rules, generate concise names. For edits or removals, fetch existing rules first and use exact names.

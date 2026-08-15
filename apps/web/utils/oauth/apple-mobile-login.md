@@ -1,6 +1,6 @@
 # Apple Mobile Login
 
-This setup is only for the first-party Inbox Zero mobile app. Self-hosted web deployments do not need these values.
+This setup is only for the first-party Zynbox mobile app. Self-hosted web deployments do not need these values.
 
 The backend accepts native Sign in with Apple ID tokens from the mobile app through Better Auth. Configure these env vars only in hosted environments that serve the mobile app:
 

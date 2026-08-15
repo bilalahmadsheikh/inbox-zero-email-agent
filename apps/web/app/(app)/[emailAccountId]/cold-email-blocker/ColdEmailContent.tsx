@@ -16,12 +16,16 @@ export function ColdEmailContent({ searchParam }: { searchParam?: string }) {
 
   return (
     <Tabs defaultValue="cold-emails" searchParam={searchParam}>
-      <TabsList>
-        <TabsTrigger value="cold-emails">Cold Emails</TabsTrigger>
-        <TabsTrigger value="rejected">Marked Not Cold</TabsTrigger>
-        <TabsTrigger value="test">Test</TabsTrigger>
-        <TabsTrigger value="settings">Settings</TabsTrigger>
-      </TabsList>
+      {/* Four labels do not fit a phone; scroll them like the assistant tabs
+          rather than letting the last one run off the edge. */}
+      <div className="w-full overflow-x-auto">
+        <TabsList>
+          <TabsTrigger value="cold-emails">Cold Emails</TabsTrigger>
+          <TabsTrigger value="rejected">Marked Not Cold</TabsTrigger>
+          <TabsTrigger value="test">Test</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+      </div>
 
       <TabsContent value="test" className="mb-10">
         <ColdEmailTest />

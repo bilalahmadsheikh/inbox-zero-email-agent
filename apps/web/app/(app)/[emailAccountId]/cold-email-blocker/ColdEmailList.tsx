@@ -86,16 +86,18 @@ export function ColdEmailList() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-center">
+                <TableHead className="px-2 text-center sm:px-4">
                   <Checkbox
                     checked={isAllSelected}
                     onChange={onToggleSelectAll}
                   />
                 </TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>AI Reason</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>
+                <TableHead className="px-2 sm:px-4">Email</TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  AI Reason
+                </TableHead>
+                <TableHead className="hidden sm:table-cell">Date</TableHead>
+                <TableHead className="px-2 sm:px-4">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -144,26 +146,34 @@ function Row({
 }) {
   return (
     <TableRow key={row.id}>
-      <TableCell className="text-center">
+      <TableCell className="p-2 text-center sm:p-4">
         <Checkbox
           checked={selected.get(row.id) || false}
           onChange={() => onToggleSelect(row.id)}
         />
       </TableCell>
-      <TableCell>
+      <TableCell className="p-2 sm:p-4">
         <EmailMessageCellWithData
           sender={row.fromEmail}
           userEmail={userEmail}
           threadId={row.threadId || ""}
           messageId={row.messageId || ""}
         />
+        {/* Reason and date have their own columns from sm up; on mobile those
+            are hidden, so keep the information on the row rather than lose it. */}
+        <div className="mt-1 text-xs text-muted-foreground sm:hidden">
+          <DateCell createdAt={row.createdAt} />
+          {row.reason ? <span className="ml-1">· {row.reason}</span> : null}
+        </div>
       </TableCell>
-      <TableCell>{row.reason || "-"}</TableCell>
-      <TableCell>
+      <TableCell className="hidden sm:table-cell">
+        {row.reason || "-"}
+      </TableCell>
+      <TableCell className="hidden sm:table-cell">
         <DateCell createdAt={row.createdAt} />
       </TableCell>
-      <TableCell>
-        <div className="flex items-center justify-end space-x-2">
+      <TableCell className="p-2 sm:p-4">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {row.threadId && (
             <ViewEmailButton
               threadId={row.threadId}
@@ -171,6 +181,10 @@ function Row({
             />
           )}
           <Button
+            // Buttons carry `text-nowrap`, so this one sets the row's minimum
+            // width and pushes itself off a phone screen. Override text-wrap
+            // (not white-space — they are different properties) below sm.
+            className="h-auto text-wrap py-1.5 text-left sm:py-0 sm:text-nowrap"
             Icon={CircleXIcon}
             onClick={async () => {
               await markNotColdEmail({ sender: row.fromEmail });

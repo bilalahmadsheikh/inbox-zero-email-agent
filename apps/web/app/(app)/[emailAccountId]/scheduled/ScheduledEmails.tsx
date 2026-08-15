@@ -148,26 +148,36 @@ function ScheduledEmailsTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>To</TableHead>
-          <TableHead>Subject</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Send at</TableHead>
-          <TableHead>Status</TableHead>
+          <TableHead className="hidden sm:table-cell">To</TableHead>
+          <TableHead className="px-2 sm:px-4">Subject</TableHead>
+          <TableHead className="hidden sm:table-cell">Type</TableHead>
+          <TableHead className="hidden sm:table-cell">Send at</TableHead>
+          <TableHead className="px-2 sm:px-4">Status</TableHead>
           {(onCancel || onDelete) && <TableHead className="w-24" />}
         </TableRow>
       </TableHeader>
       <TableBody>
         {emails.map((email) => (
           <TableRow key={email.id}>
-            <TableCell className="max-w-48 truncate">{email.to}</TableCell>
-            <TableCell className="max-w-64 truncate">{email.subject}</TableCell>
-            <TableCell>
+            <TableCell className="hidden max-w-48 truncate sm:table-cell">
+              {email.to}
+            </TableCell>
+            <TableCell className="max-w-48 p-2 sm:max-w-64 sm:p-4">
+              <div className="truncate">{email.subject}</div>
+              {/* The recipient and send time get their own columns from sm up;
+                  on mobile those are hidden, so surface them here instead of
+                  dropping them from the row entirely. */}
+              <div className="mt-1 truncate text-xs text-muted-foreground sm:hidden">
+                {email.to} · {formatSendAt(email.sendAt)}
+              </div>
+            </TableCell>
+            <TableCell className="hidden sm:table-cell">
               <ScheduleTypeBadges email={email} />
             </TableCell>
-            <TableCell className="whitespace-nowrap">
+            <TableCell className="hidden whitespace-nowrap sm:table-cell">
               {formatSendAt(email.sendAt)}
             </TableCell>
-            <TableCell>
+            <TableCell className="p-2 sm:p-4">
               <div className="space-y-1">
                 <ScheduledEmailStatusBadge status={email.status} />
                 {email.status === "FAILED" && email.error && (

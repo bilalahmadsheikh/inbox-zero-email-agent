@@ -811,7 +811,7 @@ function NotifyChannelRow({
           onChange(next === "off" ? null : next);
         }}
       >
-        <SelectTrigger className="w-[220px]">
+        <SelectTrigger className="w-full sm:w-[220px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

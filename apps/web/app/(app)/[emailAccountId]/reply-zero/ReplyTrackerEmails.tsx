@@ -354,8 +354,14 @@ function Row({
       )}
       onMouseEnter={onSelect}
     >
-      <TableCell onClick={openSplitView} className="py-8 pl-8 pr-6">
-        <div className="flex items-center justify-between">
+      <TableCell
+        onClick={openSplitView}
+        className="p-3 sm:py-8 sm:pl-8 sm:pr-6"
+      >
+        {/* The action cluster cannot shrink below the width of its buttons, so
+            beside the email it forces the row wider than a phone. Stack them
+            until there is room to sit side by side. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <EmailMessageCell
             sender={row.sender}
             subject={row.subject}
@@ -371,8 +377,8 @@ function Row({
           {/* biome-ignore lint/a11y/useKeyWithClickEvents: buttons inside handle keyboard events */}
           <div
             className={cn(
-              "ml-4 flex items-center gap-1.5",
-              isSplitViewOpen && "flex-col",
+              "flex flex-wrap items-center gap-1.5 sm:ml-4 sm:flex-nowrap",
+              isSplitViewOpen && "sm:flex-col",
             )}
             onClick={(e) => e.stopPropagation()}
           >
@@ -421,7 +427,7 @@ function NudgeButton({
       onClick={onClick}
     >
       {showNudge ? "Nudge" : "Reply"}
-      <CommandShortcut className="ml-2">R</CommandShortcut>
+      <CommandShortcut className="ml-2 hidden sm:inline">R</CommandShortcut>
     </Button>
   );
 }
@@ -446,7 +452,9 @@ function ResolveButton({
       onClick={() => onResolve(threadId, true)}
     >
       Mark Done
-      {showShortcut && <CommandShortcut className="ml-2">D</CommandShortcut>}
+      {showShortcut && (
+        <CommandShortcut className="ml-2 hidden sm:inline">D</CommandShortcut>
+      )}
     </Button>
   );
 }
@@ -471,7 +479,9 @@ function UnresolveButton({
       onClick={() => onResolve(threadId, false)}
     >
       Not Done
-      {showShortcut && <CommandShortcut className="ml-2">N</CommandShortcut>}
+      {showShortcut && (
+        <CommandShortcut className="ml-2 hidden sm:inline">N</CommandShortcut>
+      )}
     </Button>
   );
 }

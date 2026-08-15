@@ -13,7 +13,7 @@ export function buildAppHomeBlocks(): AppHomeView {
         type: "header",
         text: {
           type: "plain_text",
-          text: "Welcome to Inbox Zero",
+          text: "Welcome to Zynbox",
           emoji: true,
         },
       },
@@ -37,7 +37,7 @@ export function buildAppHomeBlocks(): AppHomeView {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*1.* Connect your email at <https://www.getinboxzero.com|getinboxzero.com>\n*2.* Link Slack in Settings > Connected Apps\n*3.* Pick a channel for notifications (meeting briefs, filing alerts)\n*4.* DM me or @mention me in any channel to chat about your emails",
+          text: "*1.* Connect your email at <https://zynbox.cloud|Zynbox>\n*2.* Link Slack in Settings > Connected Apps\n*3.* Pick a channel for notifications (meeting briefs, filing alerts)\n*4.* DM me or @mention me in any channel to chat about your emails",
         },
       },
       { type: "divider" },
@@ -67,7 +67,7 @@ export function buildAppHomeBlocks(): AppHomeView {
         type: "header",
         text: {
           type: "plain_text",
-          text: "Chat with Inbox Zero",
+          text: "Chat with Zynbox",
           emoji: true,
         },
       },
@@ -91,7 +91,7 @@ export function buildAppHomeBlocks(): AppHomeView {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*Meeting Briefs* — Get a briefing on attendees before your meetings, delivered to your chosen Slack channel.\n\n*Attachment Filing* — Inbox Zero can auto-file attachments to Google Drive and notify you here.\n\n*AI Automation* — Set up rules to auto-label, archive, or draft replies. Configure at <https://www.getinboxzero.com|getinboxzero.com>.",
+          text: "*Meeting Briefs* — Get a briefing on attendees before your meetings, delivered to your chosen Slack channel.\n\n*Attachment Filing* — Zynbox can auto-file attachments to Google Drive and notify you here.\n\n*AI Automation* — Set up rules to auto-label, archive, or draft replies. Configure at <https://zynbox.cloud|Zynbox>.",
         },
       },
       { type: "divider" },
@@ -100,7 +100,7 @@ export function buildAppHomeBlocks(): AppHomeView {
         elements: [
           {
             type: "mrkdwn",
-            text: "<https://www.getinboxzero.com|Settings> · <https://www.getinboxzero.com/support|Support> · <https://www.getinboxzero.com/privacy|Privacy Policy>",
+            text: "<https://zynbox.cloud|Settings> · <https://zynbox.cloud/support|Support> · <https://zynbox.cloud/privacy|Privacy Policy>",
           },
         ],
       },

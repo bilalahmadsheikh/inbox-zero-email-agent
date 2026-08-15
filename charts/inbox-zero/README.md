@@ -1,4 +1,4 @@
-# Inbox Zero Helm Chart
+# Zynbox Helm Chart
 
 This chart maps the Docker Compose self-hosting stack onto Kubernetes:
 

@@ -18,10 +18,10 @@ function SkeletonCheckbox() {
 function SkeletonDesktopRow() {
   return (
     <TableRow className="hover:bg-transparent dark:hover:bg-transparent">
-      <TableCell className="pr-0">
+      <TableCell className="pr-0" data-cell="checkbox">
         <SkeletonCheckbox />
       </TableCell>
-      <TableCell className="max-w-[250px] py-3">
+      <TableCell className="max-w-[250px] py-3" data-cell="from">
         <div className="flex items-center gap-2">
           <Skeleton className="h-8 w-8 rounded-lg" />
           <div className="flex flex-col gap-1">
@@ -30,13 +30,13 @@ function SkeletonDesktopRow() {
           </div>
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell data-label="Emails">
         <Skeleton className="h-4 w-8" />
       </TableCell>
-      <TableCell>
+      <TableCell data-label="Read">
         <Skeleton className="h-4 w-10" />
       </TableCell>
-      <TableCell className="p-1">
+      <TableCell className="p-1" data-cell="actions">
         <div className="flex justify-end items-center gap-2">
           <Skeleton className="h-8 w-8 rounded-lg" />
           <Skeleton className="h-8 w-24 rounded-lg" />
@@ -49,7 +49,10 @@ function SkeletonDesktopRow() {
 
 export function BulkUnsubscribeDesktopSkeleton() {
   return (
-    <Table>
+    // Same class and cell markers as the loaded table: the mobile card layout
+    // in globals.css keys off both, and without them the skeleton keeps the
+    // desktop column widths and scrolls sideways on a phone.
+    <Table className="bulk-unsub-table">
       <TableHeader>
         <TableRow>
           <TableHead className="pr-0">

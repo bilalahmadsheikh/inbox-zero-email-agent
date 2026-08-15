@@ -9,9 +9,9 @@ export const getStripe = () => {
   if (!stripe) {
     stripe = new Stripe(env.STRIPE_SECRET_KEY, {
       appInfo: {
-        name: "Inbox Zero",
+        name: "Zynbox",
         version: "1.0.0",
-        url: "https://www.getinboxzero.com",
+        url: "https://zynbox.cloud",
       },
       typescript: true,
     });

@@ -326,7 +326,7 @@ function ActionCard({
         }
       >
         <FormControl>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             {selectedTypeOption ? (
               <div className="flex items-center gap-2">
                 {SelectedTypeIcon && <SelectedTypeIcon className="size-4" />}
@@ -397,7 +397,7 @@ function ActionCard({
             <div>
               <div className="flex items-center gap-2">
                 {isAiGenerated ? (
-                  <div className="relative flex-1 min-w-[200px]">
+                  <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
                     <Input
                       type="text"
                       name={`actions.${index}.${field.name}.name`}
@@ -416,7 +416,7 @@ function ActionCard({
                     </div>
                   </div>
                 ) : (
-                  <div className="flex-1 min-w-[200px]">
+                  <div className="flex-1 min-w-0 sm:min-w-[200px]">
                     <LabelCombobox
                       userLabels={userLabels || []}
                       isLoading={isLoading}

@@ -42,7 +42,7 @@ export interface SummaryEmailProps {
 
 export default function SummaryEmail(props: SummaryEmailProps) {
   const {
-    baseUrl = "https://www.getinboxzero.com",
+    baseUrl = "https://zynbox.cloud",
     archivedEmailCount = 0,
     archivedEmails = [],
     coldEmailers,
@@ -67,18 +67,16 @@ export default function SummaryEmail(props: SummaryEmailProps) {
             <Section className="p-8 text-center">
               <Link href={baseUrl} className="text-[15px]">
                 <Img
-                  src={"https://www.getinboxzero.com/icon.png"}
+                  src={"https://zynbox.cloud/icon.png"}
                   width="40"
                   height="40"
-                  alt="Inbox Zero"
+                  alt="Zynbox"
                   className="mx-auto my-0"
                 />
               </Link>
 
               <Text className="mx-0 mb-8 mt-4 p-0 text-center text-2xl font-normal">
-                <span className="font-semibold tracking-tighter">
-                  Inbox Zero
-                </span>
+                <span className="font-semibold tracking-tighter">Zynbox</span>
               </Text>
 
               <Heading className="my-4 text-4xl font-medium leading-tight">
@@ -116,7 +114,7 @@ export default function SummaryEmail(props: SummaryEmailProps) {
 }
 
 SummaryEmail.PreviewProps = {
-  baseUrl: "https://www.getinboxzero.com",
+  baseUrl: "https://zynbox.cloud",
   archivedEmailCount: 8,
   archivedEmails: [
     {
@@ -392,8 +390,8 @@ function Footer({
   return (
     <Section>
       <Text>
-        You're receiving this email because you're subscribed to Inbox Zero
-        stats updates. You can change this in your{" "}
+        You're receiving this email because you're subscribed to Zynbox stats
+        updates. You can change this in your{" "}
         <Link
           href={`${baseUrl}/settings#email-updates`}
           className="text-[15px]"

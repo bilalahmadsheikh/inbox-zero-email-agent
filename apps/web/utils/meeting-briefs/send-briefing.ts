@@ -382,9 +382,7 @@ function formatMeetingBriefingText({
     );
   }
 
-  sections.push(
-    "AI-generated briefing from Inbox Zero. May contain inaccuracies.",
-  );
+  sections.push("AI-generated briefing from Zynbox. May contain inaccuracies.");
 
   return sections.join("\n\n");
 }

@@ -13,14 +13,14 @@ Verify that when you reply from Gmail with an unedited auto-generated draft, tha
 
 ## Preconditions
 
-- Signed into Inbox Zero as a test account.
+- Signed into Zynbox as a test account.
 - Signed into Outlook test account in another tab.
 - Signed into Gmail test account in another tab.
-- Inbox Zero is connected to both Gmail and Outlook.
+- Zynbox is connected to both Gmail and Outlook.
 
 ## Steps
 
-1. In Inbox Zero (getinboxzero.com), assign the Gmail test account in the upper-left user selector. 
+1. In Zynbox (zynbox.cloud), assign the Gmail test account in the upper-left user selector.
 2. Open the Assistant page.
 3. Find the "To Reply" rule and verify it is enabled; if not, toggle it on and save.
 4. In Outlook (outlook.com), compose a new email to the Gmail test account (type the gmail address directly in the "To" field. Do not click the "TO" text).
@@ -30,12 +30,12 @@ Verify that when you reply from Gmail with an unedited auto-generated draft, tha
 8. Wait a bit longer for automation to run.
 9. Verify the message shows the "To Reply" label in Gmail.
 10. Open the message and confirm a reply draft exists for the thread.
-11. Click on Send to send the draft as a reply (DO NOT edit the draft. just send it as is). 
-12. Wait for the message to be sent. 
-13. Wait about five minutes. 
-14. Refresh the page. 
-15. Go to the Sent Items folder and verify the message is there. 
-16. In the inbox, inspect the thread again and verify the message (draft) that was just sent is still displayed in the thread. 
+11. Click on Send to send the draft as a reply (DO NOT edit the draft. just send it as is).
+12. Wait for the message to be sent.
+13. Wait about five minutes.
+14. Refresh the page.
+15. Go to the Sent Items folder and verify the message is there.
+16. In the inbox, inspect the thread again and verify the message (draft) that was just sent is still displayed in the thread.
 
 ## Expected results
 

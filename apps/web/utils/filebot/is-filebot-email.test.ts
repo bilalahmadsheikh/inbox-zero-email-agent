@@ -127,7 +127,7 @@ describe("isFilebotNotificationMessage", () => {
         userEmail: "john@example.com",
         from: "John <john@example.com>",
         to: "john@example.com",
-        replyTo: "Inbox Zero Assistant <john+ai@example.com>",
+        replyTo: "Zynbox Assistant <john+ai@example.com>",
       },
       expected: true,
     },
@@ -135,7 +135,7 @@ describe("isFilebotNotificationMessage", () => {
       name: "assistant-formatted self-email without reply-to",
       message: {
         userEmail: "john@example.com",
-        from: "Inbox Zero Assistant <john@example.com>",
+        from: "Zynbox Assistant <john@example.com>",
         to: "john@example.com",
       },
       expected: true,

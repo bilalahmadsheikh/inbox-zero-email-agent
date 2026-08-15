@@ -71,10 +71,18 @@ export function EmailMessageCell({
   return (
     <div className="min-w-0 break-words text-sm text-slate-700 dark:text-foreground">
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="order-1 max-w-[240px] shrink-0 truncate font-semibold">
+        {/* `truncate` means nowrap, so this cap is the cell's minimum width.
+            At 240px it alone eats most of a phone screen and pushes row
+            actions off the edge; desktop keeps the original 240px. */}
+        <span className="order-1 max-w-[130px] shrink-0 truncate font-semibold sm:max-w-[240px]">
           {extractNameFromEmail(sender)}
         </span>
-        <span className="order-4 min-w-0 max-w-full basis-full truncate sm:order-2 sm:max-w-md sm:basis-auto">
+        {/* `truncate` is white-space:nowrap, and combined with basis-full its
+            min-content contribution is the whole untruncated subject — which
+            is what widened these rows past a phone screen. line-clamp-1 looks
+            the same (one line, ellipsis) but lets the text wrap, so the row
+            can shrink. Desktop keeps truncate. */}
+        <span className="order-4 line-clamp-1 min-w-0 max-w-full basis-full sm:order-2 sm:line-clamp-none sm:max-w-md sm:basis-auto sm:truncate">
           {subject}
         </span>
         {collapseLabels
@@ -96,7 +104,9 @@ export function EmailMessageCell({
                   <Badge
                     variant="outline"
                     key={label.id}
-                    className="max-w-[140px] truncate font-normal text-muted-foreground"
+                    // Also nowrap-truncated, so this cap adds to the row's
+                    // minimum width alongside the sender. Tighter on mobile.
+                    className="max-w-[90px] truncate font-normal text-muted-foreground sm:max-w-[140px]"
                   >
                     {label.name}
                   </Badge>

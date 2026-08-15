@@ -82,7 +82,7 @@ export function ResponseTimeAnalytics({
             </p>
           )}
 
-          <div className="grid gap-2 sm:gap-4 grid-cols-3">
+          <div className="grid gap-2 sm:gap-4 grid-cols-1 sm:grid-cols-3">
             <SummaryCard
               title="Median Response"
               value={formatTime(data.summary.medianResponseTime)}

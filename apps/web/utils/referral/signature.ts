@@ -1,8 +1,9 @@
 const REFERRAL_SIGNATURE_PREFIX = "Drafted by";
-const REFERRAL_SIGNATURE_PRODUCT = "Inbox Zero";
+const REFERRAL_SIGNATURE_PRODUCT = "Zynbox";
+const LEGACY_REFERRAL_SIGNATURE_PRODUCT = "Inbox Zero";
 
 const REFERRAL_SIGNATURE_PATTERN = new RegExp(
-  `\\s*${escapeRegExp(REFERRAL_SIGNATURE_PREFIX)}\\s*(?:<a\\b[^>]*>)?${escapeRegExp(REFERRAL_SIGNATURE_PRODUCT)}(?:</a>)?\\.?\\s*`,
+  `\\s*${escapeRegExp(REFERRAL_SIGNATURE_PREFIX)}\\s*(?:<a\\b[^>]*>)?(?:${escapeRegExp(REFERRAL_SIGNATURE_PRODUCT)}|${escapeRegExp(LEGACY_REFERRAL_SIGNATURE_PRODUCT)})(?:</a>)?\\.?\\s*`,
   "i",
 );
 

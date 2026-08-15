@@ -218,8 +218,8 @@ function selectModel(
       const openrouter = createOpenRouter({
         apiKey: resolveApiKey(aiApiKey, env.OPENROUTER_API_KEY),
         headers: {
-          "HTTP-Referer": "https://www.getinboxzero.com",
-          "X-Title": "Inbox Zero",
+          "HTTP-Referer": "https://zynbox.cloud",
+          "X-Title": "Zynbox",
         },
       });
       const chatModel = openrouter.chat(modelName, {
@@ -241,8 +241,8 @@ function selectModel(
       const gateway = createGateway({
         apiKey: aiGatewayApiKey,
         headers: {
-          "http-referer": "https://www.getinboxzero.com",
-          "x-title": "Inbox Zero",
+          "http-referer": "https://zynbox.cloud",
+          "x-title": "Zynbox",
         },
       });
       return {

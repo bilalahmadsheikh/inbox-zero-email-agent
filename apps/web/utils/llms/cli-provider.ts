@@ -126,7 +126,7 @@ function unprefixToolName(name: string): string {
 }
 
 // The MCP bridge causes the Claude Code CLI to surface tool calls as
-// `mcp__inboxzero__<name>`. Inbox Zero callers (stop conditions, UI part
+// `mcp__inboxzero__<name>`. Zynbox callers (stop conditions, UI part
 // renderers, validators) match on the original tool names, so the prefix is
 // stripped from every `toolName` field in both the non-streaming and
 // streaming response paths before it reaches the AI SDK consumer.

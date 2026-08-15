@@ -1,4 +1,4 @@
-# Default values for the Inbox Zero Helm chart.
+# Default values for the Zynbox Helm chart.
 #
 # This chart can run a self-contained stack for evaluation, or connect the app
 # to managed Postgres and Redis services for production.

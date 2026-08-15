@@ -1,9 +1,9 @@
 ---
 name: inbox-zero-api-cli
-description: Inspect or update Inbox Zero rules and analytics through the public API CLI. Use when tasks involve rules, stats, or API-driven automation.
+description: Inspect or update Zynbox rules and analytics through the public API CLI. Use when tasks involve rules, stats, or API-driven automation.
 ---
 
-# Inbox Zero API CLI
+# Zynbox API CLI
 
 Use `inbox-zero-api` with `--json` for stable output. Require `INBOX_ZERO_API_KEY` for authenticated commands.
 

@@ -1,4 +1,4 @@
-# Inbox Zero API CLI Reference
+# Zynbox API CLI Reference
 
 ## Install
 

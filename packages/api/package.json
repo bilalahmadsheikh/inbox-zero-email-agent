@@ -1,7 +1,7 @@
 {
   "name": "@inbox-zero/api",
   "version": "2.29.2",
-  "description": "CLI tool for managing Inbox Zero through the external API",
+  "description": "CLI tool for managing Zynbox through the external API",
   "type": "module",
   "bin": {
     "inbox-zero-api": "bin/inbox-zero-api.js"

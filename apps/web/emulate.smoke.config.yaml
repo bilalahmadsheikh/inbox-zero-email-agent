@@ -5,7 +5,7 @@ google:
   oauth_clients:
     - client_id: client_id
       client_secret: client_secret
-      name: Inbox Zero Smoke
+      name: Zynbox Smoke
       redirect_uris:
         - __SMOKE_TEST_REDIRECT_URI__
   labels:

@@ -4,7 +4,7 @@ set -e
 # This script runs at container startup.
 # It replaces the build-time placeholders with runtime environment variables.
 
-echo "🚀 Starting Inbox Zero..."
+echo "🚀 Starting Zynbox..."
 
 . /app/docker/scripts/configure-rds-ca.sh
 

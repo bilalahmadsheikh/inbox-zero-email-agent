@@ -176,7 +176,7 @@ async function recordClassificationFromLabelAdd({
 
   if (!isEligibleForClassificationFeedback(rule.systemType)) return;
 
-  // Self-labeling filter: skip if Inbox Zero already applied this label
+  // Self-labeling filter: skip if Zynbox already applied this label
   const systemApplied = await wasLabelAppliedBySystem({
     messageId,
     emailAccountId,

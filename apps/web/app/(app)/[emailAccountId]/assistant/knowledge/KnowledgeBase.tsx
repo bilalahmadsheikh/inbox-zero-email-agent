@@ -82,8 +82,10 @@ export function KnowledgeBase() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Last Updated</TableHead>
+                <TableHead className="px-2 sm:px-4">Title</TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  Last Updated
+                </TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -137,9 +139,17 @@ function KnowledgeTableRow({
 
   return (
     <TableRow>
-      <TableCell>{item.title}</TableCell>
-      <TableCell>{formatDateSimple(new Date(item.updatedAt))}</TableCell>
-      <TableCell className="text-right">
+      <TableCell className="p-2 sm:p-4">
+        {item.title}
+        {/* The Last Updated column is hidden on mobile; keep the date visible. */}
+        <div className="mt-1 text-xs text-muted-foreground sm:hidden">
+          {formatDateSimple(new Date(item.updatedAt))}
+        </div>
+      </TableCell>
+      <TableCell className="hidden sm:table-cell">
+        {formatDateSimple(new Date(item.updatedAt))}
+      </TableCell>
+      <TableCell className="p-2 text-right sm:p-4">
         <div className="flex items-center justify-end gap-2">
           <Button variant="outline" size="sm" onClick={onEdit}>
             Edit

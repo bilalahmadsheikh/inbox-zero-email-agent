@@ -138,10 +138,10 @@ async function main() {
   program
     .name("inbox-zero")
     .description(
-      "CLI tool for self-hosting Inbox Zero — AI email assistant.\n\n" +
+      "CLI tool for self-hosting Zynbox — AI email assistant.\n\n" +
         "Quick start:\n" +
         "  inbox-zero setup      Configure OAuth providers, AI provider, and Docker\n" +
-        "  inbox-zero start      Start Inbox Zero\n" +
+        "  inbox-zero start      Start Zynbox\n" +
         "  inbox-zero config     View and update settings\n\n" +
         "Docs: https://docs.getinboxzero.com/self-hosting",
     )
@@ -155,11 +155,11 @@ async function main() {
 
   program
     .command("start")
-    .description("Start Inbox Zero")
+    .description("Start Zynbox")
     .option("--no-detach", "Run in foreground (default: background)")
     .action(runStart);
 
-  program.command("stop").description("Stop Inbox Zero").action(runStop);
+  program.command("stop").description("Stop Zynbox").action(runStop);
 
   program
     .command("logs")
@@ -217,7 +217,7 @@ async function main() {
 
   program
     .command("setup-aws")
-    .description("Deploy Inbox Zero to AWS using Copilot (ECS/Fargate)")
+    .description("Deploy Zynbox to AWS using Copilot (ECS/Fargate)")
     .option("--profile <profile>", "AWS CLI profile to use")
     .option("--region <region>", "AWS region")
     .option("--environment <env>", "Environment name (e.g., production)")
@@ -312,7 +312,7 @@ function stripSetupAwsDoubleDash(argv: string[]) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function runSetup(options: { name?: string }) {
-  p.intro("Inbox Zero Setup");
+  p.intro("Zynbox Setup");
   p.note(
     "Quick setup uses production defaults with Docker Compose infrastructure\n" +
       "(Postgres + Redis) and runs the web app in Docker.",
@@ -679,7 +679,7 @@ async function runSetupQuick(options: { name?: string }) {
   );
 
   const shouldStart = await p.confirm({
-    message: "Start Inbox Zero now?",
+    message: "Start Zynbox now?",
     initialValue: true,
   });
 
@@ -698,12 +698,12 @@ async function runSetupQuick(options: { name?: string }) {
 
   if (checkContainersRunning(composeArgs)) {
     const restart = await p.confirm({
-      message: "Inbox Zero is already running. Restart?",
+      message: "Zynbox is already running. Restart?",
       initialValue: true,
     });
     if (p.isCancel(restart) || !restart) {
       p.note(
-        `Inbox Zero is still running at http://localhost:${webPort}`,
+        `Zynbox is still running at http://localhost:${webPort}`,
         "Already running",
       );
       p.outro("Setup complete!");
@@ -731,7 +731,7 @@ async function runSetupQuick(options: { name?: string }) {
   pullSpinner.stop("Images pulled");
 
   const startSpinner = p.spinner();
-  startSpinner.start("Starting Inbox Zero...");
+  startSpinner.start("Starting Zynbox...");
 
   const upResult = await runDockerCommand([
     ...composeArgs,
@@ -757,7 +757,7 @@ async function runSetupQuick(options: { name?: string }) {
     process.exit(1);
   }
 
-  startSpinner.stop("Inbox Zero is running!");
+  startSpinner.stop("Zynbox is running!");
 
   p.note(
     `Open http://localhost:${webPort} to get started.\n\n` +
@@ -769,7 +769,7 @@ async function runSetupQuick(options: { name?: string }) {
     "You're all set!",
   );
 
-  p.outro("Inbox Zero is ready!");
+  p.outro("Zynbox is ready!");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -778,7 +778,7 @@ async function runSetupQuick(options: { name?: string }) {
 
 async function runSetupAdvanced(options: { name?: string }) {
   const configName = options.name;
-  p.intro(`🚀 Inbox Zero Setup${configName ? ` (${configName})` : ""}`);
+  p.intro(`🚀 Zynbox Setup${configName ? ` (${configName})` : ""}`);
 
   // Ask about environment mode
   const envMode = await p.select({
@@ -1285,23 +1285,23 @@ async function runStart(options: { detach: boolean }) {
 
   if (!existsSync(STANDALONE_COMPOSE_FILE)) {
     p.log.error(
-      "Inbox Zero is not configured for production mode.\n" +
+      "Zynbox is not configured for production mode.\n" +
         "Run 'inbox-zero setup' and choose Production (Docker) first.",
     );
     process.exit(1);
   }
 
-  p.intro("🚀 Starting Inbox Zero");
+  p.intro("🚀 Starting Zynbox");
 
   const composeArgs = ["compose", "-f", STANDALONE_COMPOSE_FILE];
 
   if (checkContainersRunning(composeArgs)) {
     const restart = await p.confirm({
-      message: "Inbox Zero is already running. Restart?",
+      message: "Zynbox is already running. Restart?",
       initialValue: true,
     });
     if (p.isCancel(restart) || !restart) {
-      p.outro("Inbox Zero is already running.");
+      p.outro("Zynbox is already running.");
       return;
     }
     const stopSpinner = p.spinner();
@@ -1361,11 +1361,11 @@ async function runStart(options: { detach: boolean }) {
     }
 
     p.note(
-      `Inbox Zero is running at:\nhttp://localhost:${webPort}\n\nView logs: inbox-zero logs\nStop: inbox-zero stop`,
+      `Zynbox is running at:\nhttp://localhost:${webPort}\n\nView logs: inbox-zero logs\nStop: inbox-zero stop`,
       "Running",
     );
 
-    p.outro("Inbox Zero started! 🎉");
+    p.outro("Zynbox started! 🎉");
   } else {
     p.log.info("Starting containers in foreground...");
 
@@ -1389,11 +1389,11 @@ async function runStop() {
   requireDocker();
 
   if (!existsSync(STANDALONE_COMPOSE_FILE)) {
-    p.log.error("Inbox Zero is not configured.");
+    p.log.error("Zynbox is not configured.");
     process.exit(1);
   }
 
-  p.intro("Stopping Inbox Zero");
+  p.intro("Stopping Zynbox");
 
   const spinner = p.spinner();
   spinner.start("Stopping containers...");
@@ -1412,7 +1412,7 @@ async function runStop() {
   }
 
   spinner.stop("Containers stopped");
-  p.outro("Inbox Zero stopped");
+  p.outro("Zynbox stopped");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1423,7 +1423,7 @@ async function runLogs(options: { follow: boolean; tail: string }) {
   requireDocker();
 
   if (!existsSync(STANDALONE_COMPOSE_FILE)) {
-    p.log.error("Inbox Zero is not configured.");
+    p.log.error("Zynbox is not configured.");
     process.exit(1);
   }
 
@@ -1461,7 +1461,7 @@ async function runStatus() {
   requireDocker();
 
   if (!existsSync(STANDALONE_COMPOSE_FILE)) {
-    p.log.error("Inbox Zero is not configured.\nRun 'inbox-zero setup' first.");
+    p.log.error("Zynbox is not configured.\nRun 'inbox-zero setup' first.");
     process.exit(1);
   }
 
@@ -1478,11 +1478,11 @@ async function runUpdate() {
   requireDocker();
 
   if (!existsSync(STANDALONE_COMPOSE_FILE)) {
-    p.log.error("Inbox Zero is not configured.");
+    p.log.error("Zynbox is not configured.");
     process.exit(1);
   }
 
-  p.intro("Updating Inbox Zero");
+  p.intro("Updating Zynbox");
 
   const spinner = p.spinner();
   spinner.start("Pulling latest image...");
@@ -1619,7 +1619,7 @@ function requireEnvFile(name?: string): { envFile: string; content: string } {
 }
 
 async function runConfigInteractive(name?: string) {
-  p.intro("Inbox Zero Configuration");
+  p.intro("Zynbox Configuration");
 
   const { envFile, content } = requireEnvFile(name);
   const env = parseEnvFile(content);

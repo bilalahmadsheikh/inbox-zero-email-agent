@@ -491,14 +491,14 @@ async function getOAuthClient(
   }
 
   const clientMetadata: OAuthClientMetadata = {
-    client_name: "Inbox Zero",
+    client_name: "Zynbox",
     redirect_uris: [redirectUri],
     grant_types: ["authorization_code", "refresh_token"],
     response_types: ["code"],
     token_endpoint_auth_method: "none", // Public client with PKCE
     scope: integrationConfig.scopes.join(" "),
-    logo_uri: "https://getinboxzero.com/icon.png",
-    tos_uri: "https://getinboxzero.com/terms",
+    logo_uri: "https://zynbox.cloud/icon.png",
+    tos_uri: "https://zynbox.cloud/terms",
   };
 
   const registered = await registerClient(metadata.registration_endpoint, {

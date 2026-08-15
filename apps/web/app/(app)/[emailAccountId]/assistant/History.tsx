@@ -106,7 +106,7 @@ function HistoryTable({
 
                 return (
                   <TableRow key={er.messageId}>
-                    <TableCell>
+                    <TableCell className="p-2 align-top sm:p-4 sm:align-middle">
                       <EmailCell
                         message={message}
                         messageId={er.messageId}
@@ -120,7 +120,7 @@ function HistoryTable({
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="p-2 align-top sm:p-4 sm:align-middle">
                       <RuleCell
                         executedRules={er.executedRules}
                         message={message}

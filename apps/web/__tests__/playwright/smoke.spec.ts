@@ -110,7 +110,7 @@ async function completeCurrentOnboardingStep(page: Page, currentUrl: string) {
       button: "Only me",
     },
     {
-      heading: "How did you hear about Inbox Zero?",
+      heading: "How did you hear about Zynbox?",
       button: "Search",
     },
     {

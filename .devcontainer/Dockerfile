@@ -1,4 +1,4 @@
-# Inbox Zero Development Container
+# Zynbox Development Container
 #
 # Extends Microsoft devcontainer with proper directory permissions for named volumes
 

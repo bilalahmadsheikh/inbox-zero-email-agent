@@ -59,10 +59,12 @@ export function FilingActivity() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>File</TableHead>
-                  <TableHead>Folder</TableHead>
-                  <TableHead className="w-[100px]">When</TableHead>
-                  <TableHead className="w-[80px] text-center">
+                  <TableHead className="px-2 sm:px-4">File</TableHead>
+                  <TableHead className="hidden sm:table-cell">Folder</TableHead>
+                  <TableHead className="hidden w-[100px] sm:table-cell">
+                    When
+                  </TableHead>
+                  <TableHead className="w-[80px] px-2 text-center sm:px-4">
                     Correct?
                   </TableHead>
                   <TableHead className="w-[50px]" />
@@ -243,20 +245,30 @@ function FilingRow({
 
   return (
     <TableRow>
-      <TableCell>
+      <TableCell className="p-2 sm:p-4">
         <span className="font-medium truncate max-w-[200px] block">
           {filing.filename}
         </span>
+        {/* Folder and time have their own columns from sm up; keep them on the
+            row on mobile, where those columns are hidden. */}
+        <div className="mt-1 text-xs text-muted-foreground sm:hidden">
+          <FolderCell filing={filing} />
+          <span>
+            {formatDistanceToNow(new Date(filing.createdAt), {
+              addSuffix: true,
+            })}
+          </span>
+        </div>
       </TableCell>
-      <TableCell className="break-words max-w-[200px]">
+      <TableCell className="hidden break-words max-w-[200px] sm:table-cell">
         <FolderCell filing={filing} />
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden sm:table-cell">
         <span className="text-muted-foreground text-xs">
           {formatDistanceToNow(new Date(filing.createdAt), { addSuffix: true })}
         </span>
       </TableCell>
-      <TableCell>
+      <TableCell className="p-2 sm:p-4">
         <div className="flex items-center justify-center">
           {canGiveFeedback && !isSubmitting && otherFolders.length > 0 ? (
             <DropdownMenu

@@ -105,7 +105,7 @@ const createRawMailMessage = async ({
       references: replyToEmail?.references,
     }),
     headers: {
-      "X-Mailer": "Inbox Zero Web",
+      "X-Mailer": "Zynbox Web",
     },
   });
 };

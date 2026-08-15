@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.2",
+    date: "2026-08-15",
+    notes: [
+      "The Zynbox logo is legible again in dark mode. The logo is a picture file whose wordmark is painted in near-black ink, so on a dark sidebar only the coloured circle showed and the name beside it vanished into the background. The premium theme already worked around this by rendering the logo in solid white; dark mode now gets the same treatment. Light mode is unchanged, and premium looks exactly as it did before.",
+      "Pages no longer slide sideways on narrow screens, taking the sidebar off the edge with them. The column holding your page content was not allowed to be narrower than its widest contents, so a single oversized element stretched the whole document past the window instead of scrolling inside its own box — which is why the sidebar ended up half cut off. Every screen now measures zero horizontal overflow at phone widths, and desktop is untouched.",
+      "Scheduled, Cold Email Blocker, Assistant history, Drive filing activity, the knowledge base and Reply Zero were built as wide desktop tables and became a letterbox slot on a phone: five or six columns in a strip you had to drag sideways, with the action buttons stranded off the right edge. Secondary columns are now hidden on small screens and their content moved into a line beneath the main one, so nothing is lost. Reply Zero also stacks its buttons under the email rather than beside it, and hides keyboard-shortcut badges where there is no keyboard.",
+      "Email rows shrink properly on phones now. The subject line was set never to wrap, which meant every row reserved space for the entire untruncated subject even though it was visibly cut short — enough on its own to push the row's buttons off screen. It still shows as one line with an ellipsis; it can simply be narrowed now.",
+      "The Bulk Unsubscribe list no longer scrolls sideways while it loads. The finished list had a mobile card layout, but the placeholder shown beforehand was a separate table that never opted into it, so the first thing you saw on a phone was a desktop table 300 pixels too wide, snapping into place once the data arrived.",
+      'The Cold Email Blocker\'s tabs no longer run off the screen with Settings unreachable, and its "Not cold email" button no longer hangs off the edge of the row.',
+      "Settings forms stop squeezing several fields side by side on a phone. Digest scheduling, proactive updates, meeting-link durations and the signature editor laid their inputs out in fixed columns regardless of screen width, leaving each field a few dozen pixels wide; they now stack until there is room. Dropdowns with fixed pixel widths fill the screen width on mobile instead.",
+    ],
+  },
+  {
     version: "5.1",
     date: "2026-08-11",
     notes: [
@@ -93,7 +106,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-08-03",
     notes: [
       "Repaired the automated checks that run before every release. Ten test files were failing or silently not running at all — four of them loaded nothing whatsoever, so the areas they cover (the assistant's inbox search results, the rule editor, chat tool formatting, and the assistant memory safety checks) had no protection against regressions and nothing said so.",
-      "The sharing message shown after unsubscribing was still checked against the old Inbox Zero name, so it failed on every run after the rename to Zynbox. The message itself was always correct.",
+      "The sharing message shown after unsubscribing was still checked against the old Zynbox name, so it failed on every run after the rename to Zynbox. The message itself was always correct.",
       "Tests that do genuine work were being cut off after five seconds on slower machines and reported as failures. Worse, a cut-off test kept running in the background and its activity was counted against the next test, failing that one too and pointing the blame at unrelated code. The limit is now twenty seconds, still short enough to catch a genuinely stuck test.",
     ],
   },

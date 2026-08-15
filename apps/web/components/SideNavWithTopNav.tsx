@@ -29,7 +29,11 @@ function ContentWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div
       className={cn(
-        "flex-1 transition-all duration-200 ease-linear",
+        // min-w-0 is load-bearing: as a flex item this defaults to
+        // min-width:auto, so any single wide child makes this column grow past
+        // the viewport and the whole document — sidebar included — pans
+        // sideways. With it, overflow stays inside SidebarInset's own clip.
+        "min-w-0 flex-1 transition-all duration-200 ease-linear",
         isRightSidebarOpen && "lg:mr-[450px]",
       )}
     >

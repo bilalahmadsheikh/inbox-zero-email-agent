@@ -702,7 +702,7 @@ export class GmailProvider implements EmailProvider {
         headerMessageId,
         references: parentReferences,
       }),
-      headers: { "X-Mailer": "Inbox Zero Web" },
+      headers: { "X-Mailer": "Zynbox Web" },
       attachments: params.attachments,
     });
 
@@ -750,7 +750,7 @@ export class GmailProvider implements EmailProvider {
       html: content,
       inReplyTo: currentDraft.headers?.["in-reply-to"],
       references: currentDraft.headers?.references,
-      headers: { "X-Mailer": "Inbox Zero Web" },
+      headers: { "X-Mailer": "Zynbox Web" },
     });
 
     await withGmailRetry(() =>

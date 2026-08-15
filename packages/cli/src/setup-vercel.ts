@@ -138,7 +138,7 @@ export function buildVercelEnvValues(config: {
 export async function runVercelSetup(
   options: SetupVercelOptions,
 ): Promise<void> {
-  p.intro("Inbox Zero Vercel Setup");
+  p.intro("Zynbox Vercel Setup");
 
   requireVercelCli();
   requireVercelLogin(options.scope);

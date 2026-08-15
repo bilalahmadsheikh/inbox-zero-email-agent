@@ -17,7 +17,7 @@ Usage:
 - `/qa-run --all --base-url=http://localhost:3000`
 
 Base URL:
-- `--base-url=<url>` sets the Inbox Zero app URL (e.g. `http://localhost:3000`, `https://www.getinboxzero.com`, or any self-hosted URL).
+- `--base-url=<url>` sets the Zynbox app URL (e.g. `http://localhost:3000`, `https://zynbox.cloud`, or any self-hosted URL).
 - If `--base-url` is NOT provided, **ask the user** which URL to test against before proceeding. Do not assume production or localhost.
 - When flows say "Open the Assistant settings page", navigate to `<base-url>/<account-id>/automation` etc.
 - Gmail/Outlook URLs (mail.google.com, outlook.live.com) are unaffected by this flag.
@@ -34,7 +34,7 @@ Process:
 3. Determine run mode (`all`, `only`, or default high-priority). Apply `--group` filter if present. Fail fast if any requested ids are missing.
 4. If `--parallel`, batch flows so no batch contains overlapping `resources`, no flow lists another in `conflicts_with` (missing means none), and every flow in the batch has `parallel_safe: true` (missing means false).
    If batching is not possible, run sequentially.
-5. Execute each flow exactly as written. Use deliberate waits when moving between Gmail, Outlook, and Inbox Zero.
+5. Execute each flow exactly as written. Use deliberate waits when moving between Gmail, Outlook, and Zynbox.
 6. Record evidence. Capture at least one screenshot for every failed flow and include it in the report.
 7. Write the JSON report to `qa/browser-flows/results/<run-id>.json` and save screenshots under
    `qa/browser-flows/results/<run-id>/`.

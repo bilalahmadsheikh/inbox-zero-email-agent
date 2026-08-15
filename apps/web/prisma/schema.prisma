@@ -78,7 +78,7 @@ model User {
   surveyRole         String? // single choice: user's role. Now using `EmailAccount.role` instead
   surveyGoal         String? // single choice: what user wants to achieve
   surveyCompanySize  Int? // numeric company size: 1 (solo), 5 (2-10), 50 (11-100), 500 (101-1000), 1000 (1000+)
-  surveySource       String? // single choice: how user heard about Inbox Zero
+  surveySource       String? // single choice: how user heard about Zynbox
   surveyImprovements String? // open text: what user wants to improve
 
   // settings
@@ -1466,7 +1466,7 @@ model MessagingRoute {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Which Inbox Zero feature this route is for.
+  // Which Zynbox feature this route is for.
   purpose MessagingRoutePurpose
 
   // Whether the provider-native destination is a direct message or channel.
@@ -1766,7 +1766,7 @@ enum ActionType {
   // TRACK_THREAD // @deprecated - No longer used. We rely on rule SystemType instead to run this.
   DIGEST
   MOVE_FOLDER
-  NOTIFY_SENDER // Sends notification from Inbox Zero (not user's email). Only for cold email rules.
+  NOTIFY_SENDER // Sends notification from Zynbox (not user's email). Only for cold email rules.
   CANCEL_SCHEDULED // Cancel pending scheduled emails addressed to the matched email's sender
   SEND_SCHEDULED // Send pending scheduled emails addressed to the matched email's sender immediately
   // SUMMARIZE

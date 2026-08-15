@@ -297,7 +297,11 @@ export function SideNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {state.includes("left-sidebar") ? (
           <div className="relative flex items-center justify-center rounded-md px-2 py-3 text-foreground">
             <Link href="/setup" className="flex items-center">
-              <Logo className="h-14 w-auto max-w-[200px] object-contain premium:brightness-0 premium:invert" />
+              {/* The brand logo is a raster image with a near-black wordmark,
+                  so it disappears on any dark surface. `dark:` covers both the
+                  dark and premium themes (see tailwind.config.js darkMode),
+                  which need the same treatment; light mode is left untouched. */}
+              <Logo className="h-14 w-auto max-w-[200px] object-contain dark:brightness-0 dark:invert" />
             </Link>
             <SidebarTrigger
               name="left-sidebar"

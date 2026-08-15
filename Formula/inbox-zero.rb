@@ -1,8 +1,8 @@
-# Homebrew Formula for Inbox Zero CLI
+# Homebrew Formula for Zynbox CLI
 
 class InboxZero < Formula
-  desc "CLI tool for setting up Inbox Zero - AI email assistant"
-  homepage "https://www.getinboxzero.com"
+  desc "CLI tool for setting up Zynbox - AI email assistant"
+  homepage "https://zynbox.cloud"
   version "2.30.0"
   license "AGPL-3.0-only"
 

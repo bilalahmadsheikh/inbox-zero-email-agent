@@ -1,6 +1,6 @@
 # @inbox-zero/cli
 
-CLI tool for running [Inbox Zero](https://www.getinboxzero.com) - an open-source AI email assistant.
+CLI tool for running [Zynbox](https://zynbox.cloud) - an open-source AI email assistant.
 
 ## Installation
 
@@ -17,10 +17,10 @@ Download the binary for your platform from [releases](https://github.com/elie222
 ## Quick Start
 
 ```bash
-# Configure Inbox Zero (interactive)
+# Configure Zynbox (interactive)
 inbox-zero setup
 
-# Start Inbox Zero
+# Start Zynbox
 inbox-zero start
 
 # Open http://localhost:3000
@@ -76,7 +76,7 @@ Use `--deploy` if you want the CLI to trigger `vercel deploy --prod` after setup
 Pulls the latest Docker image and starts all containers:
 - PostgreSQL database
 - Redis cache
-- Inbox Zero web app
+- Zynbox web app
 - Cron job for email sync
 
 ```bash
@@ -108,7 +108,7 @@ Show status of running containers.
 
 ### `inbox-zero update`
 
-Pull the latest Inbox Zero image and optionally restart.
+Pull the latest Zynbox image and optionally restart.
 
 ```bash
 inbox-zero update

@@ -1,8 +1,8 @@
-# Inbox Zero Architecture
+# Zynbox Architecture
 
 The initial version of this document was created by Google Gemini 2.0 Flash Thinking Experimental 01-21.
 
-The Inbox Zero repository is structured as a monorepo, consisting of the main web application (`apps/web`), supporting deployable apps, and shared packages.
+The Zynbox repository is structured as a monorepo, consisting of the main web application (`apps/web`), supporting deployable apps, and shared packages.
 
 ```txt
 ├── apps/

@@ -2,12 +2,7 @@ import { chmodSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  DEFAULT_BASE_URL,
-  loadConfig,
-  resolveRuntimeConfig,
-  updateConfig,
-} from "./config";
+import { loadConfig, resolveRuntimeConfig, updateConfig } from "./config";
 
 describe("loadConfig", () => {
   it("returns an empty object when the config file does not exist", () => {
@@ -106,10 +101,10 @@ describe("updateConfig", () => {
     ).toThrow("Missing API key");
   });
 
-  it("uses the hosted site as the default base URL", () => {
+  it("keeps the legacy hosted API as the default base URL", () => {
     expect(resolveRuntimeConfig({ apiKey: "iz_test_key" }, {}, {})).toEqual({
       apiKey: "iz_test_key",
-      baseUrl: DEFAULT_BASE_URL,
+      baseUrl: "https://www.getinboxzero.com",
     });
   });
 });

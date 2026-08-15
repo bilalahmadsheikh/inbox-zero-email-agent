@@ -12,6 +12,11 @@ export const changelog: ChangelogEntry[] = [
     version: "5.2",
     date: "2026-08-15",
     notes: [
+      "Inbox Zero is now Zynbox throughout the product, including the app, assistant, settings, digests, and meeting briefs. Product links now point to zynbox.cloud wherever possible.",
+      "Emails sent by the product—including invitations, summaries, reconnection notices, booking messages, and footers—now use the Zynbox name.",
+      "Slack, Telegram, and other connected-chat welcome messages, notifications, and help text now introduce the product as Zynbox.",
+      'New referral signatures now say "Drafted by Zynbox," while existing signatures created with the previous Inbox Zero wording continue to work.',
+      "The command-line experience and setup guides now display the Zynbox brand, while existing commands and hosted API connections remain unchanged so integrations keep working.",
       "The Zynbox logo is legible again in dark mode. The logo is a picture file whose wordmark is painted in near-black ink, so on a dark sidebar only the coloured circle showed and the name beside it vanished into the background. The premium theme already worked around this by rendering the logo in solid white; dark mode now gets the same treatment. Light mode is unchanged, and premium looks exactly as it did before.",
       "Pages no longer slide sideways on narrow screens, taking the sidebar off the edge with them. The column holding your page content was not allowed to be narrower than its widest contents, so a single oversized element stretched the whole document past the window instead of scrolling inside its own box — which is why the sidebar ended up half cut off. Every screen now measures zero horizontal overflow at phone widths, and desktop is untouched.",
       "Scheduled, Cold Email Blocker, Assistant history, Drive filing activity, the knowledge base and Reply Zero were built as wide desktop tables and became a letterbox slot on a phone: five or six columns in a strip you had to drag sideways, with the action buttons stranded off the right edge. Secondary columns are now hidden on small screens and their content moved into a line beneath the main one, so nothing is lost. Reply Zero also stacks its buttons under the email rather than beside it, and hides keyboard-shortcut badges where there is no keyboard.",

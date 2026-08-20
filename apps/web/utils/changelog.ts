@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.3",
+    date: "2026-08-19",
+    notes: [
+      "The assistant now tells you when it has only seen part of your calendar. If you have more than one calendar connected and one of them cannot be reached, it used to quietly report whatever the working one returned as though that were your whole schedule - which meant it could describe a slot as free while the conflict sat in the calendar that never answered. It now knows when the picture is incomplete, and says so instead. The same applies when a day has more events than it asked for: it no longer presents a shortened list as everything you have on.",
+      "The assistant is also clearer about what it cannot do with your calendar. It can read your schedule, but nothing in the product can create, move or cancel an event from chat, and it was never told that - so it could imply a meeting had been arranged when nothing had been. It now checks your calendar, says plainly that the change has to be made in your own calendar app, and offers to draft an email proposing the times instead.",
+    ],
+  },
+  {
     version: "5.2",
     date: "2026-08-15",
     notes: [

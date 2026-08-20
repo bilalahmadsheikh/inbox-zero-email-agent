@@ -32,7 +32,8 @@ export const getCalendarEventsTool = ({
   logger: Logger;
 }) =>
   tool({
-    description: "Fetch calendar events for a date range.",
+    description:
+      "Fetch calendar events for a date range across every calendar the user has connected (Google and Outlook), merged and sorted by start time. Returns each event's title, start and end time, location, attendee email addresses, and video conference link. READ-ONLY: this tool cannot create, move, cancel, or respond to events, and no other tool can either - there is no way to write to the user's calendar from chat. When the user asks to schedule, reschedule, or cancel something, use this to check what they already have on, then say plainly that they need to make the change in their own calendar app, or offer to draft an email proposing the times. Never imply that an event was created, moved, held, or blocked out. startDate and endDate are ISO 8601 timestamps and must be resolved from the user's timezone before calling. maxResults defaults to 25 and caps the merged list: when truncated is true, more events fall in the range than were returned, so do not describe the result as their full schedule. When partialFailure is true at least one connected calendar could not be reached, so the events are an incomplete picture of that range - say so rather than presenting them as everything, and never conclude that a slot is free from a partial result. If no calendar is connected the tool returns an error; tell the user to connect one on the Calendars page instead of guessing at their availability.",
     inputSchema: getCalendarEventsInputSchema,
     execute: async ({ startDate, endDate, maxResults }) => {
       trackToolCall({ tool: "get_calendar_events", email, logger });
@@ -79,20 +80,29 @@ export const getCalendarEventsTool = ({
           };
         }
 
-        const events = fulfilled
+        const limit = maxResults ?? 25;
+        const merged = fulfilled
           .flatMap((r) => r.value)
-          .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-          .slice(0, maxResults ?? 25)
-          .map((event) => ({
-            title: event.title,
-            startTime: event.startTime.toISOString(),
-            endTime: event.endTime.toISOString(),
-            location: event.location ?? null,
-            attendees: event.attendees.map((a) => a.email),
-            videoConferenceLink: event.videoConferenceLink ?? null,
-          }));
+          .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 
-        return { events, count: events.length };
+        const events = merged.slice(0, limit).map((event) => ({
+          title: event.title,
+          startTime: event.startTime.toISOString(),
+          endTime: event.endTime.toISOString(),
+          location: event.location ?? null,
+          attendees: event.attendees.map((a) => a.email),
+          videoConferenceLink: event.videoConferenceLink ?? null,
+        }));
+
+        // A provider that fails is only logged, so without these flags the
+        // model presents half a schedule as the whole one and calls a slot
+        // free when the calendar holding the conflict never answered.
+        return {
+          events,
+          count: events.length,
+          truncated: merged.length > limit,
+          partialFailure: rejectedCount > 0,
+        };
       } catch (error) {
         logger.error("Failed to fetch calendar events", { error });
         return { error: "Failed to fetch calendar events" };

@@ -63,6 +63,7 @@ import {
   toggleRuleAction,
 } from "@/utils/actions/rule";
 import { confirmSenderWideInboxAction } from "@/utils/actions/mail";
+import { confirmCalendarEventAction } from "@/utils/actions/calendar";
 import { useAction } from "next-safe-action/hooks";
 import { useAccount } from "@/providers/EmailAccountProvider";
 import { useChat } from "@/providers/ChatProvider";
@@ -1979,6 +1980,143 @@ export function PendingManageInboxSendersCard({
                   "Delete all"
                 ) : (
                   "Archive all"
+                )}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export function PendingCreateCalendarEventCard({
+  output,
+  disableConfirm,
+}: {
+  output: unknown;
+  disableConfirm: boolean;
+}) {
+  const { emailAccountId } = useAccount();
+  const [isRunning, setIsRunning] = useState(false);
+  const [isCreated, setIsCreated] = useState(false);
+
+  const title = getOutputField<string>(output, "title") ?? "";
+  const startTime = getOutputField<string>(output, "startTime") ?? "";
+  const endTime = getOutputField<string>(output, "endTime") ?? "";
+  const attendees = getOutputField<string[]>(output, "attendees") ?? [];
+  const description = getOutputField<string>(output, "description");
+
+  const start = startTime ? new Date(startTime) : null;
+  const end = endTime ? new Date(endTime) : null;
+  const hasValidTimes =
+    !!start &&
+    !!end &&
+    !Number.isNaN(start.getTime()) &&
+    !Number.isNaN(end.getTime());
+
+  const handleConfirm = async () => {
+    if (!title || !hasValidTimes) {
+      toastError({ description: "Could not create this event." });
+      return;
+    }
+
+    setIsRunning(true);
+    try {
+      const actionResult = await confirmCalendarEventAction(emailAccountId, {
+        title,
+        startTime,
+        endTime,
+        attendees,
+        description: description ?? null,
+      });
+      if (actionResult?.serverError) {
+        toastError({ description: actionResult.serverError });
+        return;
+      }
+
+      setIsCreated(true);
+      toastSuccess({
+        description: attendees.length
+          ? "Event created and invitations sent."
+          : "Event added to your calendar.",
+      });
+    } catch {
+      toastError({ description: "Could not create this event." });
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start gap-3 space-y-0 border-b px-4 py-3.5">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold">{title || "New event"}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isCreated ? "Added to your calendar" : "Pending confirmation"}
+          </p>
+        </div>
+        {isCreated && (
+          <Badge color="green" className="shrink-0">
+            Created
+          </Badge>
+        )}
+      </CardHeader>
+
+      <CardContent className="space-y-3 px-4 py-3.5">
+        <p className="text-sm">
+          {hasValidTimes
+            ? `${start.toLocaleString()} to ${end.toLocaleTimeString()}`
+            : "Time not set"}
+        </p>
+
+        {attendees.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {attendees.map((attendee) => (
+              <Badge key={attendee} color="gray">
+                {attendee}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {description && (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        )}
+
+        {!isCreated && (
+          <>
+            {attendees.length > 0 && (
+              <Alert
+                variant="default"
+                className="border-amber-500/40 bg-amber-500/5"
+              >
+                <AlertTriangleIcon className="size-4 text-amber-600" />
+                <AlertTitle>Confirm invitations</AlertTitle>
+                <AlertDescription className="text-sm text-muted-foreground">
+                  Creating this event emails an invitation to everyone listed.
+                  Invitations cannot be recalled once sent.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={handleConfirm}
+                disabled={disableConfirm || isRunning || !hasValidTimes}
+                className="gap-2"
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : attendees.length > 0 ? (
+                  "Create & invite"
+                ) : (
+                  "Add to calendar"
                 )}
               </Button>
             </div>

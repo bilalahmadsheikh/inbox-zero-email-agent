@@ -43,7 +43,10 @@ import {
   startSenderCategorizationTool,
 } from "./chat-inbox-tools";
 import { saveMemoryTool, searchMemoriesTool } from "./chat-memory-tools";
-import { getCalendarEventsTool } from "./chat-calendar-tools";
+import {
+  createCalendarEventTool,
+  getCalendarEventsTool,
+} from "./chat-calendar-tools";
 import { searchDriveFilesTool } from "./chat-drive-tools";
 import type { MessagingPlatform } from "@/utils/messaging/platforms";
 import type { SerializedMatchReason } from "@/utils/ai/choose-rule/types";
@@ -313,6 +316,7 @@ export async function aiProcessAssistantChat({
     // Progressive disclosure groups (registered but not active by default)
     // Calendar
     getCalendarEvents: getCalendarEventsTool(toolOptions),
+    createCalendarEvent: createCalendarEventTool(toolOptions),
     // Attachments
     readAttachment: readAttachmentTool(toolOptions),
     searchDriveFiles: searchDriveFilesTool(toolOptions),

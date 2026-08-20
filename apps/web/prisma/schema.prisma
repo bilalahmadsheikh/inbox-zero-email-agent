@@ -1972,6 +1972,10 @@ enum BookingLinkLocationType {
   MICROSOFT_TEAMS
   PHONE
   CUSTOM
+  // Events created from chat have no venue. Booking links must never use
+  // this: their validation schema excludes it, since a booking page with no
+  // location has nothing to show the person booking.
+  NONE
 }
 
 enum BookingStatus {

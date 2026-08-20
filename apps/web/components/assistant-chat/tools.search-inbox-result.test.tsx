@@ -15,6 +15,9 @@ vi.mock("@/utils/actions/rule", () => ({
 vi.mock("@/utils/actions/mail", () => ({
   confirmSenderWideInboxAction: vi.fn(),
 }));
+vi.mock("@/utils/actions/calendar", () => ({
+  confirmCalendarEventAction: vi.fn(),
+}));
 vi.mock("next-safe-action/hooks", () => ({
   useAction: vi.fn(),
 }));

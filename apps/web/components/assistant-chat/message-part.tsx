@@ -16,6 +16,7 @@ import {
   PendingSaveMemoryToolCard,
   PendingCreateRuleToolCard,
   PendingUpdateRuleToolCard,
+  PendingCreateCalendarEventCard,
   PendingManageInboxSendersCard,
   ForwardEmailResult,
   getManageInboxActionLabel,
@@ -365,6 +366,38 @@ export function MessagePart({
         />
       );
     }
+  }
+
+  if (part.type === "tool-createCalendarEvent") {
+    const { state, toolCallId } = part;
+
+    if (state === "input-streaming" || state === "input-available") {
+      return <BasicToolInfo key={toolCallId} text="Preparing event..." />;
+    }
+
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+
+      // Nothing is written until the card is confirmed, so an unconfirmed
+      // output must never render as a created event.
+      if (
+        getOutputField<boolean>(output, "requiresConfirmation") === true &&
+        getOutputField<string>(output, "actionType") === "create_calendar_event"
+      ) {
+        return (
+          <PendingCreateCalendarEventCard
+            key={toolCallId}
+            output={output}
+            disableConfirm={disableConfirm || !isPersistedMessage}
+          />
+        );
+      }
+    }
+
+    return null;
   }
 
   if (part.type === "tool-sendEmail") {

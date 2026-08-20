@@ -34,7 +34,14 @@ const timezoneSchema = z.string().refine(isValidTimeZone, {
   message: "Use a valid IANA timezone",
 });
 
-const locationTypeSchema = z.nativeEnum(BookingLinkLocationType);
+// NONE exists for calendar events created from chat, which have no venue. A
+// booking page has nothing to show for it, and the sidebar would fall through
+// to its "Custom" label, so booking links keep exactly the options they had.
+const locationTypeSchema = z
+  .nativeEnum(BookingLinkLocationType)
+  .refine((value) => value !== BookingLinkLocationType.NONE, {
+    message: "Booking links require a location type",
+  });
 
 const positiveMinutesSchema = z.coerce.number().int().positive();
 const nonNegativeMinutesSchema = z.coerce.number().int().nonnegative();

@@ -24,3 +24,12 @@ export const updateBookingLinkBody = z.object({
     .or(z.literal("")),
 });
 export type UpdateBookingLinkBody = z.infer<typeof updateBookingLinkBody>;
+
+export const confirmCalendarEventBody = z.object({
+  title: z.string().trim().min(1, "Title is required").max(300),
+  startTime: z.string().min(1),
+  endTime: z.string().min(1),
+  attendees: z.array(z.string().email()).max(50).default([]),
+  description: z.string().max(5000).nullish(),
+});
+export type ConfirmCalendarEventBody = z.infer<typeof confirmCalendarEventBody>;

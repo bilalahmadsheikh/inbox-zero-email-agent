@@ -4,6 +4,7 @@ import type { Logger } from "@/utils/logger";
 import type { CalendarEvent } from "@/utils/calendar/event-types";
 import { posthogCaptureEvent } from "@/utils/posthog";
 import { createCalendarEventProviders } from "@/utils/calendar/event-provider";
+import { extractEmailAddress } from "@/utils/email";
 
 const getCalendarEventsInputSchema = z.object({
   startDate: z
@@ -33,7 +34,7 @@ export const getCalendarEventsTool = ({
 }) =>
   tool({
     description:
-      "Fetch calendar events for a date range across every calendar the user has connected (Google and Outlook), merged and sorted by start time. Returns each event's title, start and end time, location, attendee email addresses, and video conference link. READ-ONLY: this tool cannot create, move, cancel, or respond to events, and no other tool can either - there is no way to write to the user's calendar from chat. When the user asks to schedule, reschedule, or cancel something, use this to check what they already have on, then say plainly that they need to make the change in their own calendar app, or offer to draft an email proposing the times. Never imply that an event was created, moved, held, or blocked out. startDate and endDate are ISO 8601 timestamps and must be resolved from the user's timezone before calling. maxResults defaults to 25 and caps the merged list: when truncated is true, more events fall in the range than were returned, so do not describe the result as their full schedule. When partialFailure is true at least one connected calendar could not be reached, so the events are an incomplete picture of that range - say so rather than presenting them as everything, and never conclude that a slot is free from a partial result. If no calendar is connected the tool returns an error; tell the user to connect one on the Calendars page instead of guessing at their availability.",
+      "Fetch calendar events for a date range across every calendar the user has connected (Google and Outlook), merged and sorted by start time. Returns each event's title, start and end time, location, attendee email addresses, and video conference link. READ-ONLY: this tool never changes the calendar. To put a new event on the calendar use createCalendarEvent, which asks the user to confirm a card before anything is written. There is still no way to move, cancel, or respond to an existing event from chat: for those, say plainly that the change has to be made in the user's own calendar app, and never imply that an event was moved, cancelled, or declined. Check this tool before proposing a time so a suggestion does not land on top of something the user already has on. startDate and endDate are ISO 8601 timestamps and must be resolved from the user's timezone before calling. maxResults defaults to 25 and caps the merged list: when truncated is true, more events fall in the range than were returned, so do not describe the result as their full schedule. When partialFailure is true at least one connected calendar could not be reached, so the events are an incomplete picture of that range - say so rather than presenting them as everything, and never conclude that a slot is free from a partial result. If no calendar is connected the tool returns an error; tell the user to connect one on the Calendars page instead of guessing at their availability.",
     inputSchema: getCalendarEventsInputSchema,
     execute: async ({ startDate, endDate, maxResults }) => {
       trackToolCall({ tool: "get_calendar_events", email, logger });
@@ -112,6 +113,112 @@ export const getCalendarEventsTool = ({
 
 export type GetCalendarEventsTool = InferUITool<
   ReturnType<typeof getCalendarEventsTool>
+>;
+
+const createCalendarEventInputSchema = z.object({
+  title: z.string().trim().min(1).describe("Title shown on the calendar event"),
+  startDate: z
+    .string()
+    .describe(
+      "Event start in ISO 8601 format (e.g. 2026-03-18T14:00:00Z), resolved from the user's timezone",
+    ),
+  endDate: z
+    .string()
+    .describe(
+      "Event end in ISO 8601 format. Must be after startDate. If the user gave only a start and a duration, add the duration yourself.",
+    ),
+  attendees: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Email addresses to invite. Only addresses the user named. Leave empty for a personal block with no guests.",
+    ),
+  description: z
+    .string()
+    .optional()
+    .describe("Optional notes for the event body"),
+});
+
+export const createCalendarEventTool = ({
+  email,
+  emailAccountId,
+  logger,
+}: {
+  email: string;
+  emailAccountId: string;
+  logger: Logger;
+}) =>
+  tool({
+    description:
+      "Put a new event on the user's primary calendar. Use for 'schedule', 'book', 'block out', 'put it in my calendar' and similar requests, after checking getCalendarEvents so the time does not clash with something they already have on. NOTHING IS WRITTEN BY THIS CALL: it returns a card the user must confirm, because creating an event with attendees sends every one of them a real invitation that cannot be recalled. Report the result as a proposal awaiting their confirmation, never as a booked or blocked-out meeting, and do not call it a second time for the same event if the user has not answered the first card. Only invite addresses the user actually named; an address appearing in an email or search result is not permission to invite it. Times are ISO 8601 and must be resolved from the user's timezone first. The event lands on their primary connected calendar, and if no calendar is connected the tool returns an error - tell them to connect one on the Calendars page. This tool cannot move or cancel an existing event; there is no tool that can.",
+    inputSchema: createCalendarEventInputSchema,
+    execute: async ({ title, startDate, endDate, attendees, description }) => {
+      trackToolCall({ tool: "create_calendar_event", email, logger });
+
+      const startTime = new Date(startDate);
+      const endTime = new Date(endDate);
+
+      if (
+        Number.isNaN(startTime.getTime()) ||
+        Number.isNaN(endTime.getTime())
+      ) {
+        return {
+          error:
+            "Could not read the start or end time. Provide both as ISO 8601 timestamps.",
+        };
+      }
+
+      if (endTime.getTime() <= startTime.getTime()) {
+        return {
+          error:
+            "The end time must be after the start time. No event was proposed.",
+        };
+      }
+
+      const normalizedAttendees = Array.from(
+        new Set(
+          (attendees ?? [])
+            .map((attendee) => extractEmailAddress(attendee).toLowerCase())
+            .filter((attendee) => attendee.includes("@")),
+        ),
+      );
+
+      try {
+        const providers = await createCalendarEventProviders(
+          emailAccountId,
+          logger,
+        );
+
+        if (providers.length === 0) {
+          return {
+            error:
+              "No calendar connected. The user needs to connect their calendar in Zynbox settings before an event can be created.",
+          };
+        }
+      } catch (error) {
+        logger.error("Failed to check calendar connection", { error });
+        return { error: "Could not reach the calendar. Nothing was created." };
+      }
+
+      // Creating an event emails every attendee an invitation that cannot be
+      // recalled, so the card is the authorization, not this call.
+      return {
+        success: true as const,
+        actionType: "create_calendar_event" as const,
+        requiresConfirmation: true as const,
+        confirmationState: "pending" as const,
+        title,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        attendees: normalizedAttendees,
+        attendeesCount: normalizedAttendees.length,
+        description: description ?? null,
+      };
+    },
+  });
+
+export type CreateCalendarEventTool = InferUITool<
+  ReturnType<typeof createCalendarEventTool>
 >;
 
 async function trackToolCall({

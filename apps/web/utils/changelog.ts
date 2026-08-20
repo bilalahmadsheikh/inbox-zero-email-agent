@@ -9,6 +9,15 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.4",
+    date: "2026-08-19",
+    notes: [
+      "The assistant can now put an event on your calendar. Ask it to schedule something or block out an hour and it checks what you already have on, then shows you a card with the title, the time and anyone being invited. Nothing reaches your calendar until you press the button on that card: creating an event emails an invitation to every guest, and an invitation cannot be called back once it has gone. When there are guests the card warns you before you confirm; a private block on your own time does not.",
+      "It still cannot move or cancel an existing event, and it now says so rather than implying it has. Doing that needs the assistant to be handed the identifiers of a specific event, which is a separate change.",
+      "Events created this way carry no location, so nothing invents a meeting room or a video link you did not ask for. Booking links are unaffected and keep exactly the location options they had.",
+    ],
+  },
+  {
     version: "5.3",
     date: "2026-08-19",
     notes: [

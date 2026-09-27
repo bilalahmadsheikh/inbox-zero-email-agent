@@ -88,6 +88,33 @@ full history into every subsequent turn — where the same tokens are re-sent on
 each message, at premium-tier rates, for the rest of the conversation. One
 economy call that shrinks the history pays for itself within a few turns.
 
+### Draft thread context
+
+**What it costs:** more input tokens per drafted reply, on the `draft` tier
+rather than `economy`. The message being replied to went from 2,000 to 4,000
+characters, and thread history from a flat 500 per message to a shared 6,000
+budget allocated newest-first.
+
+**Where:** `utils/ai/reply/draft-thread-context.ts`, used by
+`utils/reply-tracker/generate-draft.ts` and `utils/follow-up/generate-draft.ts`.
+
+**Why it was implemented:** the limits are a ceiling, not an allocation, so an
+email shorter than the cap costs exactly what it did before. The increase lands
+only on emails long enough to have been truncated already - which are precisely
+the ones that were producing drafts that answered the first third of the
+question and stopped. The old setting saved tokens by generating replies the
+user had to rewrite, which is the most expensive kind of cheap.
+
+The drafting path had the smallest budget of any path in the app: the chat
+`readEmail` tool gives 4,000 characters to *display* an email, and the manual
+generate-reply action 3,000, while the automatic path whose output is a real
+outgoing email got 2,000. Matching `readEmail` is the change.
+
+Two caps had to move together. `getEmailListPrompt` truncates a second time at
+serialization, and while collection was the tighter of the two that layer was
+inert; raising collection alone would have been silently re-capped. Both now
+read the same constant.
+
 ### Attachment and digest summarisation
 
 **What it costs:** one `economy`-tier call per attachment or digest item —

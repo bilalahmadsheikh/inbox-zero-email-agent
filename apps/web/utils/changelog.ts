@@ -9,6 +9,16 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.5",
+    date: "2026-08-19",
+    notes: [
+      "Drafted replies now see the whole email they are replying to. The message being answered was being cut at 2,000 characters before the AI ever read it - less than the assistant is given just to show you the same email on screen - so a long or detailed email was answered from roughly its first third. That was invisible: the draft did not look truncated, it looked like it had missed the point. The limit is now double, and older messages in a thread share a pool of context so a short thread keeps real history instead of every message being clipped to a couple of lines.",
+      "When an email is genuinely too long to fit, the draft AI is now told so, rather than being handed a silently shortened message and left to answer half a question with full confidence.",
+      "This only costs more on emails that were being cut before. Anything shorter than the limit is unaffected, because the limit is a ceiling rather than an amount to fill.",
+      "If your drafts still come out shorter than you want, that is a separate setting: Assistant then Settings then Writing style. With nothing set there, the AI is told to aim for two sentences at most.",
+    ],
+  },
+  {
     version: "5.4",
     date: "2026-08-19",
     notes: [

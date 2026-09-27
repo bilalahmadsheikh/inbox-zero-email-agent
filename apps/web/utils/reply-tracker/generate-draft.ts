@@ -1,5 +1,5 @@
 import type { ParsedMessage } from "@/utils/types";
-import { internalDateToDate, sortByInternalDate } from "@/utils/date";
+import { sortByInternalDate } from "@/utils/date";
 import { getEmailForLLM } from "@/utils/get-email-from-message";
 import { extractEmailAddress, extractEmailAddresses } from "@/utils/email";
 import { aiDraftReplyWithConfidence } from "@/utils/ai/reply/draft-reply";
@@ -30,6 +30,7 @@ import {
 } from "@/generated/prisma/enums";
 import { extractDomainFromEmail, isPublicEmailDomain } from "@/utils/email";
 import { meetsDraftReplyConfidenceRequirement } from "@/utils/ai/reply/draft-confidence";
+import { buildDraftThreadMessages } from "@/utils/ai/reply/draft-thread-context";
 import type { DraftAttribution } from "@/utils/ai/reply/draft-attribution";
 import { selectDraftAttachmentsForRule } from "@/utils/attachments/draft-attachments";
 import type { SelectedAttachment } from "@/utils/attachments/source-schema";
@@ -257,18 +258,7 @@ async function generateDraftContent(
     });
   }
 
-  const messages = threadMessages.map((msg, index) => ({
-    date: internalDateToDate(msg.internalDate),
-    threadId: msg.threadId,
-    ...getEmailForLLM(msg, {
-      // give more context for the message we're processing
-      maxLength: index === threadMessages.length - 1 ? 2000 : 500,
-      extractReply: true,
-      removeForwarded: false,
-      includeLinkUrls: true,
-      includeImageAltText: true,
-    }),
-  }));
+  const messages = buildDraftThreadMessages(threadMessages);
 
   // 1. Get knowledge base entries
   const knowledgeBase = await prisma.knowledge.findMany({

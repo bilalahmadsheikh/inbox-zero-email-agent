@@ -3,8 +3,8 @@ import type { Logger } from "@/utils/logger";
 import type { EmailAccountWithAI } from "@/utils/llms/types";
 import { aiDraftFollowUp } from "@/utils/ai/reply/draft-follow-up";
 import { getWritingStyle } from "@/utils/user/get";
-import { internalDateToDate, sortByInternalDate } from "@/utils/date";
-import { getEmailForLLM } from "@/utils/get-email-from-message";
+import { sortByInternalDate } from "@/utils/date";
+import { buildDraftThreadMessages } from "@/utils/ai/reply/draft-thread-context";
 import { isSameEmailAddress } from "@/utils/email";
 import { escapeHtml } from "@/utils/string";
 import prisma from "@/utils/prisma";
@@ -76,16 +76,7 @@ export async function generateFollowUpDraft({
     const recipientOverride = trackedMessage.headers.to || undefined;
 
     // Convert messages to LLM format
-    const messages = threadMessages.map((msg, index) => ({
-      date: internalDateToDate(msg.internalDate),
-      ...getEmailForLLM(msg, {
-        maxLength: index === threadMessages.length - 1 ? 2000 : 500,
-        extractReply: true,
-        removeForwarded: false,
-        includeLinkUrls: true,
-        includeImageAltText: true,
-      }),
-    }));
+    const messages = buildDraftThreadMessages(threadMessages);
 
     const writingStyle = await getWritingStyle({
       emailAccountId: emailAccount.id,

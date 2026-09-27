@@ -1,3 +1,4 @@
+import { DRAFT_MESSAGE_SERIALIZATION_MAX_CHARS } from "@/utils/ai/reply/draft-thread-context";
 import { z } from "zod";
 import { TZDate } from "@date-fns/tz";
 import { createScopedLogger } from "@/utils/logger";
@@ -274,7 +275,7 @@ ${selectedAttachments}
 ${receivedAttachments}
 
 Here is the context of the email thread (from oldest to newest):
-${getEmailListPrompt({ messages, messageMaxLength: 3000 })}
+${getEmailListPrompt({ messages, messageMaxLength: DRAFT_MESSAGE_SERIALIZATION_MAX_CHARS })}
 
 ${userInstruction}Please write a reply to the email.
 ${getTodayForLLM(currentDate)}

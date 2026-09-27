@@ -1,3 +1,4 @@
+import { DRAFT_MESSAGE_SERIALIZATION_MAX_CHARS } from "@/utils/ai/reply/draft-thread-context";
 import { z } from "zod";
 import { createScopedLogger } from "@/utils/logger";
 import { createGenerateObject } from "@/utils/llms/index";
@@ -63,7 +64,7 @@ ${writingStyle}
 ${writingStylePrompt}
 
 Here is the context of the email thread (from oldest to newest):
-${getEmailListPrompt({ messages, messageMaxLength: 3000 })}
+${getEmailListPrompt({ messages, messageMaxLength: DRAFT_MESSAGE_SERIALIZATION_MAX_CHARS })}
 
 Please write a follow-up email to check in on the previous message.
 ${getTodayForLLM()}

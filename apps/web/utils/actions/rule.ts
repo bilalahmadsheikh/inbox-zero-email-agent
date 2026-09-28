@@ -11,6 +11,7 @@ import {
   enableMultiRuleSelectionBody,
   enableTriageLabelsBody,
   enableLearnedPatternsBody,
+  updateAutoReplySettingsBody,
   updateDraftReplyConfidenceBody,
   deleteRuleBody,
   createRulesOnboardingBody,
@@ -29,7 +30,11 @@ import {
 import prisma from "@/utils/prisma";
 import { isDuplicateError, isNotFoundError } from "@/utils/prisma-helpers";
 import { flattenConditions } from "@/utils/condition";
-import { ActionType, SystemType } from "@/generated/prisma/enums";
+import {
+  ActionType,
+  ScheduledActionStatus,
+  SystemType,
+} from "@/generated/prisma/enums";
 import { sanitizeActionFields } from "@/utils/action-item";
 import {
   deleteRule,
@@ -306,6 +311,45 @@ export const updateDraftReplyConfidenceAction = actionClient
       data: { draftReplyConfidence: confidence },
     });
   });
+
+export const updateAutoReplySettingsAction = actionClient
+  .metadata({ name: "updateAutoReplySettings" })
+  .inputSchema(updateAutoReplySettingsBody)
+  .action(
+    async ({
+      ctx: { emailAccountId },
+      parsedInput: { enabled, confidence },
+    }) => {
+      await prisma.emailAccount.update({
+        where: { id: emailAccountId },
+        data: {
+          ...(enabled !== undefined && { autoReplyEnabled: enabled }),
+          ...(confidence && { autoReplyConfidence: confidence }),
+        },
+      });
+
+      // Switching off has to stop replies already waiting in a hold window,
+      // not just future ones, or the switch does nothing for the next few
+      // minutes. The executor skips anything marked cancelled. Only replies
+      // the AI wrote are stopped; fixed-text reply rules are not governed by
+      // this switch.
+      if (enabled === false) {
+        await prisma.scheduledAction.updateMany({
+          where: {
+            emailAccountId,
+            actionType: ActionType.REPLY,
+            status: ScheduledActionStatus.PENDING,
+            executedRule: {
+              rule: {
+                actions: { some: { type: ActionType.REPLY, content: null } },
+              },
+            },
+          },
+          data: { status: ScheduledActionStatus.CANCELLED },
+        });
+      }
+    },
+  );
 
 export const deleteRuleAction = actionClient
   .metadata({ name: "deleteRule" })

@@ -346,6 +346,16 @@ export type UpdateDraftReplyConfidenceBody = z.infer<
   typeof updateDraftReplyConfidenceBody
 >;
 
+export const updateAutoReplySettingsBody = z
+  .object({
+    enabled: z.boolean().optional(),
+    confidence: z.nativeEnum(DraftReplyConfidence).optional(),
+  })
+  .refine(
+    (value) => value.enabled !== undefined || value.confidence !== undefined,
+    { message: "Nothing to update" },
+  );
+
 const categoryAction = z.enum([
   "label",
   "label_archive",

@@ -1,4 +1,5 @@
 import {
+  ActionType,
   ExecutedRuleStatus,
   ScheduledActionStatus,
 } from "@/generated/prisma/enums";
@@ -13,6 +14,7 @@ import type {
   EmailForAction,
 } from "@/utils/ai/types";
 import type { EmailProvider } from "@/utils/email/types";
+import { hasUserRepliedSince } from "@/utils/reply-tracker/auto-reply-guard";
 
 const MODULE = "scheduled-actions-executor";
 
@@ -51,6 +53,28 @@ export async function executeScheduledAction(
       );
       await checkAndCompleteExecutedRule(scheduledAction.executedRuleId, log);
       return { success: true, reason: "Email no longer exists" };
+    }
+
+    // A reply held in a delay window must not go out if the user answered the
+    // thread themselves in the meantime; the only check here used to be that
+    // the original email still existed, so a hold window double-replied.
+    if (
+      scheduledAction.actionType === ActionType.REPLY &&
+      (await hasUserRepliedSince({
+        client,
+        threadId: scheduledAction.threadId,
+        userEmail: emailAccount.email,
+        since: scheduledAction.createdAt,
+      }))
+    ) {
+      await markActionCompleted(
+        scheduledAction.id,
+        null,
+        log,
+        "User already replied in the thread",
+      );
+      await checkAndCompleteExecutedRule(scheduledAction.executedRuleId, log);
+      return { success: true, reason: "User already replied in the thread" };
     }
 
     const actionItem: ActionItem = {

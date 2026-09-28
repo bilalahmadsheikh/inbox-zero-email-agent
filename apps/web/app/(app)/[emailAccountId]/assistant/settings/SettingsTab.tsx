@@ -1,6 +1,7 @@
 import { AboutSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/AboutSetting";
 import { SensitiveDataPolicySetting } from "@/app/(app)/[emailAccountId]/assistant/settings/SensitiveDataPolicySetting";
 import { DigestSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/DigestSetting";
+import { AutoReplySetting } from "@/app/(app)/[emailAccountId]/assistant/settings/AutoReplySetting";
 import { DraftConfidenceSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/DraftConfidenceSetting";
 import { DraftReplies } from "@/app/(app)/[emailAccountId]/assistant/settings/DraftReplies";
 import { DraftAttachmentsSetting } from "@/app/(app)/[emailAccountId]/assistant/settings/DraftAttachmentsSetting";
@@ -29,6 +30,12 @@ export function SettingsTab() {
           <DraftConfidenceSetting />
           <DraftAttachmentsSetting />
           <AttachmentSettings />
+        </div>
+      )}
+
+      {env.NEXT_PUBLIC_EMAIL_SEND_ENABLED && (
+        <div className="space-y-2">
+          <AutoReplySetting />
         </div>
       )}
 

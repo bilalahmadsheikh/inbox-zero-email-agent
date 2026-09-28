@@ -148,6 +148,24 @@ mainly as a warning: the retry relieves the symptom while adding to the cause.
 signal to find that query, not as a transient to be tuned away by raising the
 retry count.
 
+### Automatic reply checks
+
+**What it costs:** three count queries and one provider call (fetching the
+thread) each time a rule produces an AI-written reply that would be sent. No
+model calls.
+
+**Where:** `getAutoReplyHistory` and `userRepliedSinceMessage` in
+`utils/ai/choose-rule/choose-args.ts`; the thread fetch again in the delayed
+executor.
+
+**Why it was implemented:** an automatic reply cannot be recalled. The counts
+enforce a one-per-thread cap (the only loop protection that works on Outlook,
+which exposes no automation headers) and an account-wide daily ceiling against
+a rule that matches far more than intended. The thread fetch stops a reply
+going out after the user already answered. This runs only for AI replies that
+are about to send - not for drafts, labels or any hot page - so it scales with
+automatic sends, which are rare by design.
+
 ### Queries on hot server components
 
 **What it costs:** one query per page view, per user, on `/automation`,

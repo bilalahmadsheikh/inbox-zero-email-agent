@@ -1,7 +1,12 @@
 import { z } from "zod";
+import { env } from "@/env";
 import type { EmailAccountWithAI } from "@/utils/llms/types";
 import type { ModelType } from "@/utils/llms/model";
-import type { DraftReplyConfidence } from "@/generated/prisma/enums";
+import {
+  ActionType,
+  DraftReplyConfidence,
+  ScheduledActionStatus,
+} from "@/generated/prisma/enums";
 import type { Action } from "@/generated/prisma/client";
 import {
   type RuleWithActions,
@@ -20,12 +25,23 @@ import type { DraftAttribution } from "@/utils/ai/reply/draft-attribution";
 import type { DraftContextMetadata } from "@/utils/ai/reply/draft-context-metadata";
 import { isDraftReplyActionType } from "@/utils/actions/draft-reply";
 import type { SelectedAttachment } from "@/utils/attachments/source-schema";
+import prisma from "@/utils/prisma";
+import {
+  AUTO_REPLY_THREAD_WINDOW_HOURS,
+  getAutoReplyBlockReason,
+  hasUserRepliedSince,
+} from "@/utils/reply-tracker/auto-reply-guard";
+import { internalDateToDate } from "@/utils/date";
 
 const MODULE = "choose-args";
 
 export type EmailAccountForDrafting = EmailAccountWithAI & {
   draftReplyConfidence: DraftReplyConfidence;
   learnedPatternsEnabled: boolean;
+  // Optional so a caller that has not selected them falls back to the schema
+  // defaults below rather than failing open.
+  autoReplyEnabled?: boolean;
+  autoReplyConfidence?: DraftReplyConfidence;
 };
 
 type DraftAttributionFields = {
@@ -145,7 +161,19 @@ export async function getActionItemsWithAiArgs({
     });
   }
 
-  return filteredActions;
+  return guardAiWrittenReplies({
+    actions: filteredActions,
+    aiReplyActionIds: new Set(
+      draftReplyActions
+        .filter((action) => action.type === ActionType.REPLY)
+        .map((action) => action.id),
+    ),
+    message,
+    emailAccount,
+    draftConfidence,
+    client,
+    logger: log,
+  });
 }
 export function combineActionsWithAiArgs(
   actions: Action[],
@@ -429,4 +457,143 @@ export function mergeTemplateWithVars(
   }
 
   return result;
+}
+
+// A REPLY with no fixed text is written by the draft pipeline and then SENT,
+// with nobody reviewing it. Anything the guard will not vouch for is turned
+// into a draft here - before execution or scheduling - so the reply still
+// exists and the user decides. Fixed-text REPLY rules are untouched.
+async function guardAiWrittenReplies({
+  actions,
+  aiReplyActionIds,
+  message,
+  emailAccount,
+  draftConfidence,
+  client,
+  logger,
+}: {
+  actions: ActionWithDraftAttribution[];
+  aiReplyActionIds: Set<string>;
+  message: ParsedMessage;
+  emailAccount: EmailAccountForDrafting;
+  draftConfidence: DraftReplyConfidence | null;
+  client: EmailProvider;
+  logger: Logger;
+}): Promise<ActionWithDraftAttribution[]> {
+  const hasAiReply = actions.some(
+    (action) =>
+      action.type === ActionType.REPLY && aiReplyActionIds.has(action.id),
+  );
+  if (!hasAiReply) return actions;
+
+  const history = await getAutoReplyHistory({
+    emailAccountId: emailAccount.id,
+    threadId: message.threadId,
+  });
+
+  const blockReason = getAutoReplyBlockReason({
+    message,
+    userEmail: emailAccount.email,
+    // With sending switched off for the deployment, REPLY throws at execution;
+    // treating it as disabled turns that error into a draft.
+    autoReplyEnabled:
+      (emailAccount.autoReplyEnabled ?? true) &&
+      env.NEXT_PUBLIC_EMAIL_SEND_ENABLED !== false,
+    autoReplyConfidence:
+      emailAccount.autoReplyConfidence ?? DraftReplyConfidence.HIGH_CONFIDENCE,
+    draftConfidence,
+    hasRecentAutoReplyInThread: history.hasRecentInThread,
+    autoRepliesInLastDay: history.inLastDay,
+    userRepliedSinceMessage: await userRepliedSinceMessage({
+      client,
+      message,
+      userEmail: emailAccount.email,
+      logger,
+    }),
+  });
+
+  if (!blockReason) return actions;
+
+  logger.info("Auto-reply held back as a draft", {
+    reason: blockReason,
+    threadId: message.threadId,
+    messageId: message.id,
+  });
+
+  return actions.map((action) =>
+    action.type === ActionType.REPLY && aiReplyActionIds.has(action.id)
+      ? // Drafts cannot be delayed, and a held-back reply should be visible now.
+        { ...action, type: ActionType.DRAFT_EMAIL, delayInMinutes: null }
+      : action,
+  );
+}
+
+async function getAutoReplyHistory({
+  emailAccountId,
+  threadId,
+}: {
+  emailAccountId: string;
+  threadId: string;
+}) {
+  const since = new Date(
+    Date.now() - AUTO_REPLY_THREAD_WINDOW_HOURS * 60 * 60 * 1000,
+  );
+
+  // A reply still waiting in a hold window counts too, or two messages
+  // arriving close together would each schedule their own.
+  const [sentInThread, pendingInThread, inLastDay] = await Promise.all([
+    prisma.executedAction.count({
+      where: {
+        type: ActionType.REPLY,
+        createdAt: { gte: since },
+        executedRule: { emailAccountId, threadId },
+      },
+    }),
+    prisma.scheduledAction.count({
+      where: {
+        emailAccountId,
+        threadId,
+        actionType: ActionType.REPLY,
+        status: ScheduledActionStatus.PENDING,
+      },
+    }),
+    prisma.executedAction.count({
+      where: {
+        type: ActionType.REPLY,
+        createdAt: { gte: since },
+        executedRule: { emailAccountId },
+      },
+    }),
+  ]);
+
+  return {
+    hasRecentInThread: sentInThread + pendingInThread > 0,
+    inLastDay,
+  };
+}
+
+async function userRepliedSinceMessage({
+  client,
+  message,
+  userEmail,
+  logger,
+}: {
+  client: EmailProvider;
+  message: ParsedMessage;
+  userEmail: string;
+  logger: Logger;
+}) {
+  try {
+    return await hasUserRepliedSince({
+      client,
+      threadId: message.threadId,
+      userEmail,
+      since: internalDateToDate(message.internalDate),
+    });
+  } catch (error) {
+    // Unable to tell whether the user already answered: assume they did, so
+    // the reply becomes a draft rather than a possible duplicate.
+    logger.warn("Could not check thread for a user reply", { error });
+    return true;
+  }
 }

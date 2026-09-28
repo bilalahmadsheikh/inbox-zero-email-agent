@@ -38,6 +38,7 @@ vi.mock("@/utils/email/provider", () => ({
       subject: "Test Subject",
       date: "2024-01-01T00:00:00Z",
     }),
+    getThreadMessages: vi.fn().mockResolvedValue([]),
   }),
 }));
 
@@ -117,6 +118,64 @@ describe("executor", () => {
           selectedAttachments,
         }),
       });
+    });
+
+    it("does not send a held reply once the user has answered the thread", async () => {
+      const scheduledAt = new Date("2024-01-01T12:00:00Z");
+      const heldReply = {
+        ...mockScheduledAction,
+        actionType: ActionType.REPLY,
+        content: "Automatic reply",
+        createdAt: scheduledAt,
+      };
+      const emailProvider = await getMockEmailProvider();
+      (emailProvider.getThreadMessages as any).mockResolvedValueOnce([
+        {
+          headers: { from: "Test User <TEST@example.com>" },
+          internalDate: String(scheduledAt.getTime() + 60_000),
+        },
+      ]);
+      mockScheduledActionUpdate(ScheduledActionStatus.COMPLETED);
+      mockCompletionCounts({ pendingActions: 0, failedActions: 0 });
+      mockExecutedRuleUpdate(ExecutedRuleStatus.APPLIED);
+
+      const result = await executeScheduledAction(
+        heldReply,
+        emailProvider,
+        logger,
+      );
+
+      expect(result).toEqual({
+        success: true,
+        reason: "User already replied in the thread",
+      });
+      expect(runActionFunction).not.toHaveBeenCalled();
+    });
+
+    it("still sends a held reply when the user's last message predates it", async () => {
+      const scheduledAt = new Date("2024-01-01T12:00:00Z");
+      const heldReply = {
+        ...mockScheduledAction,
+        actionType: ActionType.REPLY,
+        content: "Automatic reply",
+        createdAt: scheduledAt,
+      };
+      const emailProvider = await getMockEmailProvider();
+      (emailProvider.getThreadMessages as any).mockResolvedValueOnce([
+        {
+          headers: { from: "test@example.com" },
+          internalDate: String(scheduledAt.getTime() - 60_000),
+        },
+      ]);
+      mockScheduledActionUpdate(ScheduledActionStatus.COMPLETED, heldReply);
+      mockExecutedActionCreate({ type: ActionType.REPLY });
+      mockExecutedRuleFind();
+      mockCompletionCounts({ pendingActions: 0, failedActions: 0 });
+      mockExecutedRuleUpdate(ExecutedRuleStatus.APPLIED);
+
+      await executeScheduledAction(heldReply, emailProvider, logger);
+
+      expect(runActionFunction).toHaveBeenCalled();
     });
 
     it("should complete the ExecutedRule when the email no longer exists", async () => {

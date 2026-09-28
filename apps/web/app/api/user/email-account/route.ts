@@ -32,6 +32,8 @@ async function getEmailAccount({
       learnedPatternsEnabled: true,
       sensitiveDataPolicy: true,
       draftReplyConfidence: true,
+      autoReplyEnabled: true,
+      autoReplyConfidence: true,
       allowHiddenAiDraftLinks: true,
       alwaysReadDraftAttachments: true,
       attachmentSettings: true,

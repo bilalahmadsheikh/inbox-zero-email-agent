@@ -106,17 +106,26 @@ interface Headers2 {
 }
 
 export interface ParsedMessageHeaders {
+  // RFC 3834 automation markers. Gmail's parser passes every header through, so
+  // these are present when the sender set them; Outlook builds headers from
+  // named Graph fields and never has them. Never rely on their absence.
+  "auto-submitted"?: string;
   bcc?: string;
   cc?: string;
   date: string; // the date supplied by the email. internally we rely on message.internalDate provided by the gmail api
   from: string;
   "in-reply-to"?: string;
+  "list-id"?: string;
   "list-unsubscribe"?: string;
   "message-id"?: string;
+  precedence?: string;
   references?: string;
   "reply-to"?: string;
   subject: string;
   to: string;
+  "x-auto-response-suppress"?: string;
+  "x-autoreply"?: string;
+  "x-autorespond"?: string;
 }
 
 // Note: use `getEmailForLLM(message)` to convert a `ParsedMessage` to an `EmailForLLM`

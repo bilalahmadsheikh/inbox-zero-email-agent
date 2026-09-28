@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.6",
+    date: "2026-09-28",
+    notes: [
+      "Rules that send replies can now let the AI write them and send them on its own. This was already possible, but with none of the protection an unattended reply needs. There is now a separate setting for it - Assistant, then Settings, then Automatic replies - with its own on/off switch and its own confidence bar, kept apart from draft confidence: a draft the AI was unsure about costs you a read, but a sent reply the AI was unsure about reaches a real person. The bar starts at High confidence.",
+      "Nothing is lost when the AI holds back. Any reply it will not send on its own is saved as a draft instead, so you still get the reply and simply decide yourself.",
+      "It will not answer machines. Out-of-office messages, mailing lists, newsletters and addresses that cannot receive mail are left alone, and it will send at most one automatic reply in a conversation per day - so two automated systems can never end up replying to each other indefinitely. There is also a daily ceiling across your whole account, in case a rule matches far more mail than you meant it to.",
+      "It will not answer old mail. Setting up rules also runs them over recent inbox history, which could previously send replies to emails you dealt with days ago. Automatic replies now only go to mail that arrived within the last day.",
+      "It will not reply if you already have. If you answer a thread yourself before the automatic reply goes out, it stays unsent. This also fixes delayed replies, which previously went out even when you had replied during the wait.",
+      "It will not reply to a redirect. An email that claims to be from someone you know but sends replies to a different company's address - a common trick in impersonation emails - gets a draft instead of an automatic answer.",
+      "Turning automatic replies off also stops any that are already queued, not just future ones. Rules that reply with fixed text you wrote yourself are unaffected by all of this.",
+    ],
+  },
+  {
     version: "5.5",
     date: "2026-08-19",
     notes: [

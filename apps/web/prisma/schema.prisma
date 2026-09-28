@@ -157,6 +157,12 @@ model EmailAccount {
   learnedPatternsEnabled    Boolean              @default(false) // auto-learn sender patterns from AI rule matches and label removals
   sensitiveDataPolicy       String?
   draftReplyConfidence      DraftReplyConfidence @default(ALL_EMAILS)
+  // Replies the AI writes and SENDS (REPLY actions with no fixed text). Kept
+  // separate from draftReplyConfidence: a low-confidence draft costs a review,
+  // a low-confidence send reaches a real person. Anything that fails these
+  // checks becomes a draft instead, so nothing is lost.
+  autoReplyEnabled          Boolean              @default(true)
+  autoReplyConfidence       DraftReplyConfidence @default(HIGH_CONFIDENCE)
   draftCleanupDays          Int?                 @default(14)
   allowHiddenAiDraftLinks   Boolean              @default(false)
   // Global "read attachments before drafting" switch. When true, every draft or

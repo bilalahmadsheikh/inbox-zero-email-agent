@@ -86,6 +86,8 @@ export type EmailAccountForRuleExecution = EmailAccountWithAI & {
   name: string | null;
   draftReplyConfidence: DraftReplyConfidence;
   learnedPatternsEnabled: boolean;
+  autoReplyEnabled: boolean;
+  autoReplyConfidence: DraftReplyConfidence;
 };
 
 export async function getEmailAccountForRuleExecution({
@@ -109,6 +111,8 @@ export async function getEmailAccountForRuleExecution({
       name: true,
       draftReplyConfidence: true,
       learnedPatternsEnabled: true,
+      autoReplyEnabled: true,
+      autoReplyConfidence: true,
       user: {
         select: {
           aiProvider: true,

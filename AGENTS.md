@@ -63,6 +63,14 @@ Consequences when writing code:
 - Never let a redirect target a route that can re-run the same check. A server component that queries and then redirects to itself becomes an unbounded query loop from a single browser tab, which can starve slots for every user on that instance. Redirect to a different route, or make the target read the state that stops the loop.
 - The retry extension amplifies pressure rather than relieving it: a failing query retries three times with backoff, holding the attempt open longer. Treat `P2037` in logs as a signal that something is issuing too many queries, not as a transient to be tuned away.
 
+## Actions That Leave the Account
+
+Rules do not only run on new mail. The onboarding pass runs them over recent inbox history, bulk runs over a chosen range, and a webhook backlog after an outage delivers mail late. Any action that sends, forwards or replies must therefore decide what to do with an old message, not assume the message just arrived.
+
+- AI-written replies (a `REPLY` action with no fixed text) pass through `utils/reply-tracker/auto-reply-guard.ts` before they are sent. Anything the guard will not vouch for becomes a draft rather than disappearing. Add new send-side checks there, so the send-now path and the delayed executor cannot disagree.
+- Automation headers (`auto-submitted`, `precedence`, `list-id`) exist only on Gmail, whose parser passes every header through. Outlook builds headers from named Graph fields and has none of them. Never treat their absence as proof a message came from a person; rely on something provider-independent, such as the per-thread cap, for the actual guarantee.
+- A delayed action is executed later against a thread that may have changed. Re-check anything that could have gone stale during the delay rather than trusting the state at scheduling time.
+
 ## Text That Becomes Markup
 
 Anything that turns user or model text into HTML must go through `escapeHtml` / `convertNewlinesToBr` / `textToHtmlParagraphs` in `utils/string.ts`. Never write a local escape helper: a second implementation is always weaker than the shared one (a hand-rolled version missed quotes and left stray `\r` from Windows line endings), and this sits on the path where generated text becomes the body of a real outgoing email.

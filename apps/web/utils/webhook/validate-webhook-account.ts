@@ -33,6 +33,8 @@ const webhookEmailAccountSelect = {
   timezone: true,
   calendarBookingLink: true,
   draftReplyConfidence: true,
+  autoReplyEnabled: true,
+  autoReplyConfidence: true,
   lastSyncedHistoryId: true,
   autoCategorizeSenders: true,
   learnedPatternsEnabled: true,

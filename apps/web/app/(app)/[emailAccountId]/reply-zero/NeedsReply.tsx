@@ -2,19 +2,18 @@ import { ThreadTrackerType } from "@/generated/prisma/enums";
 import { ReplyTrackerEmails } from "./ReplyTrackerEmails";
 import { getPaginatedThreadTrackers } from "./fetch-trackers";
 import type { TimeRange } from "./date-filter";
+import { isAnalyzingReplyTracker } from "@/utils/redis/reply-tracker-analyzing";
 
 export async function NeedsReply({
   emailAccountId,
   userEmail,
   page,
   timeRange,
-  isAnalyzing,
 }: {
   emailAccountId: string;
   userEmail: string;
   page: number;
   timeRange: TimeRange;
-  isAnalyzing: boolean;
 }) {
   const { trackers, totalPages } = await getPaginatedThreadTrackers({
     emailAccountId,
@@ -22,6 +21,12 @@ export async function NeedsReply({
     page,
     timeRange,
   });
+
+  // The "analysing" flag only changes what an empty list says, so Redis is
+  // only asked when there is nothing to show.
+  const isAnalyzing =
+    trackers.length === 0 &&
+    (await isAnalyzingReplyTracker({ emailAccountId }));
 
   return (
     <ReplyTrackerEmails

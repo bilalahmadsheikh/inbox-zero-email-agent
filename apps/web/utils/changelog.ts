@@ -9,6 +9,15 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.8",
+    date: "2026-10-04",
+    notes: [
+      "Reply Zero no longer breaks when you filter by date. Choosing any time range other than All made the Done tab's database query fail - and because every tab was being built on every visit, that one failure took down the whole page, even on To Reply.",
+      "Reply Zero no longer goes down if the app's Redis cache is unavailable. The page asked it whether your inbox was still being analysed, purely to choose the wording of an empty list, and had no fallback; a cache problem showed an error screen instead of your emails. It now simply assumes the analysis is finished.",
+      "Reply Zero is faster and much lighter on the database. Each visit built all three tabs - To Reply, Waiting and Done - even though you only see one, and every click on a tab rebuilt all three again. Now only the tab you are looking at is built. A visit used to run nine database queries, six of them at the same moment; it now runs three, two at a time. That matters because the app can only hold a few database connections open at once, and one Reply Zero visit could use them all up.",
+    ],
+  },
+  {
     version: "5.7",
     date: "2026-10-04",
     notes: [

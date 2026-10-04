@@ -7,13 +7,12 @@ import { AwaitingReply } from "./AwaitingReply";
 import prisma from "@/utils/prisma";
 import { TimeRangeFilter } from "./TimeRangeFilter";
 import type { TimeRange } from "./date-filter";
-import { isAnalyzingReplyTracker } from "@/utils/redis/reply-tracker-analyzing";
 import { TabsToolbar } from "@/components/TabsToolbar";
 import { GmailProvider } from "@/providers/GmailProvider";
 import { cookies } from "next/headers";
 import { REPLY_ZERO_ONBOARDING_COOKIE } from "@/utils/cookies";
 import { prefixPath } from "@/utils/path";
-import { checkUserOwnsEmailAccount } from "@/utils/email-account";
+import { auth } from "@/utils/auth";
 import { CONVERSATION_STATUS_TYPES } from "@/utils/reply-tracker/conversation-status-config";
 
 export const maxDuration = 300;
@@ -28,20 +27,15 @@ export default async function ReplyTrackerPage(props: {
   }>;
 }) {
   const { emailAccountId } = await props.params;
-  await checkUserOwnsEmailAccount({ emailAccountId });
 
-  const searchParams = await props.searchParams;
-  const activeTab = getReplyZeroTab(searchParams.tab);
+  const session = await auth();
+  const userId = session?.user.id;
+  if (!userId) throw new Error("Not authenticated");
 
-  const cookieStore = await cookies();
-  const viewedOnboarding =
-    cookieStore.get(REPLY_ZERO_ONBOARDING_COOKIE)?.value === "true";
-
-  if (!viewedOnboarding)
-    redirect(prefixPath(emailAccountId, "/reply-zero/onboarding"));
-
+  // One query proves ownership and loads what the page needs. This used to be
+  // an ownership check followed by a second read of the same account.
   const emailAccount = await prisma.emailAccount.findUnique({
-    where: { id: emailAccountId },
+    where: { id: emailAccountId, userId },
     select: {
       email: true,
       rules: {
@@ -56,12 +50,22 @@ export default async function ReplyTrackerPage(props: {
     },
   });
 
-  const trackerRule = emailAccount?.rules[0];
+  if (!emailAccount) redirect("/no-access");
+
+  const searchParams = await props.searchParams;
+  const activeTab = getReplyZeroTab(searchParams.tab);
+
+  const cookieStore = await cookies();
+  const viewedOnboarding =
+    cookieStore.get(REPLY_ZERO_ONBOARDING_COOKIE)?.value === "true";
+
+  if (!viewedOnboarding)
+    redirect(prefixPath(emailAccountId, "/reply-zero/onboarding"));
+
+  const trackerRule = emailAccount.rules[0];
 
   if (!trackerRule)
     redirect(prefixPath(emailAccountId, "/reply-zero/onboarding"));
-
-  const isAnalyzing = await isAnalyzingReplyTracker({ emailAccountId });
 
   const page = Number(searchParams.page || "1");
   const timeRange = searchParams.timeRange || "all";
@@ -111,32 +115,12 @@ export default async function ReplyTrackerPage(props: {
           </div>
         </TabsToolbar>
 
-        <TabsContent value="needsReply" className="mt-0 flex-1">
-          <NeedsReply
-            emailAccountId={emailAccountId}
-            userEmail={emailAccount.email}
-            page={page}
-            timeRange={timeRange}
-            isAnalyzing={isAnalyzing}
-          />
-        </TabsContent>
-
-        <TabsContent value="awaitingReply" className="mt-0 flex-1">
-          <AwaitingReply
-            emailAccountId={emailAccountId}
-            userEmail={emailAccount.email}
-            page={page}
-            timeRange={timeRange}
-            isAnalyzing={isAnalyzing}
-          />
-        </TabsContent>
-
-        {/* <TabsContent value="needsAction" className="mt-0 flex-1">
-        <NeedsAction userId={userId} userEmail={userEmail} page={page} />
-      </TabsContent> */}
-
-        <TabsContent value="resolved" className="mt-0 flex-1">
-          <Resolved
+        {/* Only the visible tab is built. Each tab is a link, so switching
+            tabs is already a server round trip; building all three on every
+            request ran three tabs' worth of queries at once to show one. */}
+        <TabsContent value={activeTab} className="mt-0 flex-1">
+          <ReplyZeroTabContent
+            tab={activeTab}
             emailAccountId={emailAccountId}
             userEmail={emailAccount.email}
             page={page}
@@ -152,4 +136,24 @@ export default async function ReplyTrackerPage(props: {
 function getReplyZeroTab(tab: string | undefined) {
   if (tab === "awaitingReply" || tab === "resolved") return tab;
   return "needsReply";
+}
+
+function ReplyZeroTabContent({
+  tab,
+  ...props
+}: {
+  tab: ReturnType<typeof getReplyZeroTab>;
+  emailAccountId: string;
+  userEmail: string;
+  page: number;
+  timeRange: TimeRange;
+}) {
+  switch (tab) {
+    case "awaitingReply":
+      return <AwaitingReply {...props} />;
+    case "resolved":
+      return <Resolved {...props} />;
+    default:
+      return <NeedsReply {...props} />;
+  }
 }

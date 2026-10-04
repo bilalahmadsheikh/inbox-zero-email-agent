@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "5.7",
+    date: "2026-10-04",
+    notes: [
+      "A reply-all that is held back as a draft now keeps everyone it was meant for. Drafts only reply to the sender, so when an automatic reply-all was not confident enough to send and became a draft instead, everyone else on the original email was quietly left off - send it as it was and they would never see your answer. The draft now copies them in, the same people the reply-all would have reached, alongside anyone your rule already copies.",
+      "Setting up your rules no longer sends email to anyone. Setup runs your rules over your most recent emails so your inbox is organised straight away, and any rule that replies, forwards or sends would fire on those too - mail that may be days old and already answered. Setup now only labels and archives. Your rules behave exactly as before on mail that arrives after setup.",
+    ],
+  },
+  {
     version: "5.6",
     date: "2026-09-28",
     notes: [

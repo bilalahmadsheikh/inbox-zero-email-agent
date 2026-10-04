@@ -115,6 +115,7 @@ export async function runRules({
   modelType,
   logger,
   skipArchive,
+  skipSendingActions,
 }: {
   provider: EmailProvider;
   message: ParsedMessage;
@@ -124,6 +125,10 @@ export async function runRules({
   modelType: ModelType;
   logger: Logger;
   skipArchive?: boolean;
+  // Set for passes over existing mail rather than newly arrived mail. Those
+  // emails may be days old and already dealt with, so nothing may leave the
+  // account because of them; labelling and archiving still apply.
+  skipSendingActions?: boolean;
 }): Promise<RunRulesResult[]> {
   const batchTimestamp = new Date(); // Single timestamp for this batch execution
   const { regularRules, conversationRules } = prepareRulesWithMetaRule(rules);
@@ -299,7 +304,10 @@ export async function runRules({
     }
 
     const executedRule = await executeMatchedRule(
-      ruleToExecute,
+      // Stripped before any AI runs, not filtered afterwards: no reply is
+      // written for a send that will not happen, and an AI reply cannot
+      // survive as a draft on some old emails while vanishing on others.
+      skipSendingActions ? withoutSendingActions(ruleToExecute) : ruleToExecute,
       message,
       emailAccount,
       provider,
@@ -1069,4 +1077,24 @@ function collectMessagingChannelsFromOtherRules<
   }
 
   return actions;
+}
+
+// Every action that causes an email to leave the account to someone other
+// than the user. Broader than the low-trust From list in static-from-risk.ts,
+// which guards a different risk and deliberately leaves some of these out.
+const SENDING_ACTION_TYPES = new Set<ActionType>([
+  ActionType.REPLY,
+  ActionType.SEND_EMAIL,
+  ActionType.FORWARD,
+  ActionType.SEND_SCHEDULED,
+  ActionType.NOTIFY_SENDER,
+]);
+
+function withoutSendingActions<T extends RuleWithActions>(rule: T): T {
+  return {
+    ...rule,
+    actions: rule.actions.filter(
+      (action) => !SENDING_ACTION_TYPES.has(action.type),
+    ),
+  };
 }

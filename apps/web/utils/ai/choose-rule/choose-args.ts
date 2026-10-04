@@ -32,6 +32,11 @@ import {
   hasUserRepliedSince,
 } from "@/utils/reply-tracker/auto-reply-guard";
 import { internalDateToDate } from "@/utils/date";
+import {
+  buildReplyAllRecipients,
+  formatCcList,
+  mergeAndDedupeRecipients,
+} from "@/utils/email/reply-all";
 
 const MODULE = "choose-args";
 
@@ -522,9 +527,48 @@ async function guardAiWrittenReplies({
 
   return actions.map((action) =>
     action.type === ActionType.REPLY && aiReplyActionIds.has(action.id)
-      ? // Drafts cannot be delayed, and a held-back reply should be visible now.
-        { ...action, type: ActionType.DRAFT_EMAIL, delayInMinutes: null }
+      ? {
+          ...action,
+          type: ActionType.DRAFT_EMAIL,
+          // Drafts cannot be delayed, and a held-back reply should be visible
+          // now.
+          delayInMinutes: null,
+          cc: getHeldReplyCc({
+            action,
+            message,
+            userEmail: emailAccount.email,
+          }),
+        }
       : action,
+  );
+}
+
+// A draft has no reply-all option and addresses only the sender, so a
+// reply-all held back as a draft would silently drop everyone else on the
+// thread. Resolve those people now, with the same helpers both providers use
+// when sending a reply-all, so the draft addresses exactly who the reply would
+// have reached.
+function getHeldReplyCc({
+  action,
+  message,
+  userEmail,
+}: {
+  action: ActionWithDraftAttribution;
+  message: ParsedMessage;
+  userEmail: string;
+}) {
+  if (!action.replyAll) return action.cc;
+
+  const replyAllCc = buildReplyAllRecipients(
+    message.headers,
+    undefined,
+    userEmail,
+  ).cc;
+
+  return (
+    formatCcList(
+      mergeAndDedupeRecipients(replyAllCc, action.cc ?? undefined),
+    ) ?? null
   );
 }
 

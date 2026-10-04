@@ -595,6 +595,9 @@ export const createRulesOnboardingAction = actionClient
           provider,
           maxEmails: ONBOARDING_PROCESS_EMAILS_COUNT,
           skipArchive: true,
+          // These are the user's most recent existing emails, not new mail;
+          // they may be days old and already answered.
+          skipSendingActions: true,
           logger,
         }),
       );

@@ -10,12 +10,14 @@ export async function bulkProcessInboxEmails({
   provider,
   maxEmails,
   skipArchive,
+  skipSendingActions = false,
   logger: log,
 }: {
   emailAccount: EmailAccountForDrafting;
   provider: string;
   maxEmails: number;
   skipArchive: boolean;
+  skipSendingActions?: boolean;
   logger: Logger;
 }) {
   const logger = log.with({ module: "bulk-process-emails" });
@@ -74,6 +76,7 @@ export async function bulkProcessInboxEmails({
           modelType: "economy",
           logger,
           skipArchive,
+          skipSendingActions,
         });
         processedCount++;
       } catch (error) {

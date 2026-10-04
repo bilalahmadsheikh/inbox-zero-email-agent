@@ -809,6 +809,51 @@ describe("runRules outbound guardrails", () => {
       "email- or domain-based From condition",
     );
   });
+
+  describe("passes over existing mail", () => {
+    const mixedRule = createRule("mixed-rule", null, [
+      getAction({ id: "label-1", type: ActionType.LABEL, label: "Clients" }),
+      getAction({ id: "reply-1", type: ActionType.REPLY, content: null }),
+      getAction({
+        id: "forward-1",
+        type: ActionType.FORWARD,
+        to: "accountant@example.com",
+      }),
+      getAction({ id: "notify-1", type: ActionType.NOTIFY_SENDER }),
+    ]);
+
+    beforeEach(() => {
+      vi.mocked(findMatchingRules).mockResolvedValue({
+        matches: [
+          { rule: mixedRule, matchReasons: [{ type: ConditionType.STATIC }] },
+        ],
+        reasoning: "Matched mixed rule",
+      } as any);
+      vi.mocked(getActionItemsWithAiArgs).mockResolvedValue([]);
+      mockExecutedRuleCreate({ id: "exec-mixed-1", rule: mixedRule });
+    });
+
+    it("never sends anything, but still organises the email", async () => {
+      await runRulesWithDefaults({
+        rules: [mixedRule],
+        skipSendingActions: true,
+      });
+
+      const { selectedRule } = vi.mocked(getActionItemsWithAiArgs).mock
+        .calls[0][0];
+      expect(selectedRule.actions.map((action) => action.type)).toEqual([
+        ActionType.LABEL,
+      ]);
+    });
+
+    it("leaves new mail's sending actions alone", async () => {
+      await runRulesWithDefaults({ rules: [mixedRule] });
+
+      const { selectedRule } = vi.mocked(getActionItemsWithAiArgs).mock
+        .calls[0][0];
+      expect(selectedRule.actions).toHaveLength(4);
+    });
+  });
 });
 
 describe("runRules selection metadata", () => {

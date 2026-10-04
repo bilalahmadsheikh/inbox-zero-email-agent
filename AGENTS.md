@@ -67,6 +67,7 @@ Consequences when writing code:
 
 Rules do not only run on new mail. The onboarding pass runs them over recent inbox history, bulk runs over a chosen range, and a webhook backlog after an outage delivers mail late. Any action that sends, forwards or replies must therefore decide what to do with an old message, not assume the message just arrived.
 
+- Any code that runs rules over existing mail rather than newly arrived mail must pass `skipSendingActions: true` to `runRules`. It strips every action that sends email to someone else before any AI runs; labelling and archiving still apply. The onboarding pass does this.
 - AI-written replies (a `REPLY` action with no fixed text) pass through `utils/reply-tracker/auto-reply-guard.ts` before they are sent. Anything the guard will not vouch for becomes a draft rather than disappearing. Add new send-side checks there, so the send-now path and the delayed executor cannot disagree.
 - Automation headers (`auto-submitted`, `precedence`, `list-id`) exist only on Gmail, whose parser passes every header through. Outlook builds headers from named Graph fields and has none of them. Never treat their absence as proof a message came from a person; rely on something provider-independent, such as the per-thread cap, for the actual guarantee.
 - A delayed action is executed later against a thread that may have changed. Re-check anything that could have gone stale during the delay rather than trusting the state at scheduling time.
